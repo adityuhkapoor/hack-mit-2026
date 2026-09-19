@@ -152,7 +152,7 @@ class PiSensors:
         if f is None:
             return None
         mean = float(np.asarray(f[::8, ::8], np.float32).mean()) / 255
-        return round(10 ** (1.2 + 2.6 * mean), 0)
+        return round(float(10 ** (1.2 + 2.6 * mean)), 0)
 
     def _db(self) -> float | None:
         try:
@@ -165,7 +165,8 @@ class PiSensors:
                         break
             rec = sd.rec(4000, samplerate=16000, channels=1, dtype="float32", device=device, blocking=True)
             rms = float(np.sqrt(np.mean(np.square(rec))))
-            return round(94 + 20 * np.log10(max(rms, 1e-6)), 1)     # dBFS → rough dBA
+            # float(): numpy scalars do not survive json.dumps, and these readings are posted as JSON
+            return round(float(94 + 20 * np.log10(max(rms, 1e-6))), 1)   # dBFS → rough dBA
         except Exception:
             return None
 

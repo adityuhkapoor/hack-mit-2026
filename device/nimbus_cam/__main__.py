@@ -16,7 +16,7 @@ import os
 import shlex
 import threading
 
-from . import secrets
+from . import keys
 from .app import CameraApp
 from .hw import Camera, MacSensors
 from .library import open_library
@@ -67,7 +67,7 @@ def main() -> None:
         sensors = BridgeSensors()
     app = CameraApp(sensors, camera, open_library(not args.local_library),
                     render_locally=not args.server_real)
-    print(f"[camera] library: {app.library.kind} · keys: {secrets.status()}")
+    print(f"[camera] library: {app.library.kind} · keys: {keys.status()}")
 
     if args.script:
         run_script(app, args.script)

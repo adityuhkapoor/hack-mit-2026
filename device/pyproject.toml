@@ -13,6 +13,7 @@ dependencies = [
     "elasticsearch>=8.15,<9",
     "fastembed>=0.4",
     "qrcode>=8.0",
+    "smbus2>=0.4",          # the thermal array behind the UNO Q, on the Pi rig
 ]
 
 [tool.uv.sources]

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import threading
 
-from . import agent, secrets
+from . import agent, keys
 from .tagger import REASONING
 from .app import CameraApp
 
@@ -36,7 +36,7 @@ class Voice:
 
         from .hw import PushToTalkAudio
 
-        key, aid = secrets.get("elevenlabs"), agent.agent_id()
+        key, aid = keys.get("elevenlabs"), agent.agent_id()
         if not key or not aid:
             raise RuntimeError("voice needs an ElevenLabs key and an agent: run `python -m nimbus_cam.agent`")
         self.app = app
@@ -76,7 +76,7 @@ def text_session(app: CameraApp) -> None:
 
     from openai import OpenAI
 
-    key = secrets.get("meta")
+    key = keys.get("meta")
     if not key:
         raise SystemExit("text mode needs the Meta Model API key (meta-model-api-key)")
     client = OpenAI(base_url=agent.BASE_URL, api_key=key)

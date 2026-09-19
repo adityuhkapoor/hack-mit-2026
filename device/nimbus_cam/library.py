@@ -242,8 +242,8 @@ def open_library(prefer_elastic: bool = True):
     """Elasticsearch when it answers, otherwise the local library (and say which)."""
     if prefer_elastic:
         try:
-            from . import secrets
-            return ElasticLibrary(api_key=secrets.get("elastic"))
+            from . import keys
+            return ElasticLibrary(api_key=keys.get("elastic"))
         except Exception as e:  # unreachable, auth, not installed
             print(f"[library] Elasticsearch unavailable ({type(e).__name__}); using the local library")
     return LocalLibrary()

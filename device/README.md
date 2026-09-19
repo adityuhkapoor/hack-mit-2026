@@ -72,3 +72,17 @@ Tests: `uv run pytest` (offline; no keys, models or network needed).
 
 Instagram needs a professional (business or creator) Instagram account and one token from the Meta app dashboard (Instagram API with Instagram Login). Check it with `uv run python -m nimbus_cam.instagram`. Token scope:
 `instagram_content_publish`. The card image is what gets posted.
+
+## On the Pi rig (Raspberry Pi 4 + Arduino UNO Q + C270)
+
+```bash
+rsync -a --exclude .venv --exclude .git ~/Developer/hackMIT/ raspi4:~/nimbus/     # from the Mac
+ssh raspi4 'cd ~/nimbus && python3 -m venv .venv && .venv/bin/pip install -e pipeline -e device'
+ssh raspi4 'sudo apt-get install -y libportaudio2'      # the webcam microphone
+ssh raspi4 'cd ~/nimbus/device && NIMBUS_SEG=human ../.venv/bin/python -m nimbus_cam --pi'
+```
+
+`--pi` reads the MLX90640 thermal array through the UNO Q on I2C 0x08 (temperature, and motion from the
+change between frames), the light level from the camera frame, and sound from the webcam microphone.
+Humidity, wind and cloud come from the local weather and are labelled "(web)" on the card.
+`NIMBUS_SEG=human` picks the light segmentation model, which the Pi can actually run.

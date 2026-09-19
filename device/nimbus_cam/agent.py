@@ -3,7 +3,7 @@ hands are the camera's own functions (client tools, executed on the device).
 
     uv run python -m nimbus_cam.agent            # create or update the agent (idempotent); prints its id
 
-The agent id is kept in ~/.nimbus/camera/agent.json. Keys come from the Keychain (secrets.py).
+The agent id is kept in ~/.nimbus/camera/agent.json. Keys come from the Keychain (keys.py).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ import sys
 
 import httpx
 
-from . import secrets
+from . import keys
 from .library import HOME
 from .tagger import BASE_URL, MODEL
 
@@ -140,7 +140,7 @@ def conversation_config(tool_ids: list[str], secret_id: str | None, use_muse: bo
 
 
 def setup(use_muse: bool = True) -> str:
-    key, meta_key = secrets.get("elevenlabs"), secrets.get("meta")
+    key, meta_key = keys.get("elevenlabs"), keys.get("meta")
     if not key:
         sys.exit("No ElevenLabs key: security add-generic-password -s elevenlabs-api-key -a $USER -w '<key>'")
     if use_muse and not meta_key:

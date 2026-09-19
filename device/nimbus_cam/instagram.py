@@ -14,7 +14,7 @@ import time
 
 import httpx
 
-from . import secrets
+from . import keys
 
 GRAPH = "https://graph.instagram.com/v21.0"
 
@@ -24,7 +24,7 @@ class NotConfigured(RuntimeError):
 
 
 def _token() -> str:
-    token = secrets.get("ig_token")
+    token = keys.get("ig_token")
     if not token:
         raise NotConfigured("Instagram is not set up on this camera (Keychain ig-token)")
     return token
@@ -39,7 +39,7 @@ def account(c: httpx.Client, token: str) -> dict:
 def post(image_url: str, caption: str) -> str:
     token = _token()
     with httpx.Client(timeout=60) as c:
-        user = secrets.get("ig_user") or account(c, token)["user_id"]
+        user = keys.get("ig_user") or account(c, token)["user_id"]
         media = c.post(f"{GRAPH}/{user}/media", params={"image_url": image_url, "caption": caption,
                                                         "access_token": token})
         media.raise_for_status()

@@ -17,7 +17,7 @@ from PIL import Image
 
 from nimbus import sense
 
-from . import secrets
+from . import keys
 
 BASE_URL = os.environ.get("NIMBUS_META_URL", "https://api.meta.ai/v1")
 MODEL = os.environ.get("NIMBUS_META_MODEL", "muse-spark-1.3")
@@ -38,7 +38,7 @@ Reply with JSON only, no prose:
 
 
 def _client():
-    key = secrets.get("meta")
+    key = keys.get("meta")
     if not key:
         return None
     from openai import OpenAI
