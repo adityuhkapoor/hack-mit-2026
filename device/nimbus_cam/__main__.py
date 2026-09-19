@@ -27,6 +27,9 @@ def run_script(app: CameraApp, script: str) -> None:
     for step in filter(None, (s.strip() for s in script.split(";"))):
         name, *args = shlex.split(step)
         if name in ("fog", "heat", "clear"):
+            if not hasattr(app.sensors, "fog"):
+                print("> (real sensors: nothing to fake)")
+                continue
             app.sensors.fog(name == "fog")
             app.sensors.heat(name == "heat")
             print(f"> air: {name}")
@@ -42,7 +45,8 @@ def run_script(app: CameraApp, script: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="nimbus_cam")
-    ap.add_argument("--mac", action="store_true", help="simulated sensors (otherwise the UNO Q Bridge)")
+    ap.add_argument("--mac", action="store_true", help="simulated sensors")
+    ap.add_argument("--pi", action="store_true", help="the Pi rig: thermal over I2C, webcam, webcam mic")
     ap.add_argument("--image", help="use a still instead of the camera")
     ap.add_argument("--camera", type=int, default=int(os.environ.get("NIMBUS_CAMERA", "0")))
     ap.add_argument("--local-library", action="store_true", help="skip Elasticsearch")
@@ -52,12 +56,16 @@ def main() -> None:
     ap.add_argument("--no-voice", action="store_true")
     args = ap.parse_args()
 
-    if args.mac:
+    camera = Camera(args.camera, args.image)
+    if args.pi:
+        from .hw import PiSensors
+        sensors = PiSensors(camera)
+    elif args.mac:
         sensors = MacSensors()
     else:
         from .hw import BridgeSensors
         sensors = BridgeSensors()
-    app = CameraApp(sensors, Camera(args.camera, args.image), open_library(not args.local_library),
+    app = CameraApp(sensors, camera, open_library(not args.local_library),
                     render_locally=not args.server_real)
     print(f"[camera] library: {app.library.kind} · keys: {secrets.status()}")
 

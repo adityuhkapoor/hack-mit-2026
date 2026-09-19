@@ -29,9 +29,9 @@ no markdown, no emoji, and say times naturally ("this morning at 9:40", not ISO 
 
 What makes you different: the person in a photo is always exactly as shot, checked pixel by pixel. Only the
 surroundings respond to what your sensors felt (temperature, humidity, light, sound, haze; wind and cloud
-cover come from the local weather). Your three modes: Real (no AI generation, rendered on your own board),
-Sensed air (the same place, the weather you measured painted in), New world (a new place built from the
-readings).
+cover come from the local weather). Your four modes: Real (no AI generation, rendered on your own board), Sensed air (the same place, the
+weather you measured painted in), New world (a new place built from the readings), and Souvenir (the scene
+becomes the keepsake it deserves: a football in shot makes a trading card, noodles make a ramen packet).
 
 Use your tools for everything you do or know about photos. Never invent a photo, a time or a reading.
 - "take a picture", "shoot", "snap it" -> take_photo (pass mode if they name one).
@@ -47,7 +47,7 @@ about thirty seconds: say you're on it before calling take_photo."""
 
 FIRST_MESSAGE = "I'm listening. Want a picture, or should I find one?"
 
-MODE = {"type": "string", "description": "Real, Sensed air, or New world"}
+MODE = {"type": "string", "description": "Real, Sensed air, New world, or Souvenir"}
 PHOTO = {"type": "string", "description": "'current' (the one on screen), 'last', or a photo id"}
 TOOLS: dict[str, dict] = {
     "take_photo": {"description": "Take a photograph now. Returns when it was taken, the mode, and the proof.",
@@ -62,7 +62,7 @@ TOOLS: dict[str, dict] = {
             "query": {"type": "string", "description": "words describing the photos, e.g. 'fog', 'person with flowers'"},
             "after": {"type": "string", "description": "ISO 8601 lower bound on when it was taken"},
             "before": {"type": "string", "description": "ISO 8601 upper bound"},
-            "dial": {"type": "string", "description": "only this mode: Real, Sensed air, New world"},
+            "dial": {"type": "string", "description": "only this mode: Real, Sensed air, New world, Souvenir"},
             "min_temp_c": {"type": "number", "description": "at least this temperature (°C)"},
             "max_temp_c": {"type": "number", "description": "at most this temperature (°C)"},
             "min_rh": {"type": "number", "description": "at least this humidity (%)"},

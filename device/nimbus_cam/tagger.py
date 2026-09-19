@@ -108,3 +108,42 @@ def tag(jpeg: bytes, readings: dict, dial_name: str) -> tuple[dict, str]:
         return fallback, "readings"
     out["tags"] = list(dict.fromkeys(out["tags"] + fallback["tags"]))   # keep the measured air searchable
     return out, "muse"
+
+
+SOUVENIR_PROMPT = """Look at this photograph. It is about to become a physical keepsake: the person or main
+subject stays exactly as photographed, and everything around them is reprinted as that keepsake's artwork.
+Choose what it should be from the scene: a football in shot -> a sports trading card; a bowl of noodles ->
+a ramen packet; a concert -> a ticket stub; a landmark -> a postcard; flowers -> a seed packet. Other kinds
+are fine if the scene calls for one.
+Reply with JSON only:
+{"kind": "<trading card | ramen packet | ticket stub | postcard | seed packet | magazine cover | stamp | ...>",
+ "subject": "<what it celebrates, a few words: 'a football', 'a bowl of ramen'>",
+ "title": "<2-4 words, big on the front, like a team or brand name>",
+ "subtitle": "<a short line under it, playful>",
+ "palette": ["#111827", "#d8b24a"]}"""
+
+
+def souvenir(jpeg: bytes) -> dict:
+    """What keepsake this scene should become (dial 3). Falls back to a plain card if Muse is unavailable."""
+    fallback = {"kind": "trading card", "subject": "this moment", "title": "THE MOMENT", "subtitle": "",
+                "palette": ["#141418", "#d8b24a"]}
+    client = _client()
+    if client is None:
+        return fallback
+    try:
+        r = client.chat.completions.create(model=MODEL, max_tokens=800, reasoning_effort=REASONING,
+                                           messages=[{"role": "user", "content": [
+                                               {"type": "text", "text": SOUVENIR_PROMPT},
+                                               {"type": "image_url", "image_url": {"url": _data_url(jpeg)}}]}])
+        import json as _json
+        import re as _re
+        m = _re.search(r"\{.*\}", r.choices[0].message.content or "", _re.S)
+        d = _json.loads(m.group(0))
+    except Exception as e:
+        print(f"[souvenir] Muse unavailable ({type(e).__name__}); plain card")
+        return fallback
+    pal = [p for p in (d.get("palette") or []) if isinstance(p, str) and p.startswith("#")][:2]
+    return {"kind": str(d.get("kind") or fallback["kind"])[:40],
+            "subject": str(d.get("subject") or fallback["subject"])[:60],
+            "title": str(d.get("title") or "")[:28], "subtitle": str(d.get("subtitle") or "")[:60],
+            "palette": pal or fallback["palette"]}

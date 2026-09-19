@@ -74,6 +74,119 @@ class MacSensors:
         pass
 
 
+class PiSensors:
+    """The rig: a Raspberry Pi with an MLX90640 thermal array behind an Arduino UNO Q (I2C 0x08), the
+    webcam, and its microphone. The mapping the sketches call for:
+
+        thermal array  → temperature (hue) and motion (blur), from the frame and its change
+        camera frame   → light level (grain)
+        webcam mic     → sound level (saturation)
+        local weather  → humidity (diffusion), wind, cloud — no sensor for those on this rig
+
+    The thermal frame arrives in 12 I2C chunks and takes ~0.4 s, so a background thread keeps the newest
+    one and `readings()` never blocks the shutter.
+    """
+
+    ADDR, BUS, CMD_CHUNK, CHUNK, CHUNKS, PIXELS = 0x08, 1, 0x02, 256, 12, 768
+    MOTION_FULL = 1.2      # mean absolute change (°C) between frames that counts as "moving fast"
+
+    def __init__(self, camera=None, mic: str | None = "C270"):
+        self.camera, self.mic = camera, mic
+        self.temp_c: float | None = None
+        self.motion: float = 0.0
+        self._prev = None
+        self._stop = threading.Event()
+        threading.Thread(target=self._thermal_loop, daemon=True).start()
+
+    # -- thermal ------------------------------------------------------------------------------
+
+    def _read_frame(self, bus) -> list[float] | None:
+        import struct
+
+        from smbus2 import i2c_msg
+        raw = b""
+        for idx in range(self.CHUNKS):
+            bus.i2c_rdwr(i2c_msg.write(self.ADDR, bytes([self.CMD_CHUNK, idx])))
+            time.sleep(0.01)
+            read = i2c_msg.read(self.ADDR, self.CHUNK)
+            bus.i2c_rdwr(read)
+            raw += bytes(read)
+        if len(raw) != self.PIXELS * 4:
+            return None
+        return list(struct.unpack(f"<{self.PIXELS}f", raw))
+
+    def _thermal_loop(self) -> None:
+        from smbus2 import SMBus
+        while not self._stop.is_set():
+            try:
+                with SMBus(self.BUS) as bus:
+                    while not self._stop.is_set():
+                        f = self._read_frame(bus)
+                        if f:
+                            self._update(f)
+                        time.sleep(0.1)
+            except OSError as e:          # the Arduino was unplugged or is busy; keep trying
+                print(f"[thermal] {e}; retrying")
+                time.sleep(2)
+
+    def _update(self, frame: list[float]) -> None:
+        good = [v for v in frame if v == v]
+        if not good:
+            return
+        self.temp_c = round(sum(good) / len(good), 1)
+        if self._prev:
+            pairs = [(a, b) for a, b in zip(frame, self._prev) if a == a and b == b]
+            delta = sum(abs(a - b) for a, b in pairs) / max(len(pairs), 1)
+            moved = min(1.0, delta / self.MOTION_FULL)
+            self.motion = round(max(moved, self.motion * 0.6), 2)   # decays over a few frames
+        self._prev = frame
+
+    # -- camera and microphone ------------------------------------------------------------------
+
+    def _lux(self) -> float | None:
+        """A stop-accurate guess from the picture itself: mid-grey under office light is ~300 lux.
+        Replace with a real light sensor (APDS-9930) when one is fitted."""
+        if self.camera is None:
+            return None
+        f = self.camera.frame()
+        if f is None:
+            return None
+        mean = float(np.asarray(f[::8, ::8], np.float32).mean()) / 255
+        return round(10 ** (1.2 + 2.6 * mean), 0)
+
+    def _db(self) -> float | None:
+        try:
+            import sounddevice as sd
+            device = None
+            if self.mic:
+                for i, d in enumerate(sd.query_devices()):
+                    if self.mic.lower() in d["name"].lower() and d["max_input_channels"] > 0:
+                        device = i
+                        break
+            rec = sd.rec(4000, samplerate=16000, channels=1, dtype="float32", device=device, blocking=True)
+            rms = float(np.sqrt(np.mean(np.square(rec))))
+            return round(94 + 20 * np.log10(max(rms, 1e-6)), 1)     # dBFS → rough dBA
+        except Exception:
+            return None
+
+    def readings(self) -> dict:
+        out: dict[str, float] = {}
+        if self.temp_c is not None:
+            out["temp_c"] = self.temp_c
+            out["motion"] = self.motion
+        if (lux := self._lux()) is not None:
+            out["lux"] = lux
+        if (db := self._db()) is not None:
+            out["db"] = db
+        return out
+
+    def status(self, s: int) -> None:
+        pass
+
+    def close(self) -> None:
+        self._stop.set()
+
+
 class Camera:
     def __init__(self, index: int = 0, still: str | None = None):
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None

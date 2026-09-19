@@ -41,6 +41,24 @@ FOG_HIDES_DETAIL = 0.75          # …less of it as humidity rises: fog is exact
 
 
 @dataclass
+class Souvenir:
+    """What the scene should become on dial 3, as named by Muse Spark (nimbus_cam.tagger.souvenir)."""
+    kind: str = "trading card"          # e.g. trading card, ramen packet, ticket stub
+    subject: str = "this moment"        # what it celebrates: "a football", "a bowl of ramen"
+    title: str = ""                     # big line on the frame
+    subtitle: str = ""
+    palette: list[str] = field(default_factory=lambda: ["#141418", "#d8b24a"])
+
+    @classmethod
+    def from_dict(cls, d: dict | None) -> "Souvenir":
+        d = d or {}
+        pal = [p for p in (d.get("palette") or []) if isinstance(p, str)][:2]
+        return cls(kind=str(d.get("kind") or "trading card"), subject=str(d.get("subject") or "this moment"),
+                   title=str(d.get("title") or ""), subtitle=str(d.get("subtitle") or ""),
+                   palette=pal or ["#141418", "#d8b24a"])
+
+
+@dataclass
 class Capture:
     image: np.ndarray            # the finished photograph, full resolution
     as_shot: np.ndarray          # white-balanced input: what "unaltered" is measured against
@@ -53,12 +71,13 @@ class Capture:
     fallback_reason: str | None = None
     timings: dict[str, float] = field(default_factory=dict)
     taken_at: datetime = field(default_factory=datetime.now)
+    souvenir: Souvenir | None = None
     web: set[str] = field(default_factory=set)   # readings that came from the weather service, not a sensor
 
 
 def with_web_weather(r: sense.Readings) -> tuple[sense.Readings, set[str]]:
     """Fill wind and cloud cover from the local weather when no sensor supplied them."""
-    missing = [k for k in ("wind", "cloud") if getattr(r, k) is None]
+    missing = [k for k in ("wind", "cloud", "rh", "temp_c") if getattr(r, k) is None]
     if not missing:
         return r, set()
     got = weather.current()
@@ -74,11 +93,12 @@ def air_denoise(r: sense.Readings) -> float:
 
 
 def _ai_surroundings(src: np.ndarray, mask: np.ndarray, r: sense.Readings, dial: int, comfy: Comfy,
-                     seed: int) -> tuple[np.ndarray, str]:
+                     seed: int, souvenir: Souvenir | None = None) -> tuple[np.ndarray, str]:
     h, w = src.shape[:2]
     work = imageio.fit_within(src, AI_WORK_LONG)
     bg = 1 - subject.hard(cv2.resize(mask, (work.shape[1], work.shape[0])))
-    prompt = sense.scene_prompt(r, dial)
+    sv = souvenir or Souvenir()
+    prompt = sense.souvenir_prompt(sv.kind, sv.subject, r) if dial == 3 else sense.scene_prompt(r, dial)
     names = [comfy.upload(work), comfy.upload(np.repeat(bg[..., None], 3, -1))]
     s = min(1.0, AI_OUT_LONG / max(h, w))
     gen = comfy.run(klein_inpaint(prompt, names[0], names[1], [], denoise=air_denoise(r) if dial == 1 else 1.0, seed=seed,
@@ -94,7 +114,8 @@ def _ai_surroundings(src: np.ndarray, mask: np.ndarray, r: sense.Readings, dial:
 
 
 def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comfy | None = None,
-         seed: int = 1, mask: np.ndarray | None = None, web: set[str] | None = None) -> Capture:
+         seed: int = 1, mask: np.ndarray | None = None, web: set[str] | None = None,
+         souvenir: Souvenir | None = None) -> Capture:
     """`web` names the readings that came from weather.py rather than a sensor (for the card)."""
     if dial not in sense.DIAL_NAMES:
         raise ValueError(f"dial must be one of {sorted(sense.DIAL_NAMES)}")
@@ -114,7 +135,7 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
         else:
             t = time.perf_counter()
             try:
-                surroundings, prompt = _ai_surroundings(as_shot, mask, readings, dial, comfy, seed)
+                surroundings, prompt = _ai_surroundings(as_shot, mask, readings, dial, comfy, seed, souvenir)
                 dial_used = dial
             except ComfyError as e:
                 fallback = str(e)[:300]
@@ -130,10 +151,15 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
     styled = sense.apply_effects(plate, params, seed)
     out = subject.composite(as_shot, styled, mask)
     proof = subject.verify(as_shot, out, mask)
+    if dial_used == 3:
+        # The frame is packaging around the finished photograph: the proof is measured before it goes on.
+        sv = souvenir or Souvenir()
+        air = readings.strip(set(web or ()))
+        out = effects.souvenir_frame(out, sv.kind, sv.title or sv.subject, sv.subtitle, air, sv.palette)
     timings["surroundings"] = round(time.perf_counter() - t, 3)
     timings["total"] = round(time.perf_counter() - t0, 3)
     return Capture(out, as_shot, mask, proof, readings, dial, dial_used, prompt, fallback, timings,
-                   web=set(web or ()))
+                   souvenir=souvenir if dial_used == 3 else None, web=set(web or ()))
 
 
 # ---------------------------------------------------------------------------------------------

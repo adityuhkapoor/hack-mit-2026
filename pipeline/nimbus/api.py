@@ -538,8 +538,12 @@ def paint(brush_id: str, photo: UploadFile = File(...), mask: UploadFile = File(
 
 @app.post("/capture", response_model=capture.CaptureMeta)
 def take_capture(request: Request, photo: UploadFile = File(...), readings: str = Form("{}"),
-                 dial: int = Form(0), seed: int = Form(1)):
-    """Photo + sensor readings JSON + dial (0 real, 1 sensed air, 2 new world) → stored capture.
+                 dial: int = Form(0), seed: int = Form(1), souvenir: str = Form("{}")):
+    """Photo + sensor readings JSON + dial → stored capture.
+
+    dial: 0 real, 1 sensed air, 2 new world, 3 souvenir. On dial 3, `souvenir` is JSON naming what the
+    scene should become: {"kind": "ramen packet", "subject": "a bowl of noodles", "title": …,
+    "subtitle": …, "palette": ["#111", "#d8b24a"]}; the camera gets it from Muse Spark.
 
     readings: {"temp_c", "rh", "lux", "cct", "wind", "db"}, any subset. Dial 1–2 fall back to 0
     with `fallback_reason` when the GPU box is unavailable, so the shutter always produces a card.
@@ -549,6 +553,7 @@ def take_capture(request: Request, photo: UploadFile = File(...), readings: str 
         raise HTTPException(400, f"dial must be one of {sorted(sense.DIAL_NAMES)}")
     try:
         r = sense.Readings.from_dict(json.loads(readings or "{}"))
+        sv = capture.Souvenir.from_dict(json.loads(souvenir or "{}"))
     except (ValueError, TypeError) as e:
         raise HTTPException(400, f"bad readings: {e}") from e
     if dial > 0:
@@ -558,11 +563,11 @@ def take_capture(request: Request, photo: UploadFile = File(...), readings: str 
     comfy = backends.pick() if dial > 0 else None
     if comfy is not None:
         with _gpu_lock:
-            cap = capture.take(img, r, dial, comfy, seed=seed, web=web)
+            cap = capture.take(img, r, dial, comfy, seed=seed, web=web, souvenir=sv)
         if cap.fallback_reason:
             backends.invalidate()
     else:
-        cap = capture.take(img, r, dial, None, seed=seed, web=web)
+        cap = capture.take(img, r, dial, None, seed=seed, web=web, souvenir=sv)
         if dial > 0:
             cap.fallback_reason = "; ".join(f"{b.url}: {b.reason}" for b in backends.status())[:300]
     cid = captures.new_id()

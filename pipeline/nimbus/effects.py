@@ -314,3 +314,54 @@ def field_card(img: np.ndarray, title: str, lines: list[str], qr_url: str | None
             (qr_side, qr_side), Image.NEAREST)
         paper.paste(code, (width - margin - qr_side, margin + ph + margin // 2))
     return np.asarray(paper, np.float32) / 255
+
+
+def _hex(colour: str, fallback=(20, 20, 24)) -> tuple:
+    try:
+        c = colour.lstrip("#")
+        return tuple(int(c[i : i + 2], 16) for i in (0, 2, 4))
+    except (ValueError, IndexError):
+        return fallback
+
+
+def souvenir_frame(img: np.ndarray, kind: str, title: str, subtitle: str = "", footer: str = "",
+                   palette: list[str] | None = None) -> np.ndarray:
+    """Dial 3: mount the picture as the keepsake it became — a card border, a title, a line of small print.
+
+    The photograph is untouched inside the frame; this only adds the packaging around and over it.
+    """
+    h, w = img.shape[:2]
+    ink, accent = (_hex(p) for p in ((palette or ["#141418", "#d8b24a"]) + ["#141418", "#d8b24a"])[:2])
+    # Muse picks the palette, so the card can come back cream or near-black: pick text that reads on it.
+    dark_card = (0.299 * ink[0] + 0.587 * ink[1] + 0.114 * ink[2]) < 140
+    body = (240, 240, 240) if dark_card else (30, 30, 34)
+    quiet = (170, 170, 175) if dark_card else (95, 95, 100)
+    if abs(sum(accent) - sum(ink)) < 90:          # accent too close to the card to read
+        accent = body
+    border = max(8, int(min(h, w) * 0.035))
+    band = int(min(h, w) * 0.16)
+    card = Image.new("RGB", (w + 2 * border, h + 2 * border + band), ink)
+    card.paste(to_pil_local(img), (border, border))
+    d = ImageDraw.Draw(card)
+    d.rectangle([border - 3, border - 3, border + w + 2, border + h + 2], outline=accent, width=3)
+
+    def font(size):
+        try:
+            return ImageFont.load_default(size=size)
+        except TypeError:
+            return ImageFont.load_default()
+
+    y = border + h + int(band * 0.12)
+    d.text((border, y), title.upper()[:28], font=font(int(band * 0.42)), fill=accent)
+    if subtitle:
+        d.text((border, y + int(band * 0.46)), subtitle[:60], font=font(int(band * 0.22)), fill=body)
+    if footer:
+        d.text((border, y + int(band * 0.74)), footer[:80], font=font(int(band * 0.17)), fill=quiet)
+    tag = kind.upper()[:18]
+    tw = d.textbbox((0, 0), tag, font=font(int(band * 0.17)))[2]
+    d.text((card.width - border - tw, border + int(band * 0.06)), tag, font=font(int(band * 0.17)), fill=accent)
+    return np.asarray(card, np.float32) / 255
+
+
+def to_pil_local(img: np.ndarray) -> Image.Image:
+    return Image.fromarray((np.clip(img, 0, 1) * 255 + 0.5).astype(np.uint8))

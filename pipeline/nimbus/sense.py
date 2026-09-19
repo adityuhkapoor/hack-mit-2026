@@ -3,7 +3,8 @@
 The subject is never touched (see subject.py). Everything here acts on the *surroundings*, and each
 sensor drives one photographic lever, named the way a photographer would name it:
 
-    temperature   → colour temperature   cold air renders blue, hot air amber
+    temperature   → hue                  cold air renders blue, hot air amber
+    motion        → blur                 a moving scene smears, the way a slow shutter sees it
     humidity      → diffusion            a Pro-Mist bloom, heavier as the air gets wetter
     light (lux)   → grain                dim scenes get high-ISO grain, bright ones stay clean
     wind          → distortion           the background bends and smears in the wind
@@ -17,6 +18,7 @@ The dial sets how much freedom the AI gets on top of that:
     0 real        procedural effects only; no generation
     1 sensed air  diffusion repaints the measured weather into the real background, same layout
     2 new world   diffusion replaces the background with a place invented from the readings
+    3 souvenir    the scene becomes the keepsake it deserves: a football card, a ramen packet, a ticket
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ import numpy as np
 from . import effects
 from .color import luminance
 
-DIAL_NAMES = {0: "Real", 1: "Sensed air", 2: "New world"}
+DIAL_NAMES = {0: "Real", 1: "Sensed air", 2: "New world", 3: "Souvenir"}
 
 # Ranges a hackathon floor and the street outside will actually produce; readings are clipped to them.
 RANGES = {
@@ -40,6 +42,7 @@ RANGES = {
     "wind": (0.0, 8.0),                              # m/s
     "db": (35.0, 90.0),
     "pm25": (0.0, 60.0),                             # µg/m³; Boston is ~5–12, wildfire smoke 50+
+    "motion": (0.0, 1.0),                            # 0 still … 1 the scene is moving fast
 }
 
 
@@ -52,6 +55,7 @@ class Readings:
     wind: float | None = None     # m/s
     db: float | None = None       # ambient sound level, dBA
     pm25: float | None = None     # particulates, µg/m³ (SEN54)
+    motion: float | None = None   # 0–1, how much the scene is moving (thermal or camera frame delta)
     pressure_hpa: float | None = None   # BME280; words only, the effects ignore it
     cloud: float | None = None    # % sky covered (web weather)
 
@@ -87,6 +91,9 @@ class Readings:
             parts.append(f"{self.db:.0f} dB")
         if self.pm25 is not None:
             parts.append(f"PM2.5 {self.pm25:.0f}")
+        if self.motion is not None:
+            parts.append("still" if self.motion < 0.15 else
+                         f"motion {self.motion:.0%}")
         if self.pressure_hpa is not None:
             parts.append(f"{self.pressure_hpa:.0f} hPa")
         if self.wind is not None:
@@ -104,6 +111,7 @@ class EffectParams:
     distortion: float = 0.0   # 0–1 bend and smear
     saturation: float = 1.0   # multiplier
     haze: float = 0.0         # 0–1 veil over the distance
+    blur: float = 0.0         # 0–1 motion blur
 
 
 def effect_params(r: Readings) -> EffectParams:
@@ -121,6 +129,8 @@ def effect_params(r: Readings) -> EffectParams:
         p.saturation = 0.55 + 0.95 * d  # 0.55 in a silent room … 1.5 at a loud party
     if (q := r.norm("pm25")) is not None:
         p.haze = q ** 0.8
+    if (m := r.norm("motion")) is not None:
+        p.blur = m ** 1.2          # a still scene stays sharp; blur arrives as things start moving
     return p
 
 
@@ -196,6 +206,20 @@ def haze(img: np.ndarray, amount: float) -> np.ndarray:
     return np.clip(saturate(out, 1 - 0.4 * amount), 0, 1).astype(np.float32)
 
 
+def motion_blur(img: np.ndarray, amount: float, angle: float = 0.0) -> np.ndarray:
+    """What a slow shutter does to a moving scene: a straight smear, longer the faster things move."""
+    if amount < 1e-3:
+        return img
+    length = max(3, int(max(img.shape[:2]) * 0.02 * amount)) | 1
+    kernel = np.zeros((length, length), np.float32)
+    kernel[length // 2, :] = 1.0 / length
+    if angle:
+        m = cv2.getRotationMatrix2D((length / 2 - 0.5, length / 2 - 0.5), angle, 1.0)
+        kernel = cv2.warpAffine(kernel, m, (length, length))
+        kernel /= kernel.sum() + 1e-6
+    return np.clip(cv2.filter2D(img, -1, kernel, borderType=cv2.BORDER_REFLECT), 0, 1)
+
+
 def saturate(img: np.ndarray, factor: float) -> np.ndarray:
     if abs(factor - 1) < 1e-3:
         return img
@@ -206,19 +230,21 @@ def saturate(img: np.ndarray, factor: float) -> np.ndarray:
 # On the AI dials the diffusion model has already painted the temperature, light and air, so the
 # procedural levers would double it. Grain is film, not weather, and stays at full strength.
 AI_EFFECT_SCALE = {"warmth": 0.3, "diffusion": 0.4, "distortion": 0.5, "saturation": 0.25, "grain": 1.0,
-                   "haze": 0.4}
+                   "haze": 0.4, "blur": 1.0}   # blur is the shutter, not the weather: full strength
 
 
 def scaled(p: EffectParams, scale: dict[str, float]) -> EffectParams:
     return EffectParams(warmth=p.warmth * scale["warmth"], diffusion=p.diffusion * scale["diffusion"],
                         grain=p.grain * scale["grain"], distortion=p.distortion * scale["distortion"],
-                        saturation=1 + (p.saturation - 1) * scale["saturation"], haze=p.haze * scale["haze"])
+                        saturation=1 + (p.saturation - 1) * scale["saturation"], haze=p.haze * scale["haze"],
+                        blur=p.blur * scale["blur"])
 
 
 def apply_effects(img: np.ndarray, p: EffectParams, seed: int = 0) -> np.ndarray:
     out = warm(img, p.warmth)
     out = saturate(out, p.saturation)
     out = wind_bend(out, p.distortion, seed)
+    out = motion_blur(out, p.blur)
     out = mist(out, p.diffusion)
     out = haze(out, p.haze)
     if p.grain > 1e-3:
@@ -262,11 +288,35 @@ def describe(r: Readings) -> str:
         # at night the sky reads as dark anyway, and "overcast" from the light level needs no repeat
         bits.append("a fully overcast sky" if r.cloud > 85 else
                     "scattered clouds" if r.cloud > 30 else "a clear, open sky")
+    if r.motion is not None and r.motion > 0.3:
+        bits.append("blurred with movement, everything in motion" if r.motion > 0.6 else "a scene in gentle movement")
     if r.db is not None:
         # Loudness sets the energy of colour and light, never people: "bustling" summoned crowds.
         bits.append("vivid, saturated, energetic colour and light" if r.db > 70 else
                     "calm, muted, still light" if r.db < 50 else "")
     return ", ".join(b for b in bits if b) or "the same conditions"
+
+
+# The keepsakes the camera knows how to make. Muse names one from the scene (see nimbus_cam.tagger);
+# anything it invents is passed through as-is, with these as the examples that keep it plausible.
+SOUVENIRS = {
+    "trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
+    "ramen packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
+    "ticket stub": "a printed ticket stub: perforated edge, guilloche pattern, ink-stamped date",
+    "postcard": "a vintage travel postcard: painted scenery, saturated skies, a soft printed grain",
+    "magazine cover": "a glossy magazine cover: studio backdrop, clean colour blocking",
+    "seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
+    "vinyl sleeve": "a record sleeve: graphic shapes, limited palette, print texture",
+    "stamp": "a postage stamp: engraved lines, perforated border, a flat single-colour field",
+}
+
+
+def souvenir_prompt(kind: str, subject: str, r: Readings) -> str:
+    """Dial 3: the surroundings become the artwork of a keepsake about whatever is in the picture."""
+    look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
+    return (f"Replace the masked surroundings with {look}, celebrating {subject}. Graphic, printed artwork "
+            "filling the whole background, bold and uncluttered behind the subject, leaving the centre clear. "
+            "No text, no lettering, no logos, no people.")
 
 
 def scene_prompt(r: Readings, dial: int) -> str:
