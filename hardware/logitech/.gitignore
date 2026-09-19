@@ -1,0 +1,7 @@
+.env
+.env.*
+!.env.example
+captures/
+__pycache__/
+.DS_Store
+*.log

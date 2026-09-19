@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="camera-token" content="__TOKEN__"><title>Camera Studio · HackMIT</title><link rel="stylesheet" href="/style.css"></head>
+<body>
+<header><a class="brand" href="/" aria-label="Camera Studio home"><span class="cube">◇</span> CAMERA STUDIO <small>HACKMIT / 2026</small></a><span id="connection" class="pill">Camera off</span></header>
+<main>
+<section class="intro"><div><p class="eyebrow">A MOMENT. A DIFFERENT DIMENSION.</p><h1>Reality, with a little <em>possibility.</em></h1><p>Capture what’s here. Make it something unexpected.</p></div><div class="intro-note">01 / LIVE STUDIO<br><span>Built for your physical AI camera</span></div></section>
+<div class="workspace">
+<section class="camera-panel">
+<div class="panel-head"><span class="eyebrow">VIEWFINDER</span><span id="device">Logitech C270 · 720p</span></div>
+<div class="viewfinder" id="viewfinder"><img id="preview" alt="Live Logitech camera preview" hidden><div id="placeholder"><div class="focus-icon">⌗</div><h2>Your next moment starts here.</h2><p>Connect to the Logitech to see a live preview.<br>Nothing is saved until you press capture.</p><button id="start" class="primary">Connect camera <span>↗</span></button></div><div class="reticle" aria-hidden="true"></div><div id="live" class="live" hidden><i></i> LIVE · LOCAL</div><div id="flash"></div></div>
+<div class="camera-controls"><div><button id="rotate" title="Rotate preview and capture 90 degrees">↻ Rotate</button><button id="mirror" aria-pressed="false">Mirror</button><button id="stop" disabled>Disconnect</button></div><button id="capture" class="shutter" disabled><span></span> Capture moment</button></div>
+<p id="cameraHint" class="hint">Preview is local. AI mode sends only your selected capture to OpenAI.</p>
+</section>
+<aside class="creative-panel"><p class="eyebrow">THE CREATIVE CONTROLS</p><h2>Choose your dimension.</h2><div class="modes" id="modes">
+<button data-mode="enhance" class="mode selected" aria-pressed="true"><span>✧</span><b>Clean light</b><small>Natural color & clarity</small></button>
+<button data-mode="noir" class="mode" aria-pressed="false"><span>◐</span><b>After hours</b><small>Cinematic monochrome</small></button>
+<button data-mode="dream" class="mode" aria-pressed="false"><span>✺</span><b>Daydream</b><small>Soft light & lilac glow</small></button>
+<button data-mode="sports" class="mode" aria-pressed="false"><span>✳</span><b>Moment MVP</b><small>Your collectible card</small></button>
+<button data-mode="food" class="mode" aria-pressed="false"><span>◒</span><b>Fresh take</b><small>A playful poster</small></button>
+<button data-mode="ai" class="mode" aria-pressed="false"><span>◇</span><b>Imagine</b><small>AI transformation</small></button></div>
+<div id="localControl"><label for="strength">Effect strength <output id="strengthValue">80%</output></label><input id="strength" type="range" min="0" max="100" value="80"><p class="hint">Local processing · no API required</p></div>
+<div id="aiControl" hidden><label for="prompt">What should your camera create?</label><textarea id="prompt" maxlength="2000" placeholder="Turn this scene into a miniature paper world, preserving the main subject."></textarea><p class="hint" id="aiHint">Checking OpenAI connection…</p></div>
+<button id="render" class="primary full" disabled>Develop this moment <span>✧</span></button>
+<div class="voice-row"><label><input type="checkbox" id="voice"> Spoken feedback</label><span id="voiceProvider">Device voice</span></div>
+<p class="hint">ElevenLabs when configured; device voice otherwise. No microphone recording.</p>
+</aside></div>
+<div id="notice" role="status" aria-live="polite">Ready when you are.</div>
+<section class="result-section" id="resultSection" hidden><div class="section-heading"><div><p class="eyebrow">YOUR LATEST MOMENT</p><h2>See what changed.</h2></div><a id="download" class="download" download="camera-moment.jpg">Save result ↓</a></div><div class="comparison"><figure><img id="original" alt="Original captured photo"><figcaption>ORIGINAL</figcaption></figure><figure><img id="result" alt="Processed captured photo"><figcaption id="resultLabel">READY TO DEVELOP</figcaption></figure></div><p id="resultMeta" class="hint"></p><button id="speak" disabled>Hear feedback ▷</button></section>
+<section class="bottom-grid"><div><p class="eyebrow">PHYSICAL WORLD</p><h2>A place for every sense.</h2><div class="sensor-grid"><div><span>LIGHT</span><b id="lightValue">—</b></div><div><span>TEMPERATURE</span><b id="tempValue">—</b></div><div><span>SOUND</span><b id="soundValue">—</b></div><div><span>ARDUINO</span><b id="arduinoValue">Not connected</b></div></div><p class="hint" id="sensorHint">No sensor measurements yet. Capture works independently.</p></div><div><p class="eyebrow">LOCAL COLLECTION</p><h2>Moments you’ve made.</h2><div id="gallery" class="gallery"><p class="hint">Your saved captures will appear here.</p></div></div></section>
+</main><footer>CAMERA STUDIO <span>Capture → transform → experience.</span><span>Local prototype · no automatic sharing</span></footer><script src="/app.js"></script></body></html>
