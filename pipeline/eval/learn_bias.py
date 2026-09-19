@@ -1,4 +1,4 @@
-"""Learn each neutralizer's systematic bias and ship it as a LUT in lookcam/data/.
+"""Learn each neutralizer's systematic bias and ship it as a LUT in nimbus/data/.
 
 A neutralizer run on an already-neutral photo should change nothing. Whatever it does change is
 its bias (klein makes everything punchier; auto-levels stretches every histogram). Fitting
@@ -19,11 +19,11 @@ import numpy as np
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 
-from lookcam import grade, imageio  # noqa: E402
-from lookcam.comfy import Comfy  # noqa: E402
-from lookcam.look import DATA_DIR  # noqa: E402
-from lookcam.neutralize import neutralize  # noqa: E402
-from lookcam.restyle import neutralize_diffusion  # noqa: E402
+from nimbus import grade, imageio  # noqa: E402
+from nimbus.comfy import Comfy  # noqa: E402
+from nimbus.look import DATA_DIR  # noqa: E402
+from nimbus.neutralize import neutralize  # noqa: E402
+from nimbus.restyle import neutralize_diffusion  # noqa: E402
 
 SIDE = 512
 

@@ -1,5 +1,5 @@
 [project]
-name = "lookcam"
+name = "nimbus"
 version = "0.1.0"
 description = "Image-processing pipeline for the HackMIT look camera: steal a photo's look, paint with the world."
 requires-python = ">=3.12"
@@ -19,7 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-lookcam = "lookcam.cli:main"
+nimbus = "nimbus.cli:main"
 
 [dependency-groups]
 dev = [

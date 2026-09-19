@@ -1,6 +1,6 @@
 """HTTP API for the camera frontend. Contract: docs/API.md.
 
-    uv run uvicorn lookcam.api:app --host 0.0.0.0 --port 8000
+    uv run uvicorn nimbus.api:app --host 0.0.0.0 --port 8000
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from . import analyze, brush, capture, effects, grade, imageio, look, realtime, 
 from .backends import Backends
 from .comfy import ComfyError
 
-app = FastAPI(title="lookcam", version="0.1.0",
+app = FastAPI(title="Nimbus", version="0.1.0",
               description="Steal a photo's look; paint with the world. Image-processing pipeline for the HackMIT camera.")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
                    expose_headers=["X-Tier-Used", "X-Mode-Used", "X-Timings", "X-Alignment", "X-Fallback-Reason", "X-Style", "X-Capture-Id", "X-Dial-Used", "X-Proof"])
@@ -36,19 +36,19 @@ _preview_tables: dict[str, np.ndarray] = {}
 _gpu_lock = threading.Lock()  # one diffusion job at a time; the 8 GB card cannot overlap them
 
 # The card's QR opens this page with the capture id in the fragment.
-GALLERY_URL = os.environ.get("LOOKCAM_GALLERY_URL", "https://lookcam-akvaithis-projects.vercel.app/captures.html")
+GALLERY_URL = os.environ.get("NIMBUS_GALLERY_URL", "https://lookcam-akvaithis-projects.vercel.app/captures.html")
 # The QR carries this short form instead (/c/<id> redirects to the gallery): fewer modules, so each one
 # is big enough to scan off a thermal print.
-PUBLIC_URL = os.environ.get("LOOKCAM_PUBLIC_URL", "https://lookcam.akvaithi.page")
+PUBLIC_URL = os.environ.get("NIMBUS_PUBLIC_URL", "https://lookcam.akvaithi.page")
 
 SENSOR_MP = 12.0  # the camera's sensor; larger uploads are resized to what it would capture
 
 # This service is reachable from the public demo page, and every GPU request costs real seconds on a
 # single 8 GB card, so there is a ceiling on concurrent viewers and on heavy calls per address.
-MAX_LIVE_SESSIONS = int(os.environ.get("LOOKCAM_MAX_SESSIONS", "3"))
-GPU_CALLS_PER_MINUTE = int(os.environ.get("LOOKCAM_GPU_CALLS_PER_MIN", "20"))
-LOOKS_PER_MINUTE = int(os.environ.get("LOOKCAM_LOOKS_PER_MIN", "12"))
-MAX_STORED_LOOKS = int(os.environ.get("LOOKCAM_MAX_LOOKS", "300"))
+MAX_LIVE_SESSIONS = int(os.environ.get("NIMBUS_MAX_SESSIONS", "3"))
+GPU_CALLS_PER_MINUTE = int(os.environ.get("NIMBUS_GPU_CALLS_PER_MIN", "20"))
+LOOKS_PER_MINUTE = int(os.environ.get("NIMBUS_LOOKS_PER_MIN", "12"))
+MAX_STORED_LOOKS = int(os.environ.get("NIMBUS_MAX_LOOKS", "300"))
 _live_sessions = 0
 _calls: dict[str, list[float]] = {}
 
@@ -111,7 +111,7 @@ def _get_brush(brush_id: str) -> brush.Brush:
 def _warm_segmenter() -> None:
     # Loading the two ONNX models takes seconds (a 350 MB download the first time); do it before the
     # first shutter press, not during it.
-    if os.environ.get("LOOKCAM_WARM_SEG", "1") == "1":
+    if os.environ.get("NIMBUS_WARM_SEG", "1") == "1":
         from . import subject
         threading.Thread(target=subject.warm_up, daemon=True).start()
 
@@ -401,7 +401,7 @@ async def ws_preview(ws: WebSocket):
     messages; each frame comes back as a JSON line followed by the processed JPEG.
 
     Grade and camera styles are rendered here on the Mac. Reimagine styles show a local stand-in
-    immediately while FLUX.2 klein frames stream in from the GPU box (see lookcam/realtime.py).
+    immediately while FLUX.2 klein frames stream in from the GPU box (see nimbus/realtime.py).
     """
     import asyncio
 

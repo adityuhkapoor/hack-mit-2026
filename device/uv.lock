@@ -671,84 +671,6 @@ wheels = [
 ]
 
 [[package]]
-name = "lookcam"
-version = "0.1.0"
-source = { editable = "../pipeline" }
-dependencies = [
-    { name = "fastapi" },
-    { name = "httpx" },
-    { name = "numpy" },
-    { name = "onnxruntime" },
-    { name = "opencv-python-headless" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "python-multipart" },
-    { name = "qrcode" },
-    { name = "scipy" },
-    { name = "uvicorn", extra = ["standard"] },
-    { name = "websockets" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "numpy", specifier = ">=2.0" },
-    { name = "onnxruntime", specifier = ">=1.18" },
-    { name = "opencv-python-headless", specifier = ">=4.10" },
-    { name = "pillow", specifier = ">=11.0" },
-    { name = "pydantic", specifier = ">=2.9" },
-    { name = "python-multipart", specifier = ">=0.0.12" },
-    { name = "qrcode", specifier = ">=8.0" },
-    { name = "scipy", specifier = ">=1.14" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
-    { name = "websockets", specifier = ">=13.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "pytest", specifier = ">=8.3" },
-]
-
-[[package]]
-name = "lookcam-cam"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "elasticsearch" },
-    { name = "elevenlabs" },
-    { name = "fastembed" },
-    { name = "httpx" },
-    { name = "lookcam" },
-    { name = "openai" },
-    { name = "opencv-python-headless" },
-    { name = "qrcode" },
-    { name = "sounddevice" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "elasticsearch", specifier = ">=8.15,<9" },
-    { name = "elevenlabs", specifier = ">=2.0" },
-    { name = "fastembed", specifier = ">=0.4" },
-    { name = "httpx", specifier = ">=0.27" },
-    { name = "lookcam", editable = "../pipeline" },
-    { name = "openai", specifier = ">=1.50" },
-    { name = "opencv-python-headless", specifier = ">=4.10" },
-    { name = "qrcode", specifier = ">=8.0" },
-    { name = "sounddevice", specifier = ">=0.5" },
-]
-
-[package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.3" }]
-
-[[package]]
 name = "mmh3"
 version = "5.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -866,6 +788,84 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/03/73/5f5d7a5c0bad6ae5568e3232d8b7bcee9639da0de45f8e664342f22bf682/mmh3-5.3.0-cp315-cp315t-win_amd64.whl", hash = "sha256:1617be1ce93f97513bbf23cafa28a6ab1d20b0928de760054a4c603a89bdab7c", size = 43152, upload-time = "2026-08-26T04:58:17.706Z" },
     { url = "https://files.pythonhosted.org/packages/a2/0a/033fef3d7a486aa369ec11cdf0455bbae6640df13491f6e7d35fd90aa000/mmh3-5.3.0-cp315-cp315t-win_arm64.whl", hash = "sha256:a8389010a2721e568fbe40ba94e7d8f931beabd59b95af2b2ab8238fd40a6b3e", size = 40275, upload-time = "2026-08-26T04:58:18.883Z" },
 ]
+
+[[package]]
+name = "nimbus"
+version = "0.1.0"
+source = { editable = "../pipeline" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "opencv-python-headless" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "python-multipart" },
+    { name = "qrcode" },
+    { name = "scipy" },
+    { name = "uvicorn", extra = ["standard"] },
+    { name = "websockets" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.115" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "numpy", specifier = ">=2.0" },
+    { name = "onnxruntime", specifier = ">=1.18" },
+    { name = "opencv-python-headless", specifier = ">=4.10" },
+    { name = "pillow", specifier = ">=11.0" },
+    { name = "pydantic", specifier = ">=2.9" },
+    { name = "python-multipart", specifier = ">=0.0.12" },
+    { name = "qrcode", specifier = ">=8.0" },
+    { name = "scipy", specifier = ">=1.14" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
+    { name = "websockets", specifier = ">=13.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "pytest", specifier = ">=8.3" },
+]
+
+[[package]]
+name = "nimbus-cam"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "elasticsearch" },
+    { name = "elevenlabs" },
+    { name = "fastembed" },
+    { name = "httpx" },
+    { name = "nimbus" },
+    { name = "openai" },
+    { name = "opencv-python-headless" },
+    { name = "qrcode" },
+    { name = "sounddevice" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "elasticsearch", specifier = ">=8.15,<9" },
+    { name = "elevenlabs", specifier = ">=2.0" },
+    { name = "fastembed", specifier = ">=0.4" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "nimbus", editable = "../pipeline" },
+    { name = "openai", specifier = ">=1.50" },
+    { name = "opencv-python-headless", specifier = ">=4.10" },
+    { name = "qrcode", specifier = ">=8.0" },
+    { name = "sounddevice", specifier = ">=0.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.3" }]
 
 [[package]]
 name = "numpy"

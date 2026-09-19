@@ -38,7 +38,7 @@ class Voice:
 
         key, aid = secrets.get("elevenlabs"), agent.agent_id()
         if not key or not aid:
-            raise RuntimeError("voice needs an ElevenLabs key and an agent: run `python -m lookcam_cam.agent`")
+            raise RuntimeError("voice needs an ElevenLabs key and an agent: run `python -m nimbus_cam.agent`")
         self.app = app
         self.audio = PushToTalkAudio()
         tools = ClientTools()
@@ -47,7 +47,7 @@ class Voice:
         self.conv = Conversation(
             ElevenLabs(api_key=key), aid, requires_auth=True, audio_interface=self.audio, client_tools=tools,
             callback_user_transcript=lambda t: print(f"[you] {t}"),
-            callback_agent_response=lambda t: (print(f"[lookcam] {t}"), app.say(t)),
+            callback_agent_response=lambda t: (print(f"[Nimbus] {t}"), app.say(t)),
             callback_end_session=lambda: print("[voice] session ended"))
         self.started = False
         self._lock = threading.Lock()
@@ -94,7 +94,7 @@ def text_session(app: CameraApp) -> None:
             m = r.choices[0].message
             msgs.append(m.model_dump(exclude_none=True))
             if not m.tool_calls:
-                print(f"lookcam> {m.content}")
+                print(f"Nimbus> {m.content}")
                 break
             for call in m.tool_calls:
                 out = handlers[call.function.name](json.loads(call.function.arguments or "{}"))

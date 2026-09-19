@@ -1,9 +1,9 @@
 import numpy as np
 import pytest
 
-from lookcam import grade
-from lookcam.color import delta_e2000, lab_to_rgb, rgb_to_lab
-from lookcam.neutralize import cct_to_illuminant, neutralize
+from nimbus import grade
+from nimbus.color import delta_e2000, lab_to_rgb, rgb_to_lab
+from nimbus.neutralize import cct_to_illuminant, neutralize
 
 
 def natural_image(h=96, w=128, seed=0):

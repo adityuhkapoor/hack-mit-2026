@@ -14,8 +14,8 @@ import numpy as np
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
 
-from lookcam import imageio  # noqa: E402
-from lookcam.comfy import Comfy, klein_edit  # noqa: E402
+from nimbus import imageio  # noqa: E402
+from nimbus.comfy import Comfy, klein_edit  # noqa: E402
 
 RESTYLE = ("Apply the color grading, tones, lighting mood and film look of image 2 to image 1. "
            "Keep the composition, subjects, objects and details of image 1 exactly the same.")

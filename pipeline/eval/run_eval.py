@@ -8,7 +8,7 @@ Methods:
     none        B unchanged (lower bound)
     oracle      LUT fitted on the true pair (A, G(A)) (upper bound: needs the ungraded original)
     mkl_direct  classic color transfer, B's Lab distribution -> reference's (scene-dependent)
-    <estimators from lookcam.look.estimate_grade>
+    <estimators from nimbus.look.estimate_grade>
     uv run python eval/run_eval.py [--pairs 12] [--methods neutral_fit,mkl_neutral]
 """
 
@@ -28,11 +28,11 @@ sys.path.insert(0, str(HERE.parent))
 
 from grades import GRADES  # noqa: E402
 
-from lookcam import grade, imageio  # noqa: E402
-from lookcam.color import delta_e2000, rgb_to_lab  # noqa: E402
-from lookcam.comfy import Comfy  # noqa: E402
-from lookcam.look import estimate_grade  # noqa: E402
-from lookcam.restyle import restyle  # noqa: E402
+from nimbus import grade, imageio  # noqa: E402
+from nimbus.color import delta_e2000, rgb_to_lab  # noqa: E402
+from nimbus.comfy import Comfy  # noqa: E402
+from nimbus.look import estimate_grade  # noqa: E402
+from nimbus.restyle import restyle  # noqa: E402
 
 COMFY = None  # created lazily when a diffusion method is requested
 

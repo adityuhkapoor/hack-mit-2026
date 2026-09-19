@@ -14,9 +14,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lookcam import effects, imageio  # noqa: E402
-from lookcam.realtime import RELAY_URL, RealtimePreview  # noqa: E402
-from lookcam.styles import BY_ID  # noqa: E402
+from nimbus import effects, imageio  # noqa: E402
+from nimbus.realtime import RELAY_URL, RealtimePreview  # noqa: E402
+from nimbus.styles import BY_ID  # noqa: E402
 
 
 def pan_frames(path: Path, count: int = 60, side: int = 640) -> list[np.ndarray]:

@@ -1,4 +1,4 @@
-# lookcam — the image pipeline
+# Nimbus — the image pipeline
 
 Steal a photo's look. Paint with the world. This is the processing service behind the HackMIT
 camera; the frontend talks to it over HTTP ([../docs/API.md](../docs/API.md)).
@@ -6,13 +6,13 @@ camera; the frontend talks to it over HTTP ([../docs/API.md](../docs/API.md)).
 ```bash
 uv sync
 uv run pytest                                              # 17 tests, ~3 s
-uv run uvicorn lookcam.api:app --host 0.0.0.0 --port 8000  # the service
+uv run uvicorn nimbus.api:app --host 0.0.0.0 --port 8000  # the service
 ```
 
 ## How it works
 
 A reference photo mixes two things: **the scene** and **the grade**. Classic color transfer copies both, so a
-beach reference turns your forest yellow-blue. That's why "just match the colors" never looks right. lookcam
+beach reference turns your forest yellow-blue. That's why "just match the colors" never looks right. Nimbus
 treats a Look as a *grade*, stored as a 3D LUT, and keeps the scene out of it.
 
 ```
@@ -65,7 +65,7 @@ uv run python scripts/lookbook.py ../Photos --out ../Photos/looks --long 3000   
 uv run python scripts/rt_demo.py --style anime --seconds 20                     # live viewfinder benchmark
 ```
 
-**Live preview.** `infra/win/rt_server.py` runs on the box next to ComfyUI (scheduled task "LookcamRT",
+**Live preview.** `infra/win/rt_server.py` runs on the box next to ComfyUI (scheduled task "NimbusRT",
 port 8190, ZeroTier only) and keeps the per-frame loop off the network: one websocket, JPEG in, JPEG out,
 newest frame wins. Driving ComfyUI remotely per frame cost about five round trips and 3–5 s; through the
 relay a frame costs one. ComfyUI itself runs with `--disable-dynamic-vram --fast fp16_accumulation
@@ -75,23 +75,23 @@ Environment overrides:
 
 | Variable | Default |
 |---|---|
-| `LOOKCAM_COMFY_BACKENDS` | `http://172.25.242.235:8188\|cuda-fp8\|win,http://127.0.0.1:8188\|mps-gguf` |
-| `LOOKCAM_OLLAMA_URL` | `http://127.0.0.1:11434` |
-| `LOOKCAM_VISION_MODEL` | `gemma3:4b` |
-| `LOOKCAM_HOME` | `pipeline/looks` |
-| `LOOKCAM_BRUSHES` | `pipeline/brushes` |
+| `NIMBUS_COMFY_BACKENDS` | `http://172.25.242.235:8188\|cuda-fp8\|win,http://127.0.0.1:8188\|mps-gguf` |
+| `NIMBUS_OLLAMA_URL` | `http://127.0.0.1:11434` |
+| `NIMBUS_VISION_MODEL` | `gemma3:4b` |
+| `NIMBUS_HOME` | `pipeline/looks` |
+| `NIMBUS_BRUSHES` | `pipeline/brushes` |
 
 ## Public demo
 
 | Piece | Where |
 |---|---|
-| Site (gallery, steal-a-look, live viewfinder) | Vercel project `lookcam`, built from `web/` — `vercel deploy --prod` |
+| Site (gallery, steal-a-look, live viewfinder) | Vercel project `nimbus`, built from `web/` — `vercel deploy --prod` |
 | Gallery images | `uv run python scripts/build_site.py` regenerates `web/public/gallery` from `Photos/looks` |
-| Backend | The API runs **on the GPU box** (`infra/win/deploy_api.sh` → task "LookcamAPI", localhost:8000) |
+| Backend | The API runs **on the GPU box** (`infra/win/deploy_api.sh` → task "NimbusAPI", localhost:8000) |
 | Public URL | `https://lookcam.akvaithi.page` via the box's existing cloudflared tunnel (`infra/win/expose_api.ps1`) |
 
 The backend is unauthenticated on purpose so the page works for anyone, and therefore capped:
-`LOOKCAM_MAX_SESSIONS` (default 3) live viewers and `LOOKCAM_GPU_CALLS_PER_MIN` (default 20) GPU calls per
+`NIMBUS_MAX_SESSIONS` (default 3) live viewers and `NIMBUS_GPU_CALLS_PER_MIN` (default 20) GPU calls per
 address. To take it down, restore `config.yml.bak` on the box and restart the cloudflared service.
 
 Over the public tunnel the preview rate is bounded by the box's CPU for the local layer and by round trips:
@@ -106,6 +106,6 @@ See [../docs/EVAL.md](../docs/EVAL.md). The eval scripts:
 uv run python eval/fetch.py                 # 24 Unsplash photos (credits.json)
 uv run python eval/run_eval.py --pairs 6    # known grades → CIEDE2000 vs truth
 uv run python eval/sweep_estimators.py      # neutralizer × fit model × shrinkage × debias
-uv run python eval/learn_bias.py            # ship neutralizer bias LUTs to lookcam/data/
+uv run python eval/learn_bias.py            # ship neutralizer bias LUTs to nimbus/data/
 uv run python eval/spike_klein.py           # GPU box timing
 ```

@@ -20,9 +20,9 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from lookcam import effects, imageio, look  # noqa: E402
-from lookcam.backends import Backends  # noqa: E402
-from lookcam.styles import BY_ID, STYLES, StyleUnavailable, render_style  # noqa: E402
+from nimbus import effects, imageio, look  # noqa: E402
+from nimbus.backends import Backends  # noqa: E402
+from nimbus.styles import BY_ID, STYLES, StyleUnavailable, render_style  # noqa: E402
 
 Image.MAX_IMAGE_PIXELS = None
 SENSOR_MP = 12.0
@@ -121,7 +121,7 @@ figure{{margin:0}} img{{width:100%;border-radius:6px;display:block}}
 figcaption{{color:#bbb;margin-top:4px}} .fam{{font-size:11px;padding:1px 6px;border-radius:8px;background:#333;color:#9cf}}
 .refs figure{{max-width:240px;display:inline-block;margin-right:10px}}
 </style>
-<h1>Lookbook</h1><p>Photos resized to a 12 MP sensor, rendered by the lookcam pipeline, saved at {args.long}px.
+<h1>Lookbook</h1><p>Photos resized to a 12 MP sensor, rendered by the Nimbus pipeline, saved at {args.long}px.
 Families: <b>grade</b> = LUT only · <b>camera</b> = grade + procedural optics/sensor artifacts · <b>reimagine</b> =
 FLUX.2 klein diffusion (+ ESRGAN, + procedural finishing) · <b>stolen</b> = grade reverse-engineered from a reference photo.</p>
 <div class="refs">{refs_html}</div>

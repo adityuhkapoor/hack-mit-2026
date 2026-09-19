@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from lookcam.color import lab_to_rgb, luminance, rgb_to_lab
+from nimbus.color import lab_to_rgb, luminance, rgb_to_lab
 
 
 def _smoothstep(x, lo, hi):

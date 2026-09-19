@@ -1,4 +1,4 @@
-// lookcam — UNO Q microcontroller side: read the sensors and the controls, hand them to Linux.
+// nimbus — UNO Q microcontroller side: read the sensors and the controls, hand them to Linux.
 //
 // The Linux side (python/main.py) calls these over the Arduino Bridge:
 //   readings()  -> "temp_c=21.4;rh=48.0;lux=310;db=57.2"   key=value, any subset; absent sensors are omitted

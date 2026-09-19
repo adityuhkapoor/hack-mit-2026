@@ -114,7 +114,7 @@ def paint_ai(photo: np.ndarray, mask: np.ndarray, patch: np.ndarray, brush: Brus
 
 class BrushStore:
     def __init__(self, root: str | Path | None = None):
-        self.root = Path(root or os.environ.get("LOOKCAM_BRUSHES", Path(__file__).resolve().parents[1] / "brushes"))
+        self.root = Path(root or os.environ.get("NIMBUS_BRUSHES", Path(__file__).resolve().parents[1] / "brushes"))
         self.root.mkdir(parents=True, exist_ok=True)
 
     def dir(self, brush_id: str) -> Path:

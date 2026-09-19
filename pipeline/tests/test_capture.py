@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from lookcam import capture, sense, subject
-from lookcam.comfy import CUDA_FP8, ComfyError
+from nimbus import capture, sense, subject
+from nimbus.comfy import CUDA_FP8, ComfyError
 
 
 def scene(h=240, w=320, seed=0):
@@ -102,7 +102,7 @@ def test_card_renders():
 
 
 def test_web_weather_fills_only_gaps(monkeypatch):
-    from lookcam import weather
+    from nimbus import weather
     monkeypatch.setattr(weather, "current", lambda: {"wind": 4.2, "cloud": 90.0, "wind_dir": 200.0})
     r, web = capture.with_web_weather(sense.Readings(temp_c=10, wind=1.0))
     assert r.wind == 1.0 and r.cloud == 90.0 and web == {"cloud"}      # the sensor's wind wins

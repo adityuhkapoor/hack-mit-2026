@@ -1,7 +1,7 @@
 import numpy as np
 
-from lookcam import effects, realtime
-from lookcam.styles import BY_ID
+from nimbus import effects, realtime
+from nimbus.styles import BY_ID
 
 
 def photo(h=180, w=320, seed=0):
@@ -61,7 +61,7 @@ def test_layout_score_separates_same_scene_from_a_different_one():
 
 
 def test_faces_noop_without_faces():
-    from lookcam import faces
+    from nimbus import faces
     img = photo()
     styled = np.clip(img * [1.3, 0.9, 0.8], 0, 1)
     out, found = faces.restore_faces(img, styled)
@@ -69,7 +69,7 @@ def test_faces_noop_without_faces():
 
 
 def test_face_mask_and_restore_are_local():
-    from lookcam import faces
+    from nimbus import faces
     img, styled = photo(), np.clip(photo() * [1.4, 0.8, 0.7], 0, 1)
     box = [faces.Face(x=200, y=40, w=60, h=70, score=0.9)]
     m = faces.face_mask(img.shape[:2], box)

@@ -1,9 +1,9 @@
 """The camera's voice: an ElevenLabs agent whose brain is Muse Spark (Meta Model API as a custom LLM) and whose
 hands are the camera's own functions (client tools, executed on the device).
 
-    uv run python -m lookcam_cam.agent            # create or update the agent (idempotent); prints its id
+    uv run python -m nimbus_cam.agent            # create or update the agent (idempotent); prints its id
 
-The agent id is kept in ~/.lookcam/camera/agent.json. Keys come from the Keychain (secrets.py).
+The agent id is kept in ~/.nimbus/camera/agent.json. Keys come from the Keychain (secrets.py).
 """
 
 from __future__ import annotations
@@ -19,11 +19,11 @@ from .tagger import BASE_URL, MODEL
 
 EL = "https://api.elevenlabs.io/v1/convai"
 AGENT_FILE = HOME / "agent.json"
-AGENT_NAME = "lookcam"
+AGENT_NAME = "Nimbus"
 VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"   # "George": warm, a little dry; change freely
 META_SECRET = "meta-model-api-key"
 
-PERSONA = """You are lookcam, a camera that photographs the air. You speak as the camera itself, in first
+PERSONA = """You are Nimbus, a camera that photographs the air. You speak as the camera itself, in first
 person: warm, a little dry, brief. One or two short sentences per reply; this is spoken aloud, so no lists,
 no markdown, no emoji, and say times naturally ("this morning at 9:40", not ISO strings).
 

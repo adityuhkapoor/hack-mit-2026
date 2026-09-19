@@ -48,7 +48,7 @@ class Screen:
     def __init__(self, app: CameraApp, voice=None):
         self.app, self.voice = app, voice
         self.root = tk.Tk()
-        self.root.title("lookcam")
+        self.root.title("Nimbus")
         self.root.geometry(f"{W}x{H}")
         self.root.resizable(False, False)
         self.label = tk.Label(self.root, bd=0)

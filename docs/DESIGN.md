@@ -1,4 +1,4 @@
-# lookcam — software design
+# Nimbus — software design
 
 **The camera that photographs the air.** The person in the picture stays exactly as shot, checked pixel by
 pixel. Everything around them is rendered from what the camera measured at that moment. One dial sets
@@ -32,7 +32,7 @@ code that puts a photo on your phone.
 mic ─(push-to-talk)─► ElevenLabs agent ──custom LLM──► Muse Spark (Meta Model API, reasoning "minimal")
 speaker ◄─────────── speech                  │ tool calls, executed on the camera (ClientTools)
                                              ▼
-   device/lookcam_cam/app.py: the 8 tools ─► capture (below) · Muse vision tags · Elasticsearch · Instagram
+   device/nimbus_cam/app.py: the 8 tools ─► capture (below) · Muse vision tags · Elasticsearch · Instagram
 ```
 
 - **Push-to-talk.** The ElevenLabs session stays open, but the mic sends silence unless the button is held, so a loud room never starts a turn.
@@ -98,7 +98,7 @@ camera: Muse tags it · Elasticsearch indexes it · on request: QR code to a pho
 
 `subject.py` enforces it and the tests check it:
 
-1. **Find the subject.** Two ONNX models segment it, run directly on onnxruntime (no rembg): `isnet-general-use` for objects and what people hold, and `u2net_human_seg` for whole bodies, hands included. When a face is found, their masks are combined. On the board, `LOOKCAM_SEG=human` uses the body model alone, because the 1024² general model is too slow there.
+1. **Find the subject.** Two ONNX models segment it, run directly on onnxruntime (no rembg): `isnet-general-use` for objects and what people hold, and `u2net_human_seg` for whole bodies, hands included. When a face is found, their masks are combined. On the board, `NIMBUS_SEG=human` uses the body model alone, because the 1024² general model is too slow there.
 2. **Clean plate.** The subject's area is filled in before any background effect runs, so blooms and bends pull in background colour, never the subject's.
 3. **Composite.** The original subject pixels go back in bit for bit. Only a 2 px edge band cross-fades.
 4. **Verify.** In 8-bit, inside the mask shrunk by that edge band, the output must equal the as-shot frame exactly. The result is printed on the card and exposed as `untouched` in the API.
@@ -110,7 +110,7 @@ The only change ever made to the subject is **white balance**, and only from a r
 | Path | Time | Notes |
 |---|---|---|
 | Real, on an M3 at 2400 px | ~1.3 s | Estimated at 10–20 s on the UNO Q's A53 cores (to measure on the board). Peak memory **1.26 GB**, flat across shots. |
-| Sensed air / New world on the box | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. `LOOKCAM_AI_MP=1.0` saves ~6 s. |
+| Sensed air / New world on the box | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. `NIMBUS_AI_MP=1.0` saves ~6 s. |
 | Segmentation | 0.5 s (body), 1.0–1.4 s (general) | M3 |
 
 ## Contracts
@@ -123,18 +123,18 @@ The only change ever made to the subject is **white balance**, and only from a r
 
 | Where | What |
 |---|---|
-| `pipeline/lookcam/sense.py` | Readings, the effect map, the effects, the prompts |
-| `pipeline/lookcam/subject.py` | Segmentation, clean plate, composite, verify, mask overlay |
-| `pipeline/lookcam/capture.py` | One press end to end, web-weather merge, card, capture store |
-| `pipeline/lookcam/weather.py` | Open-Meteo wind and cloud cover, cached for 10 min |
-| `pipeline/lookcam/api.py` | `/capture`, `/captures/publish`, `/captures…`, `/c/<id>` (→ the card image) |
-| `device/lookcam_cam/app.py` | The camera's state and its 8 tools (shared by voice and the d-pad) |
-| `device/lookcam_cam/{agent,voice}.py` | ElevenLabs agent setup (persona, tools, Muse as custom LLM); push-to-talk session; typed test mode |
-| `device/lookcam_cam/{tagger,library}.py` | Muse vision tags; Elasticsearch / local hybrid search |
-| `device/lookcam_cam/{hw,ui}.py` | Sensors, camera and push-to-talk audio; the Tk screen and d-pad |
+| `pipeline/nimbus/sense.py` | Readings, the effect map, the effects, the prompts |
+| `pipeline/nimbus/subject.py` | Segmentation, clean plate, composite, verify, mask overlay |
+| `pipeline/nimbus/capture.py` | One press end to end, web-weather merge, card, capture store |
+| `pipeline/nimbus/weather.py` | Open-Meteo wind and cloud cover, cached for 10 min |
+| `pipeline/nimbus/api.py` | `/capture`, `/captures/publish`, `/captures…`, `/c/<id>` (→ the card image) |
+| `device/nimbus_cam/app.py` | The camera's state and its 8 tools (shared by voice and the d-pad) |
+| `device/nimbus_cam/{agent,voice}.py` | ElevenLabs agent setup (persona, tools, Muse as custom LLM); push-to-talk session; typed test mode |
+| `device/nimbus_cam/{tagger,library}.py` | Muse vision tags; Elasticsearch / local hybrid search |
+| `device/nimbus_cam/{hw,ui}.py` | Sensors, camera and push-to-talk audio; the Tk screen and d-pad |
 | `infra/elastic/docker-compose.yml` | Single-node Elasticsearch |
 | `device/sketch/sketch.ino` | MCU: sensors and controls over the Bridge (drivers to be finalised with the parts) |
-| `device/python/main.py` | App Lab entry point (runs `lookcam_cam`) |
+| `device/python/main.py` | App Lab entry point (runs `nimbus_cam`) |
 
 ## Open
 

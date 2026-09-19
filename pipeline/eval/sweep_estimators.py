@@ -21,11 +21,11 @@ sys.path.insert(0, str(HERE.parent))
 
 from grades import GRADES  # noqa: E402
 
-from lookcam import grade, imageio  # noqa: E402
-from lookcam.color import delta_e2000, rgb_to_lab  # noqa: E402
-from lookcam.comfy import Comfy  # noqa: E402
-from lookcam.neutralize import neutralize  # noqa: E402
-from lookcam.restyle import fit_aligned, neutralize_diffusion  # noqa: E402
+from nimbus import grade, imageio  # noqa: E402
+from nimbus.color import delta_e2000, rgb_to_lab  # noqa: E402
+from nimbus.comfy import Comfy  # noqa: E402
+from nimbus.neutralize import neutralize  # noqa: E402
+from nimbus.restyle import fit_aligned, neutralize_diffusion  # noqa: E402
 
 SIDE = 512
 

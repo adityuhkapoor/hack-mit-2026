@@ -8,15 +8,15 @@ from PIL import Image
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
-    monkeypatch.setenv("LOOKCAM_HOME", str(tmp_path / "looks"))
-    monkeypatch.setenv("LOOKCAM_BRUSHES", str(tmp_path / "brushes"))
-    monkeypatch.setenv("LOOKCAM_COMFY_BACKENDS", "http://127.0.0.1:9|cuda-fp8")  # nothing listens: Tier 0 only
-    monkeypatch.setenv("LOOKCAM_OLLAMA_URL", "http://127.0.0.1:9")
-    monkeypatch.setenv("LOOKCAM_WARM_SEG", "0")
-    monkeypatch.setenv("LOOKCAM_WEB_WEATHER", "0")
+    monkeypatch.setenv("NIMBUS_HOME", str(tmp_path / "looks"))
+    monkeypatch.setenv("NIMBUS_BRUSHES", str(tmp_path / "brushes"))
+    monkeypatch.setenv("NIMBUS_COMFY_BACKENDS", "http://127.0.0.1:9|cuda-fp8")  # nothing listens: Tier 0 only
+    monkeypatch.setenv("NIMBUS_OLLAMA_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("NIMBUS_WARM_SEG", "0")
+    monkeypatch.setenv("NIMBUS_WEB_WEATHER", "0")
     import importlib
 
-    from lookcam import analyze, api
+    from nimbus import analyze, api
     importlib.reload(analyze)
     importlib.reload(api)
     return TestClient(api.app)
@@ -101,7 +101,7 @@ def test_bad_image(client):
 def test_capture_roundtrip(client, tmp_path, monkeypatch):
     import json
 
-    from lookcam import api, subject
+    from nimbus import api, subject
     monkeypatch.setattr(api, "captures", api.capture.CaptureStore(tmp_path / "captures"))
 
     def fake_mask(img):
@@ -127,7 +127,7 @@ def test_capture_roundtrip(client, tmp_path, monkeypatch):
 def test_publish_camera_rendered(client, tmp_path, monkeypatch):
     import json
 
-    from lookcam import api, capture, sense
+    from nimbus import api, capture, sense
     monkeypatch.setattr(api, "captures", capture.CaptureStore(tmp_path / "captures"))
     img = photo(6)
     mask = np.zeros(img.shape[:2], np.float32)

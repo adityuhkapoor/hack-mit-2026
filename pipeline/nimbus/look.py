@@ -89,7 +89,7 @@ def effects_from_measured(m: dict) -> Effects:
 
 class LookStore:
     def __init__(self, root: str | Path | None = None):
-        self.root = Path(root or os.environ.get("LOOKCAM_HOME", Path(__file__).resolve().parents[1] / "looks"))
+        self.root = Path(root or os.environ.get("NIMBUS_HOME", Path(__file__).resolve().parents[1] / "looks"))
         self.root.mkdir(parents=True, exist_ok=True)
         self._lut_cache: dict[str, np.ndarray] = {}
 

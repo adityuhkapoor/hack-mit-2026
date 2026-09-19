@@ -1,11 +1,11 @@
 """Run the camera.
 
-    python -m lookcam_cam --mac                       screen + voice + webcam + simulated sensors
-    python -m lookcam_cam --mac --image photo.jpg     a still instead of the webcam
-    python -m lookcam_cam --mac --text                type to the camera in the terminal (Muse, no mic)
-    python -m lookcam_cam --mac --script "take_photo mode=real; search_photos query=fog; photo_details"
+    python -m nimbus_cam --mac                       screen + voice + webcam + simulated sensors
+    python -m nimbus_cam --mac --image photo.jpg     a still instead of the webcam
+    python -m nimbus_cam --mac --text                type to the camera in the terminal (Muse, no mic)
+    python -m nimbus_cam --mac --script "take_photo mode=real; search_photos query=fog; photo_details"
                                                       run tools with no screen or voice (tests)
-    python -m lookcam_cam                             on the UNO Q (sensors over the Bridge)
+    python -m nimbus_cam                             on the UNO Q (sensors over the Bridge)
 """
 
 from __future__ import annotations
@@ -41,10 +41,10 @@ def run_script(app: CameraApp, script: str) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(prog="lookcam_cam")
+    ap = argparse.ArgumentParser(prog="nimbus_cam")
     ap.add_argument("--mac", action="store_true", help="simulated sensors (otherwise the UNO Q Bridge)")
     ap.add_argument("--image", help="use a still instead of the camera")
-    ap.add_argument("--camera", type=int, default=int(os.environ.get("LOOKCAM_CAMERA", "0")))
+    ap.add_argument("--camera", type=int, default=int(os.environ.get("NIMBUS_CAMERA", "0")))
     ap.add_argument("--local-library", action="store_true", help="skip Elasticsearch")
     ap.add_argument("--server-real", action="store_true", help="render Real on the server, not here")
     ap.add_argument("--script", help="run tools and exit")

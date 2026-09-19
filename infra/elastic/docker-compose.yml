@@ -3,7 +3,7 @@
 services:
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
-    container_name: lookcam-es
+    container_name: nimbus-es
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -11,7 +11,7 @@ services:
     ports:
       - "127.0.0.1:9200:9200"
     volumes:
-      - lookcam-es:/usr/share/elasticsearch/data
+      - nimbus-es:/usr/share/elasticsearch/data
     restart: unless-stopped
 volumes:
-  lookcam-es:
+  nimbus-es:

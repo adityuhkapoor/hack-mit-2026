@@ -1,4 +1,4 @@
-# lookcam — the camera (Arduino UNO Q)
+# Nimbus — the camera (Arduino UNO Q)
 
 The UNO Q is the whole brain. Its microcontroller reads the sensors and controls, and its Linux side takes
 the picture. It renders Real itself; for the AI positions it sends the frame to the GPU box. It then posts the card.
@@ -35,15 +35,15 @@ stays: `readings()` returns `key=value;…` with any subset of `temp_c rh lux db
 - [ ] Bridge API names match the App Lab examples (`Bridge.provide` / `Bridge.call`).
 - [ ] Camera enumerates on the UNO Q (CSI carrier, or `/dev/video*` for USB).
 - [ ] `curl https://lookcam.akvaithi.page/health` from the board over venue Wi-Fi.
-- [ ] On the board: `pip install -e pipeline` and `LOOKCAM_SEG=human`, then time one Real shot (Real renders on the board).
+- [ ] On the board: `pip install -e pipeline` and `NIMBUS_SEG=human`, then time one Real shot (Real renders on the board).
 
 ## Run the camera on a Mac (no hardware needed)
 
 ```bash
 cd infra/elastic && docker compose up -d          # photo search (optional: falls back to a local index)
 cd device && uv sync
-uv run python -m lookcam_cam.agent                # once: creates the ElevenLabs agent (needs both keys)
-uv run python -m lookcam_cam --mac                # screen + voice + webcam + simulated sensors
+uv run python -m nimbus_cam.agent                # once: creates the ElevenLabs agent (needs both keys)
+uv run python -m nimbus_cam --mac                # screen + voice + webcam + simulated sensors
 ```
 
 | Mode | Command |

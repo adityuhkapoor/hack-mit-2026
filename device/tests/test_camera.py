@@ -3,9 +3,9 @@ import json
 import numpy as np
 import pytest
 
-from lookcam_cam import library, tagger
-from lookcam_cam.hw import parse_readings
-from lookcam_cam.library import LocalLibrary, Photo, Query, es_query, matches
+from nimbus_cam import library, tagger
+from nimbus_cam.hw import parse_readings
+from nimbus_cam.library import LocalLibrary, Photo, Query, es_query, matches
 
 
 @pytest.fixture(autouse=True)
@@ -88,8 +88,8 @@ class FakeSensors:
 
 def test_app_tools_without_network(tmp_path, monkeypatch):
     """Real on this machine with the server unreachable: the photo still exists, is proven and searchable."""
-    from lookcam import capture as lc
-    from lookcam_cam import app as appmod
+    from nimbus import capture as lc
+    from nimbus_cam import app as appmod
 
     monkeypatch.setattr(appmod, "HOME", tmp_path)
     monkeypatch.setattr(lc, "with_web_weather", lambda r: (r, set()))

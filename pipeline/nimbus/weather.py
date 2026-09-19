@@ -13,8 +13,8 @@ import time
 
 import httpx
 
-LAT = float(os.environ.get("LOOKCAM_LAT", "42.3601"))    # MIT
-LON = float(os.environ.get("LOOKCAM_LON", "-71.0942"))
+LAT = float(os.environ.get("NIMBUS_LAT", "42.3601"))    # MIT
+LON = float(os.environ.get("NIMBUS_LON", "-71.0942"))
 URL = "https://api.open-meteo.com/v1/forecast"
 CACHE_SECONDS = 600
 FIELDS = {"wind": "wind_speed_10m", "wind_dir": "wind_direction_10m", "cloud": "cloud_cover"}
@@ -26,7 +26,7 @@ _lock = threading.Lock()
 def current(timeout: float = 3.0) -> dict:
     """{"wind": m/s, "wind_dir": degrees, "cloud": %} or {} when the service is unreachable."""
     global _cache
-    if os.environ.get("LOOKCAM_WEB_WEATHER", "1") != "1":
+    if os.environ.get("NIMBUS_WEB_WEATHER", "1") != "1":
         return {}
     with _lock:
         if _cache and time.time() - _cache[0] < CACHE_SECONDS:

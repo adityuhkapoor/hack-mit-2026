@@ -1,9 +1,9 @@
-# lookcam pipeline API
+# Nimbus pipeline API
 
 The image-processing service the camera frontend calls. It runs on the MacBook at the table:
 
 ```bash
-cd pipeline && uv run uvicorn lookcam.api:app --host 0.0.0.0 --port 8000
+cd pipeline && uv run uvicorn nimbus.api:app --host 0.0.0.0 --port 8000
 ```
 
 - Base URL: `http://<mac-ip>:8000` locally, or `https://lookcam.akvaithi.page` (the copy running on the GPU box, used by the public demo).
@@ -258,7 +258,7 @@ Render and paint never fail over GPU trouble; they degrade to tier 0 or `fast`.
 
 **Public instance limits** (`https://lookcam.akvaithi.page`): 3 concurrent live-preview sockets, 20 GPU calls and
 12 new Looks per minute per address, and only the newest 300 Looks are kept on disk. All are environment
-variables (`LOOKCAM_MAX_SESSIONS`, `LOOKCAM_GPU_CALLS_PER_MIN`, `LOOKCAM_LOOKS_PER_MIN`, `LOOKCAM_MAX_LOOKS`).
+variables (`NIMBUS_MAX_SESSIONS`, `NIMBUS_GPU_CALLS_PER_MIN`, `NIMBUS_LOOKS_PER_MIN`, `NIMBUS_MAX_LOOKS`).
 
 ## Example
 

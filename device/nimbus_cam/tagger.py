@@ -15,15 +15,15 @@ import re
 
 from PIL import Image
 
-from lookcam import sense
+from nimbus import sense
 
 from . import secrets
 
-BASE_URL = os.environ.get("LOOKCAM_META_URL", "https://api.meta.ai/v1")
-MODEL = os.environ.get("LOOKCAM_META_MODEL", "muse-spark-1.3")
+BASE_URL = os.environ.get("NIMBUS_META_URL", "https://api.meta.ai/v1")
+MODEL = os.environ.get("NIMBUS_META_MODEL", "muse-spark-1.3")
 # Muse Spark reasons before answering; "minimal" keeps quality for tagging and tool choice while cutting a
 # reply from ~6 s to ~2 s, and the reasoning tokens are most of the bill.
-REASONING = os.environ.get("LOOKCAM_META_REASONING", "minimal")
+REASONING = os.environ.get("NIMBUS_META_REASONING", "minimal")
 
 PROMPT = """You are tagging a photograph for a camera's searchable library.
 The person or main subject is exactly as photographed; the surroundings may have been re-rendered from the

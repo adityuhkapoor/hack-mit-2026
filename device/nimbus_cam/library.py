@@ -1,7 +1,7 @@
 """Every photo the camera has taken, searchable by meaning, words, time and the air it was taken in.
 
 A photo is indexed as one document: when, which dial, the readings, what Muse Spark saw in it (caption, tags,
-scene, mood), and the *weather in words* (lookcam.sense.describe), so "the foggy ones" finds photos taken in
+scene, mood), and the *weather in words* (nimbus.sense.describe), so "the foggy ones" finds photos taken in
 94% humidity even when the model never said "fog".
 
     ElasticLibrary  Elasticsearch: BM25 over the words + kNN over an embedding, both under the same filters
@@ -23,11 +23,11 @@ from pathlib import Path
 
 import numpy as np
 
-from lookcam import sense
+from nimbus import sense
 
-HOME = Path(os.environ.get("LOOKCAM_CAM_HOME", Path.home() / ".lookcam" / "camera"))
-INDEX = os.environ.get("LOOKCAM_ES_INDEX", "lookcam-captures")
-ES_URL = os.environ.get("LOOKCAM_ES_URL", "http://localhost:9200")
+HOME = Path(os.environ.get("NIMBUS_CAM_HOME", Path.home() / ".nimbus" / "camera"))
+INDEX = os.environ.get("NIMBUS_ES_INDEX", "nimbus-captures")
+ES_URL = os.environ.get("NIMBUS_ES_URL", "http://localhost:9200")
 EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 DIMS = 384
 

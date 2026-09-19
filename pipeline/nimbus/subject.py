@@ -29,12 +29,12 @@ MODELS = {
     "u2net_human_seg": ("u2net_human_seg.onnx", 320, (0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
 }
 MODEL_URL = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/{file}"
-MODEL_DIR = Path(os.environ.get("LOOKCAM_MODELS", Path.home() / ".lookcam" / "models"))
+MODEL_DIR = Path(os.environ.get("NIMBUS_MODELS", Path.home() / ".nimbus" / "models"))
 # The general model drops limbs away from the torso (a hand on a shoulder), and an altered hand breaks
 # the promise on the card, so when there is a face the two masks are unioned. BiRefNet is as good and
 # does both, but costs ~17 s per frame on CPU against ~0.5 s here. On the board, where 1024² is too
-# slow, LOOKCAM_SEG=human uses the body model alone.
-SEG_MODE = os.environ.get("LOOKCAM_SEG", "full")      # full | human
+# slow, NIMBUS_SEG=human uses the body model alone.
+SEG_MODE = os.environ.get("NIMBUS_SEG", "full")      # full | human
 SEG_LONG = 1024            # segmentation input is taken from a downscaled copy
 EDGE_PX = 2                # the only band where output may differ from the photo
 _sessions: dict[str, object] = {}

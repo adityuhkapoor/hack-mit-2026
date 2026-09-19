@@ -30,7 +30,7 @@ from . import effects, grade, imageio, styles
 from .comfy import Profile, klein_img2img
 from .styles import Style
 
-RELAY_URL = os.environ.get("LOOKCAM_RT_RELAY", "ws://172.25.242.235:8190/rt")
+RELAY_URL = os.environ.get("NIMBUS_RT_RELAY", "ws://172.25.242.235:8190/rt")
 PREVIEW_LONG = 448      # what the local layer renders at
 DIFFUSION_LONG = 256    # what goes to the GPU box
 DIFFUSION_MP = 0.04     # measured 4.1 fps on the box at this size

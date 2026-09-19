@@ -17,8 +17,8 @@ from pydantic import BaseModel, Field, ValidationError
 
 from . import imageio
 
-OLLAMA_URL = os.environ.get("LOOKCAM_OLLAMA_URL", "http://127.0.0.1:11434")
-VISION_MODEL = os.environ.get("LOOKCAM_VISION_MODEL", "gemma3:4b")
+OLLAMA_URL = os.environ.get("NIMBUS_OLLAMA_URL", "http://127.0.0.1:11434")
+VISION_MODEL = os.environ.get("NIMBUS_VISION_MODEL", "gemma3:4b")
 
 
 class LookAnalysis(BaseModel):

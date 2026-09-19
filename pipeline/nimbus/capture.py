@@ -30,8 +30,8 @@ from .neutralize import balance_for_cct
 # ESRGAN on the box bring the surroundings up to the subject's resolution. Otherwise a soft 1 MP
 # background sits next to a sharp full-resolution subject and the cut-out shows.
 AI_WORK_LONG = 1600
-AI_MEGAPIXELS = float(os.environ.get("LOOKCAM_AI_MP", "1.5"))   # box time: 1.0 MP ≈ 9 s, 1.5 ≈ 15 s, 2.0 ≈ 23 s
-AI_UPSCALER = os.environ.get("LOOKCAM_AI_UPSCALER", "RealESRGAN_x4plus.pth") or None  # +≈10 s
+AI_MEGAPIXELS = float(os.environ.get("NIMBUS_AI_MP", "1.5"))   # box time: 1.0 MP ≈ 9 s, 1.5 ≈ 15 s, 2.0 ≈ 23 s
+AI_UPSCALER = os.environ.get("NIMBUS_AI_UPSCALER", "RealESRGAN_x4plus.pth") or None  # +≈10 s
 AI_OUT_LONG = 4000               # ESRGAN output cap sent to the box; larger sensors are resized locally
 # Dial 1 must keep the real layout, so it only partly re-noises: mild air barely moves the scene,
 # harsh air (fog, frost, a gale) gets the room it needs. At 0.72 fog never appeared; 0.92 reads as fog.
@@ -201,7 +201,7 @@ def render_files(cap: Capture, card_img: np.ndarray | None) -> dict[str, bytes]:
 
 class CaptureStore:
     def __init__(self, root: str | Path | None = None):
-        self.root = Path(root or os.environ.get("LOOKCAM_CAPTURES", Path(__file__).resolve().parents[1] / "captures"))
+        self.root = Path(root or os.environ.get("NIMBUS_CAPTURES", Path(__file__).resolve().parents[1] / "captures"))
         self.root.mkdir(parents=True, exist_ok=True)
 
     def dir(self, capture_id: str) -> Path:

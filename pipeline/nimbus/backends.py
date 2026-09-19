@@ -1,6 +1,6 @@
 """Choose a diffusion backend that will actually answer quickly, or none.
 
-Order comes from LOOKCAM_COMFY_BACKENDS, "url|profile,url|profile". Default: the Windows GPU box
+Order comes from NIMBUS_COMFY_BACKENDS, "url|profile,url|profile". Default: the Windows GPU box
 over ZeroTier, then ComfyUI on this Mac.
 
 A backend is skipped when ComfyUI is unreachable or when Ollama on the same machine has a model
@@ -36,7 +36,7 @@ class BackendStatus:
 
 
 def _configured() -> list[tuple[str, Profile, str | None]]:
-    spec = os.environ.get("LOOKCAM_COMFY_BACKENDS", DEFAULT)
+    spec = os.environ.get("NIMBUS_COMFY_BACKENDS", DEFAULT)
     out = []
     for item in filter(None, (s.strip() for s in spec.split(","))):
         url, prof, ssh = (item.split("|") + ["", ""])[:3]

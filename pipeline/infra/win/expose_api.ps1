@@ -1,4 +1,4 @@
-# Publishes the lookcam API on the existing cloudflared tunnel as lookcam.akvaithi.page.
+# Publishes the nimbus API on the existing cloudflared tunnel as lookcam.akvaithi.page.
 # Run elevated on the box: powershell -ExecutionPolicy Bypass -File expose_api.ps1
 $ErrorActionPreference = "Stop"
 $HostName = "lookcam.akvaithi.page"

@@ -10,7 +10,7 @@ the photo's structure and let the style keep everything else:
 blended back under a soft elliptical mask. `mode="photo"` instead restores the original face
 outright, color-matched to the style, for when likeness matters more than the look.
 
-Detection is YuNet (OpenCV Zoo, 232 KB, bundled in lookcam/data). No network, no GPU.
+Detection is YuNet (OpenCV Zoo, 232 KB, bundled in nimbus/data). No network, no GPU.
 """
 
 from __future__ import annotations

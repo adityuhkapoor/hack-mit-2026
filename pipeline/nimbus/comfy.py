@@ -20,7 +20,7 @@ from PIL import Image
 
 from . import imageio
 
-COMFY_URL = os.environ.get("LOOKCAM_COMFY_URL", "http://172.25.242.235:8188")
+COMFY_URL = os.environ.get("NIMBUS_COMFY_URL", "http://172.25.242.235:8188")
 
 
 @dataclass(frozen=True)
@@ -76,7 +76,7 @@ class Comfy:
         pil = img if isinstance(img, Image.Image) else imageio.to_pil(img)
         buf = io.BytesIO()
         pil.save(buf, format="PNG")
-        name = name or f"lookcam_{uuid.uuid4().hex[:10]}.png"
+        name = name or f"nimbus_{uuid.uuid4().hex[:10]}.png"
         r = self._request("POST", "/upload/image", files={"image": (name, buf.getvalue(), "image/png")},
                           data={"overwrite": "true", "type": "input"})
         r.raise_for_status()

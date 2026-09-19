@@ -90,7 +90,7 @@ def blend_lut(lut: np.ndarray, strength: float) -> np.ndarray:
     return ident + (lut - ident) * float(strength)
 
 
-def write_cube(lut: np.ndarray, path: str | Path, title: str = "lookcam") -> None:
+def write_cube(lut: np.ndarray, path: str | Path, title: str = "Nimbus") -> None:
     n = lut.shape[0]
     lines = [f'TITLE "{title}"', f"LUT_3D_SIZE {n}", "DOMAIN_MIN 0 0 0", "DOMAIN_MAX 1 1 1"]
     # .cube order: red varies fastest, then green, then blue.
