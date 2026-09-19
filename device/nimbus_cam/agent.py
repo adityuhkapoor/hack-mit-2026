@@ -128,8 +128,10 @@ def _tool_ids(c: httpx.Client) -> list[str]:
 def conversation_config(tool_ids: list[str], secret_id: str | None, use_muse: bool = True) -> dict:
     prompt: dict = {"prompt": PERSONA, "tool_ids": tool_ids, "timezone": "America/New_York", "temperature": 0.3}
     if use_muse:
-        prompt |= {"llm": "custom-llm", "custom_llm": {"url": BASE_URL, "model_id": MODEL,
-                                                       "api_key": {"secret_id": secret_id}}}
+        # Muse reasons before answering; at full effort a turn takes ~10 s and ElevenLabs gives up on the
+        # reply that follows a tool call. "minimal" is forwarded to the model as reasoning_effort.
+        prompt |= {"llm": "custom-llm", "reasoning_effort": "minimal", "cascade_timeout_seconds": 15,
+                   "custom_llm": {"url": BASE_URL, "model_id": MODEL, "api_key": {"secret_id": secret_id}}}
     else:
         prompt |= {"llm": "gemini-2.5-flash"}
     return {"agent": {"first_message": FIRST_MESSAGE, "language": "en", "prompt": prompt},
