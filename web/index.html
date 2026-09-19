@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lookcam — a camera that steals looks</title>
+<meta name="description" content="A camera that steals a photo's look, shoots in built-in styles, and paints with real-world textures. HackMIT 2026.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">lookcam</a>
+  <nav>
+    <a href="#gallery">Looks</a>
+    <a href="/steal.html">Steal a look</a>
+    <a href="#how">How it works</a>
+    <a href="/live.html">Live demo</a>
+  </nav>
+</header>
+
+<section class="hero">
+  <h1>A camera that steals looks.</h1>
+  <p class="lede">Share a photo you like and the camera works out its grade. Turn the dial for a film stock, a
+  2006 point-and-shoot, or a hand-painted anime version of what you are pointing at — and watch it live in the
+  viewfinder.</p>
+  <div class="cta">
+    <a class="button primary" href="#gallery">See the looks</a>
+    <a class="button" href="/steal.html">Steal a look from a photo</a>
+    <a class="button" href="/live.html">Try it on your webcam</a>
+  </div>
+  <p class="small">HackMIT 2026 · image pipeline running on a home GPU box · <a href="#numbers">the measurements</a></p>
+</section>
+
+<section id="gallery">
+  <h2>Every style, on the same six photos</h2>
+  <p class="sub">Shot on a full-frame camera, resized to what a 12&nbsp;MP sensor would capture, then run through
+  the pipeline. Click any image to compare it with the original.</p>
+  <div id="chips" class="chips"></div>
+  <div id="grid" class="grid"></div>
+</section>
+
+<section id="how">
+  <h2>Three kinds of style, one dial</h2>
+  <div class="cards">
+    <article>
+      <h3>Color grades</h3>
+      <p>A reference photo mixes <em>the scene</em> with <em>the grade</em>. Copying its colors directly copies
+      the scene too — that is why a beach reference turns your forest yellow. lookcam estimates the grade alone
+      and stores it as a 3D lookup table, which also opens in Lightroom or Resolve.</p>
+      <p class="meta">under 1 second · no GPU</p>
+    </article>
+    <article>
+      <h3>Camera character</h3>
+      <p>What makes a 2006 compact look like one is not its colors: it is chroma noise, smeared detail sharpened
+      into halos, purple fringing, JPEG blocks and an orange date stamp. Those are modeled directly, so the
+      artifacts are real rather than painted on.</p>
+      <p class="meta">0.05–1 second · no GPU</p>
+    </article>
+    <article>
+      <h3>Reimagine</h3>
+      <p>For an anime painting or a toy diorama, colors are not enough — the scene has to be repainted. FLUX.2
+      klein does that on the GPU box at 1&nbsp;MP, then a 4× upscaler brings it back to sensor resolution.</p>
+      <p class="meta">15–25 seconds · GPU box</p>
+    </article>
+  </div>
+
+  <div class="figure">
+    <h3>Faces stay recognizable</h3>
+    <p>Diffusion redraws a face into <em>a</em> person, not <em>the</em> person. Identity lives in fine
+    structure — the exact shape and spacing of eyes, nose and mouth — while style lives in color and broad tone.
+    So faces are detected and given back the photo's own structure under a soft mask, keeping the style
+    everywhere else.</p>
+    <img src="/public/figures/faces.jpg" alt="Original, anime style, and face restoration at three strengths" loading="lazy">
+    <p class="caption">Original · anime · face restoration at 0.5, 0.7 and 1.0</p>
+  </div>
+
+  <div class="figure">
+    <h3>Live preview, two layers</h3>
+    <p>Live diffusion tops out near 4 frames per second on an 8&nbsp;GB card, so the viewfinder does not wait for
+    it. Every frame gets a local stand-in; real diffusion frames arrive a few times a second and re-teach the
+    stand-in its colors. Hold the camera still and the real frame fades in.</p>
+    <img src="/public/figures/realtime.jpg" alt="Camera frame, local proxy, distilled proxy, diffusion frame" loading="lazy">
+    <p class="caption">Camera frame · local stand-in · stand-in with the model's colors · the diffusion frame itself</p>
+  </div>
+</section>
+
+<section id="numbers">
+  <h2>Measured, not guessed</h2>
+  <table>
+    <tr><th>Reverse-engineering a grade from one photo</th><th>Mean ΔE2000</th></tr>
+    <tr><td>Classic color transfer</td><td>18.50</td></tr>
+    <tr><td>Doing nothing</td><td>8.78</td></tr>
+    <tr><td>Our best blind estimate</td><td>7.76</td></tr>
+    <tr><td>Given a before/after pair</td><td><strong>0.89</strong></td></tr>
+  </table>
+  <table>
+    <tr><th>Speed</th><th></th></tr>
+    <tr><td>Color grade, 12 MP</td><td>0.7 s</td></tr>
+    <tr><td>2006 digicam, 12 MP</td><td>1 s</td></tr>
+    <tr><td>Anime painting, 12 MP (GPU box)</td><td>17 s</td></tr>
+    <tr><td>Live preview: local layer</td><td>14–16 fps</td></tr>
+    <tr><td>Live preview: diffusion frames</td><td>3.8 fps, 270 ms round trip</td></tr>
+  </table>
+  <p class="small">Grade accuracy measured against seven hand-built grades on twelve photos, scored with CIEDE2000;
+  lower is better. Speeds measured on an RTX 3060 Ti (8 GB) and an M3 MacBook.</p>
+</section>
+
+<div id="lightbox" class="lightbox" hidden>
+  <button class="close" aria-label="Close">×</button>
+  <figure>
+    <div class="compare" id="compare">
+      <img id="lbBase" alt="">
+      <div class="after" id="lbAfterWrap"><img id="lbAfter" alt=""></div>
+      <div class="handle" id="lbHandle"></div>
+    </div>
+    <figcaption id="lbCaption"></figcaption>
+  </figure>
+</div>
+
+<footer>
+  <p>Built for HackMIT 2026. Photos by Arun Vaithianathan.</p>
+</footer>
+<script src="/app.js"></script>
+</body>
+</html>

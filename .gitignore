@@ -1,0 +1,15 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+pipeline/looks/
+pipeline/brushes/
+pipeline/eval/out/
+pipeline/eval/photos/
+pipeline/eval/refs/
+pipeline/captures/
+.pytest_cache/
+**/.pytest_cache/
+web/.vercel/
+*.part

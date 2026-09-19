@@ -1,0 +1,8 @@
+[
+  {"key": "fog", "title": "Killian Court, 6:40 am", "note": "sea fog off the Charles",
+   "readings": {"temp_c": 11, "rh": 94, "lux": 180, "wind": 2.5, "db": 46}},
+  {"key": "dusk", "title": "Kresge Oval, 8:15 pm", "note": "just after rain, lamps coming on",
+   "readings": {"temp_c": 16, "rh": 83, "lux": 12, "wind": 1.0, "db": 55}},
+  {"key": "heat", "title": "Harvard Bridge, 2:30 pm", "note": "late-summer heat, gusty",
+   "readings": {"temp_c": 31, "rh": 52, "lux": 4800, "wind": 6.5, "db": 64}}
+]

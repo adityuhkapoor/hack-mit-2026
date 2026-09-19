@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lookcam — live viewfinder</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">lookcam</a>
+  <nav><a href="/#gallery">Looks</a><a href="/steal.html">Steal a look</a><a href="/#how">How it works</a><a href="/live.html">Live demo</a></nav>
+</header>
+
+<section>
+  <h1 style="font-size:28px;margin-bottom:6px">Live viewfinder</h1>
+  <p class="sub">Your webcam, styled in real time. Grade and camera styles are computed on the GPU box in a few
+  milliseconds; the ◆ styles run FLUX.2 klein there at a few frames a second, with a local stand-in filling the
+  gaps. Nothing is recorded — frames are processed and returned.</p>
+
+  <div id="chips" class="chips"></div>
+
+  <div class="stage">
+    <canvas id="out"></canvas>
+    <div id="hud">idle</div>
+    <canvas id="hero"></canvas>
+  </div>
+
+  <div class="controls">
+    <button class="button primary" id="startBtn">Start camera</button>
+    <label><input type="checkbox" id="showHero" checked> diffusion inset</label>
+    <label><input type="checkbox" id="stillBlend" checked> fade in when still</label>
+    <label>backend <input type="text" id="api" spellcheck="false"></label>
+  </div>
+  <p class="status" id="status">Enter a backend and press start. The backend is the pipeline server; it needs a GPU.</p>
+</section>
+
+<footer><p>Built for HackMIT 2026.</p></footer>
+<script src="/live.js"></script>
+</body>
+</html>

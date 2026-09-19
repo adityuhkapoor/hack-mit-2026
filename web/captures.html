@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lookcam — photographs of the air</title>
+<meta name="description" content="Every shot from the camera: the subject exactly as shot, the surroundings rendered from what the sensors felt.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">lookcam</a>
+  <nav><a href="/captures.html">Captures</a><a href="/">About</a></nav>
+</header>
+
+<section id="detail" hidden>
+  <a href="#" class="small">← all captures</a>
+  <div class="shot-head">
+    <h1 id="d-title"></h1>
+    <span id="d-proof" class="proof"></span>
+  </div>
+  <p id="d-readings" class="readings"></p>
+  <div class="tabs" role="tablist">
+    <button data-view="photo" class="on">Photograph</button>
+    <button data-view="compare">As shot ⇄ result</button>
+    <button data-view="mask">What the AI could touch</button>
+    <button data-view="card">Printed card</button>
+  </div>
+  <div id="d-view" class="shot-view"></div>
+  <p id="d-explain" class="sub"></p>
+  <details id="d-prompt-box" hidden><summary>What the AI was told</summary><p id="d-prompt" class="sub"></p></details>
+</section>
+
+<section id="list">
+  <h1 class="page-title">Photographs of the air</h1>
+  <p class="sub">The person in each picture is exactly as the camera captured them, checked pixel by pixel.
+  Everything around them was rendered from what the camera's sensors measured at that moment: temperature,
+  humidity, light, wind and sound. The dial sets how much the AI was allowed to change.</p>
+  <p id="status" class="status"></p>
+  <div id="grid" class="grid"></div>
+</section>
+
+<script src="/captures.js"></script>
+</body>
+</html>

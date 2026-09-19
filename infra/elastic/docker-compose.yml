@@ -1,0 +1,17 @@
+# Single-node Elasticsearch for the camera's photo search. Same file on the Mac (demo) and the ZimaOS box
+# (event). Security is off: it listens on localhost only here; on the box, keep it off the public tunnel.
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: lookcam-es
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - lookcam-es:/usr/share/elasticsearch/data
+    restart: unless-stopped
+volumes:
+  lookcam-es:

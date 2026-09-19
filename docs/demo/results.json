@@ -1,0 +1,242 @@
+[
+ {
+  "scenario": "fog",
+  "dial": 1,
+  "id": "69a0e969806e",
+  "created_at": 1789820458.4022605,
+  "dial_used": 1,
+  "dial_name": "Sensed air",
+  "readings": {
+   "temp_c": 11.0,
+   "rh": 94.0,
+   "lux": 180.0,
+   "wind": 2.5,
+   "db": 46.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Keep the layout of image 1 exactly: the same buildings, ground, objects and perspective, in the same places. Change only the weather, light and atmosphere of the masked surroundings to: cool, crisp autumn air, thick fog and drifting mist, overcast daylight, a steady breeze moving the trees, calm, muted, still light. Photorealistic, like a real photograph. The surroundings are deserted: nobody else is in the scene.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.466,
+   "diffusion": 28.508,
+   "surroundings": 0.371,
+   "total": 30.346
+  }
+ },
+ {
+  "scenario": "fog",
+  "dial": 2,
+  "id": "d4dce004cc70",
+  "created_at": 1789820490.5202253,
+  "dial_used": 2,
+  "dial_name": "New world",
+  "readings": {
+   "temp_c": 11.0,
+   "rh": 94.0,
+   "lux": 180.0,
+   "wind": 2.5,
+   "db": 46.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Replace the masked surroundings with a completely new real-world place that embodies: cool, crisp autumn air, thick fog and drifting mist, overcast daylight, a steady breeze moving the trees, calm, muted, still light. Match the camera height, perspective and light direction of image 1 so the subject belongs there. Photorealistic, like a real photograph. The place is deserted: an empty scene with nobody else in it.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.512,
+   "diffusion": 28.019,
+   "surroundings": 0.372,
+   "total": 29.904
+  }
+ },
+ {
+  "scenario": "dusk",
+  "dial": 1,
+  "id": "f396e120ff71",
+  "created_at": 1789820527.3736062,
+  "dial_used": 1,
+  "dial_name": "Sensed air",
+  "readings": {
+   "temp_c": 16.0,
+   "rh": 83.0,
+   "lux": 12.0,
+   "wind": 1.0,
+   "db": 55.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Keep the layout of image 1 exactly: the same buildings, ground, objects and perspective, in the same places. Change only the weather, light and atmosphere of the masked surroundings to: mild, comfortable spring air, thick fog and drifting mist, night, lit by streetlights and glowing windows. Photorealistic, like a real photograph. The surroundings are deserted: nobody else is in the scene.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.501,
+   "diffusion": 28.616,
+   "surroundings": 0.373,
+   "total": 30.491
+  }
+ },
+ {
+  "scenario": "dusk",
+  "dial": 2,
+  "id": "8966697e3b9c",
+  "created_at": 1789820559.6818607,
+  "dial_used": 2,
+  "dial_name": "New world",
+  "readings": {
+   "temp_c": 16.0,
+   "rh": 83.0,
+   "lux": 12.0,
+   "wind": 1.0,
+   "db": 55.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Replace the masked surroundings with a completely new real-world place that embodies: mild, comfortable spring air, thick fog and drifting mist, night, lit by streetlights and glowing windows. Match the camera height, perspective and light direction of image 1 so the subject belongs there. Photorealistic, like a real photograph. The place is deserted: an empty scene with nobody else in it.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.504,
+   "diffusion": 28.216,
+   "surroundings": 0.366,
+   "total": 30.087
+  }
+ },
+ {
+  "scenario": "heat",
+  "dial": 1,
+  "id": "7507ab9053aa",
+  "created_at": 1789820596.24152,
+  "dial_used": 1,
+  "dial_name": "Sensed air",
+  "readings": {
+   "temp_c": 31.0,
+   "rh": 52.0,
+   "lux": 4800.0,
+   "wind": 6.5,
+   "db": 64.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Keep the layout of image 1 exactly: the same buildings, ground, objects and perspective, in the same places. Change only the weather, light and atmosphere of the masked surroundings to: sweltering heat, shimmering heat haze, bleached sunlight, clear air, bright direct sun, hard shadows, strong wind, leaves and clouds streaming sideways. Photorealistic, like a real photograph. The surroundings are deserted: nobody else is in the scene.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.507,
+   "diffusion": 28.444,
+   "surroundings": 0.337,
+   "total": 30.289
+  }
+ },
+ {
+  "scenario": "heat",
+  "dial": 2,
+  "id": "4691ebc3c01b",
+  "created_at": 1789820628.4486475,
+  "dial_used": 2,
+  "dial_name": "New world",
+  "readings": {
+   "temp_c": 31.0,
+   "rh": 52.0,
+   "lux": 4800.0,
+   "wind": 6.5,
+   "db": 64.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": "Replace the masked surroundings with a completely new real-world place that embodies: sweltering heat, shimmering heat haze, bleached sunlight, clear air, bright direct sun, hard shadows, strong wind, leaves and clouds streaming sideways. Match the camera height, perspective and light direction of image 1 so the subject belongs there. Photorealistic, like a real photograph. The place is deserted: an empty scene with nobody else in it.",
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.489,
+   "diffusion": 28.201,
+   "surroundings": 0.338,
+   "total": 30.029
+  }
+ },
+ {
+  "scenario": "fog",
+  "dial": 0,
+  "id": "5250925f87ca",
+  "created_at": 1789820709.8582728,
+  "dial_used": 0,
+  "dial_name": "Real",
+  "readings": {
+   "temp_c": 11.0,
+   "rh": 94.0,
+   "lux": 180.0,
+   "wind": 2.5,
+   "db": 46.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": null,
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.591,
+   "surroundings": 0.398,
+   "total": 1.991
+  }
+ },
+ {
+  "scenario": "dusk",
+  "dial": 0,
+  "id": "82ba888096ac",
+  "created_at": 1789820713.9115827,
+  "dial_used": 0,
+  "dial_name": "Real",
+  "readings": {
+   "temp_c": 16.0,
+   "rh": 83.0,
+   "lux": 12.0,
+   "wind": 1.0,
+   "db": 55.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": null,
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.521,
+   "surroundings": 0.436,
+   "total": 1.959
+  }
+ },
+ {
+  "scenario": "heat",
+  "dial": 0,
+  "id": "c2dabc181700",
+  "created_at": 1789820718.107316,
+  "dial_used": 0,
+  "dial_name": "Real",
+  "readings": {
+   "temp_c": 31.0,
+   "rh": 52.0,
+   "lux": 4800.0,
+   "wind": 6.5,
+   "db": 64.0
+  },
+  "untouched": true,
+  "proof": "subject unaltered \u00b7 verified",
+  "max_diff": 0.0,
+  "subject_fraction": 0.25,
+  "prompt": null,
+  "fallback_reason": null,
+  "timings": {
+   "mask": 1.521,
+   "surroundings": 0.394,
+   "total": 1.917
+  }
+ }
+]

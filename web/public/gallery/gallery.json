@@ -1,0 +1,1066 @@
+{
+ "photos": [
+  {
+   "id": "DSC00272-Enhanced-NR",
+   "title": "Grand Canyon, sunrise",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "DSC00272-Enhanced-NR/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "DSC00272-Enhanced-NR/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "DSC00272-Enhanced-NR/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "DSC00272-Enhanced-NR/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "DSC00272-Enhanced-NR/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "DSC00272-Enhanced-NR/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "DSC00272-Enhanced-NR/06_digicam.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "DSC00272-Enhanced-NR/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "DSC00272-Enhanced-NR/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "DSC00272-Enhanced-NR/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "DSC00272-Enhanced-NR/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "DSC00272-Enhanced-NR/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "DSC00272-Enhanced-NR/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "DSC00272-Enhanced-NR/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "DSC00272-Enhanced-NR/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "DSC00272-Enhanced-NR/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "DSC00272-Enhanced-NR/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "DSC00272-Enhanced-NR/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "DSC00272-Enhanced-NR/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  },
+  {
+   "id": "DSC06684-Enhanced-NR",
+   "title": "Egret over the reeds",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "DSC06684-Enhanced-NR/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "DSC06684-Enhanced-NR/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "DSC06684-Enhanced-NR/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "DSC06684-Enhanced-NR/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "DSC06684-Enhanced-NR/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "DSC06684-Enhanced-NR/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "DSC06684-Enhanced-NR/06_digicam.jpg",
+     "w": 1200,
+     "h": 801
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "DSC06684-Enhanced-NR/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "DSC06684-Enhanced-NR/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "DSC06684-Enhanced-NR/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "DSC06684-Enhanced-NR/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "DSC06684-Enhanced-NR/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "DSC06684-Enhanced-NR/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "DSC06684-Enhanced-NR/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "DSC06684-Enhanced-NR/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "DSC06684-Enhanced-NR/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "DSC06684-Enhanced-NR/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "DSC06684-Enhanced-NR/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "DSC06684-Enhanced-NR/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  },
+  {
+   "id": "IMG_0223",
+   "title": "Campus lawn at dusk",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "IMG_0223/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "IMG_0223/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "IMG_0223/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "IMG_0223/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "IMG_0223/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "IMG_0223/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "IMG_0223/06_digicam.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "IMG_0223/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "IMG_0223/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "IMG_0223/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "IMG_0223/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "IMG_0223/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "IMG_0223/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "IMG_0223/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "IMG_0223/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "IMG_0223/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "IMG_0223/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "IMG_0223/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "IMG_0223/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  },
+  {
+   "id": "_DSC7022-Enhanced-NR",
+   "title": "Lavaux vineyards, Lake Geneva",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "_DSC7022-Enhanced-NR/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "_DSC7022-Enhanced-NR/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "_DSC7022-Enhanced-NR/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "_DSC7022-Enhanced-NR/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "_DSC7022-Enhanced-NR/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "_DSC7022-Enhanced-NR/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "_DSC7022-Enhanced-NR/06_digicam.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "_DSC7022-Enhanced-NR/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "_DSC7022-Enhanced-NR/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "_DSC7022-Enhanced-NR/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "_DSC7022-Enhanced-NR/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "_DSC7022-Enhanced-NR/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "_DSC7022-Enhanced-NR/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "_DSC7022-Enhanced-NR/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "_DSC7022-Enhanced-NR/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "_DSC7022-Enhanced-NR/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "_DSC7022-Enhanced-NR/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "_DSC7022-Enhanced-NR/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "_DSC7022-Enhanced-NR/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  },
+  {
+   "id": "_DSC8307-Enhanced-NR",
+   "title": "Jungfrau in cloud",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "_DSC8307-Enhanced-NR/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "_DSC8307-Enhanced-NR/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "_DSC8307-Enhanced-NR/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "_DSC8307-Enhanced-NR/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "_DSC8307-Enhanced-NR/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "_DSC8307-Enhanced-NR/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "_DSC8307-Enhanced-NR/06_digicam.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "_DSC8307-Enhanced-NR/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "_DSC8307-Enhanced-NR/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "_DSC8307-Enhanced-NR/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "_DSC8307-Enhanced-NR/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "_DSC8307-Enhanced-NR/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "_DSC8307-Enhanced-NR/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "_DSC8307-Enhanced-NR/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "_DSC8307-Enhanced-NR/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "_DSC8307-Enhanced-NR/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "_DSC8307-Enhanced-NR/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "_DSC8307-Enhanced-NR/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "_DSC8307-Enhanced-NR/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  },
+  {
+   "id": "_DSC8705-Enhanced-NR",
+   "title": "Brienz marina",
+   "renders": [
+    {
+     "id": "original",
+     "name": "Original (12 MP)",
+     "family": "original",
+     "description": "",
+     "file": "_DSC8705-Enhanced-NR/00_original.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "velvia",
+     "name": "Velvia Landscape",
+     "family": "grade",
+     "description": "Fuji Velvia 50 slide film: dense greens and blues, deep shadows.",
+     "file": "_DSC8705-Enhanced-NR/01_velvia.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "portra",
+     "name": "Portra Warm",
+     "family": "grade",
+     "description": "Kodak Portra 400: warm, soft, gently faded shadows.",
+     "file": "_DSC8705-Enhanced-NR/02_portra.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "teal_orange",
+     "name": "Cinematic Teal & Orange",
+     "family": "grade",
+     "description": "Blockbuster split tone: teal shadows, warm highlights.",
+     "file": "_DSC8705-Enhanced-NR/03_teal_orange.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "faded_matte",
+     "name": "Faded Matte",
+     "family": "grade",
+     "description": "Low-contrast, desaturated, lifted blacks: the Instagram matte.",
+     "file": "_DSC8705-Enhanced-NR/04_faded_matte.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "mono",
+     "name": "Selenium Mono",
+     "family": "grade",
+     "description": "Rich black-and-white with cool selenium-toned shadows.",
+     "file": "_DSC8705-Enhanced-NR/05_mono.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "digicam",
+     "name": "2006 Digicam",
+     "family": "camera",
+     "description": "5 MP CCD compact: chroma noise, smeared-then-oversharpened detail, purple fringing, JPEG blocks, date stamp.",
+     "file": "_DSC8705-Enhanced-NR/06_digicam.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "cinestill",
+     "name": "CineStill 800T",
+     "family": "camera",
+     "description": "Tungsten night film: cool cast, red halation around highlights, grain.",
+     "file": "_DSC8705-Enhanced-NR/07_cinestill.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "instant",
+     "name": "Instant Print",
+     "family": "camera",
+     "description": "Faded instant film mounted in its print border, ready for the printer.",
+     "file": "_DSC8705-Enhanced-NR/08_instant.jpg",
+     "w": 1050,
+     "h": 1200
+    },
+    {
+     "id": "miniature",
+     "name": "Tilt-Shift Miniature",
+     "family": "camera",
+     "description": "Lens-blurred top and bottom make the world look like a toy model.",
+     "file": "_DSC8705-Enhanced-NR/09_miniature.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "pixel",
+     "name": "16-bit Pixel Art",
+     "family": "camera",
+     "description": "Retro game pixel art: a real 320-pixel-wide grid and a 32-color palette.",
+     "file": "_DSC8705-Enhanced-NR/10_pixel.jpg",
+     "w": 1200,
+     "h": 799
+    },
+    {
+     "id": "anime",
+     "name": "Anime Painting",
+     "family": "reimagine",
+     "description": "Hand-painted anime background art in the style of Studio Ghibli films.",
+     "file": "_DSC8705-Enhanced-NR/11_anime.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "watercolor",
+     "name": "Watercolor",
+     "family": "reimagine",
+     "description": "Loose watercolor washes on textured paper.",
+     "file": "_DSC8705-Enhanced-NR/12_watercolor.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "poster",
+     "name": "Vintage Travel Poster",
+     "family": "reimagine",
+     "description": "1930s screen-printed travel poster: flat shapes, limited palette.",
+     "file": "_DSC8705-Enhanced-NR/13_poster.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "golden_hour",
+     "name": "Golden Hour Relight",
+     "family": "reimagine",
+     "description": "Relit by a low warm sun, still photographic.",
+     "file": "_DSC8705-Enhanced-NR/14_golden_hour.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "diorama",
+     "name": "Toy Diorama",
+     "family": "reimagine",
+     "description": "The scene rebuilt as a handmade miniature model, shot with tilt-shift.",
+     "file": "_DSC8705-Enhanced-NR/15_diorama.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_crossprocess",
+     "name": "Stolen look (82.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 82.jpg, full strength",
+     "file": "_DSC8705-Enhanced-NR/16_ref_crossprocess.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_faded_green",
+     "name": "Stolen look (101.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 101.jpg, full strength",
+     "file": "_DSC8705-Enhanced-NR/17_ref_faded_green.jpg",
+     "w": 1200,
+     "h": 800
+    },
+    {
+     "id": "ref_sepia",
+     "name": "Stolen look (111.jpg)",
+     "family": "stolen",
+     "description": "Grade estimated from 111.jpg, full strength",
+     "file": "_DSC8705-Enhanced-NR/18_ref_sepia.jpg",
+     "w": 1200,
+     "h": 800
+    }
+   ]
+  }
+ ]
+}

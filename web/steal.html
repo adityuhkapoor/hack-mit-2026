@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lookcam — steal a look</title>
+<meta name="description" content="Upload a photo you like; the camera works out its color grade and applies it to your own shots.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📷</text></svg>">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">lookcam</a>
+  <nav>
+    <a href="/#gallery">Looks</a>
+    <a href="/steal.html">Steal a look</a>
+    <a href="/#how">How it works</a>
+    <a href="/live.html">Live demo</a>
+  </nav>
+</header>
+
+<section>
+  <h1 style="font-size:28px;margin-bottom:6px">Steal a look</h1>
+  <p class="sub">Upload a photo whose look you want — a post you saved, a film scan, a frame from a film. The
+  pipeline separates its <em>grade</em> from its <em>scene</em>, so you get the look without the other photo's
+  colors bleeding in, then applies it to a shot of yours.</p>
+
+  <div class="steal">
+    <div class="panel">
+      <h3>1. The photo you like</h3>
+      <label class="drop" id="refDrop">
+        <input type="file" id="refFile" accept="image/*" hidden>
+        <img id="refThumb" alt="" hidden>
+        <span id="refHint">Drop an image, or click to choose</span>
+      </label>
+
+      <details id="pairBox">
+        <summary>Have a before/after pair?</summary>
+        <p class="small" style="margin:6px 0 8px">Preset sellers post the unedited shot next to the edited one.
+        With both, the grade is recovered almost exactly (ΔE 0.89) instead of estimated (7.76).</p>
+        <label class="drop small-drop" id="beforeDrop">
+          <input type="file" id="beforeFile" accept="image/*" hidden>
+          <img id="beforeThumb" alt="" hidden>
+          <span id="beforeHint">Optional: the unedited “before” image</span>
+        </label>
+      </details>
+
+      <div id="lookCard" class="lookcard" hidden>
+        <div class="lookhead">
+          <b id="lookName">—</b>
+          <span class="tag" id="lookMethod"></span>
+        </div>
+        <ul id="lookTraits"></ul>
+        <div id="swatches" class="swatches"></div>
+        <a id="cubeLink" class="button" download>Download .cube</a>
+      </div>
+      <p class="status" id="status">The grade is extracted on the demo box, which keeps a thumbnail and the LUT for the
+      most recent few hundred looks and discards older ones.</p>
+    </div>
+
+    <div class="panel">
+      <h3>2. Your photo</h3>
+      <div id="targets" class="targets"></div>
+      <label class="drop small-drop" id="ownDrop">
+        <input type="file" id="ownFile" accept="image/*" hidden>
+        <span>…or use one of your own</span>
+      </label>
+
+      <div class="compare" id="compare" hidden>
+        <img id="base" alt="Result">
+        <div class="after" id="afterWrap"><img id="after" alt="Original"></div>
+        <div class="handle" id="handle"></div>
+      </div>
+      <div class="controls" id="renderControls" hidden>
+        <label>strength <input type="range" id="strength" min="0" max="1" step="0.05"></label>
+        <span id="strengthVal" class="small"></span>
+        <span class="small" id="renderMs"></span>
+      </div>
+      <p class="small" id="hint">Pick a reference on the left, then a photo here.</p>
+    </div>
+  </div>
+
+  <div class="figure" style="margin-top:34px">
+    <h3>Why the slider starts halfway</h3>
+    <p>Guessing a grade from a single photo is genuinely ill-posed: the same picture could be a warm scene shot
+    neutrally or a neutral scene graded warm. Measured against seven known grades, the best blind estimate beats
+    doing nothing by about 12% — and only when applied at partial strength. Give it the before/after pair and
+    that ambiguity disappears.</p>
+  </div>
+</section>
+
+<footer><p>Built for HackMIT 2026.</p></footer>
+<script src="/steal.js"></script>
+</body>
+</html>
