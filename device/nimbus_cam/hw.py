@@ -77,13 +77,26 @@ class MacSensors:
 class Camera:
     def __init__(self, index: int = 0, still: str | None = None):
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None
-        self.cap = None if still else cv2.VideoCapture(index)
-        if self.cap is not None:
-            self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
-            self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
-            if not self.cap.isOpened():
-                raise RuntimeError(f"camera {index} did not open (on a Mac: allow camera access for the terminal)")
+        self.cap = None if still else self._open(index)
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _open(index: int, wait_s: float = 30) -> cv2.VideoCapture:
+        """On a Mac the first open only *asks* for camera permission and fails at once; keep trying while
+        the "allow camera" prompt is on screen."""
+        deadline = time.time() + wait_s
+        while True:
+            cap = cv2.VideoCapture(index)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
+                return cap
+            cap.release()
+            if time.time() > deadline:
+                raise RuntimeError(f"camera {index} did not open (on a Mac: System Settings → Privacy & "
+                                   "Security → Camera → allow the terminal app, then relaunch)")
+            print("[camera] waiting for camera permission…", flush=True)
+            time.sleep(1.5)
 
     def frame(self) -> np.ndarray | None:
         """RGB uint8, full resolution."""
