@@ -2,6 +2,11 @@
 
 Status snapshot: September 19, 2026. This is the team's implementation and assembly plan, not a claim that every feature is already working. Hardware in hand, reservation requests, working software, and proposed integrations are deliberately separated below.
 
+> **Live handoff:** Read [TEAM_HARDWARE_RUNBOOK.md](TEAM_HARDWARE_RUNBOOK.md)
+> first for the later verified touchscreen, BOX-3, ASUS, and Raspberry Pi
+> status. This longer plan preserves design context, but some live-state claims
+> below predate the evening integration tests.
+
 ### Read alongside the existing Nimbus plan
 
 The shared repository already contains [Nimbus design](docs/DESIGN.md), [device software](device/README.md), and an [image pipeline](pipeline/README.md). This document records **Aditya's physical hardware/integration track** and its observed tests; it does not replace those documents or audit all of their implementation claims. The local Mac prototype described below is a separate working tree and has not been uploaded as part of this documentation change.
