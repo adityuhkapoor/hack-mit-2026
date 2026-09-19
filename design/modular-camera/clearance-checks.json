@@ -1,0 +1,5 @@
+{
+  "printable_part_intersections": [],
+  "hardware_envelope_intersections": [],
+  "limitation": "Only modeled rigid shapes checked. Cables, hardware tolerances, fastener access, thermal performance and clip pose still require real fitting."
+}

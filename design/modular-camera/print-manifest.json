@@ -1,0 +1,218 @@
+{
+  "revision": "R01",
+  "units": "mm",
+  "printer": "HackMIT Bambu A1/P1S 256x256x256, 0.4mm, PLA; read hardware.hackmit.org/3d-prints",
+  "physical_fit_tested": false,
+  "parts": [
+    {
+      "name": "01_rear_screen_frame",
+      "quantity": 1,
+      "dimensions_mm": [
+        192.0,
+        140.0,
+        4.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 1776,
+      "volume_mm3": 33253.88,
+      "notes": "Same 192x140x4 carrier as screen-holder R02. Do not reprint if already made."
+    },
+    {
+      "name": "02_base",
+      "quantity": 1,
+      "dimensions_mm": [
+        211.4,
+        180.0,
+        4.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3592,
+      "volume_mm3": 146214.56,
+      "notes": ""
+    },
+    {
+      "name": "03_left_side",
+      "quantity": 1,
+      "dimensions_mm": [
+        180.0,
+        180.0,
+        24.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3080,
+      "volume_mm3": 74393.53,
+      "notes": "Print exterior flat down, lugs upwards; review small horizontal bores in slicer."
+    },
+    {
+      "name": "04_right_side",
+      "quantity": 1,
+      "dimensions_mm": [
+        180.0,
+        180.0,
+        24.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3082,
+      "volume_mm3": 74393.53,
+      "notes": "Print exterior flat down, lugs upwards; review small horizontal bores in slicer."
+    },
+    {
+      "name": "05_removable_roof",
+      "quantity": 1,
+      "dimensions_mm": [
+        211.4,
+        180.0,
+        4.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3762,
+      "volume_mm3": 145532.11,
+      "notes": ""
+    },
+    {
+      "name": "06_replaceable_front",
+      "quantity": 1,
+      "dimensions_mm": [
+        224.0,
+        172.0,
+        4.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3004,
+      "volume_mm3": 130275.69,
+      "notes": "Whole webcam opening; styling/lens nose can change without redesigning the cage."
+    },
+    {
+      "name": "07_Pi4_and_UNOQ_shelf",
+      "quantity": 1,
+      "dimensions_mm": [
+        208.0,
+        90.0,
+        3.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 3030,
+      "volume_mm3": 54162.08,
+      "notes": "Pi: M2.5, UNO Q: M3. Separate 6 mm insulating spacers. Native board patterns, not a shared guessed rectangle."
+    },
+    {
+      "name": "08_Logitech_clip_cradle",
+      "quantity": 1,
+      "dimensions_mm": [
+        208.0,
+        86.0,
+        21.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 2104,
+      "volume_mm3": 60574.67,
+      "notes": "Adjust webcam on non-slip pad; strap around clip/base, never over lens or microphone. Cable exits rear/side."
+    },
+    {
+      "name": "09_Anker_strap_cradle",
+      "quantity": 1,
+      "dimensions_mm": [
+        160.0,
+        96.0,
+        8.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 1510,
+      "volume_mm3": 49613.32,
+      "notes": "No tight clamp, no battery modification. Two straps pass through cradle AND aligned floor slots."
+    },
+    {
+      "name": "10_sensor_control_carrier_PRINT_5",
+      "quantity": 5,
+      "dimensions_mm": [
+        70.0,
+        46.0,
+        3.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 1730,
+      "volume_mm3": 8489.48,
+      "notes": "Four small slots suit measured Modulino-style mounting; side tie slots accommodate unverified thermal/small breakouts using insulating stand-offs."
+    },
+    {
+      "name": "11_Pi_M2p5_spacer_6mm_PRINT_4",
+      "quantity": 4,
+      "dimensions_mm": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 320,
+      "volume_mm3": 129.48,
+      "notes": ""
+    },
+    {
+      "name": "12_UNO_M3_spacer_6mm_PRINT_4",
+      "quantity": 4,
+      "dimensions_mm": [
+        6.0,
+        6.0,
+        6.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 320,
+      "volume_mm3": 114.7,
+      "notes": ""
+    },
+    {
+      "name": "13_sensor_spacer_5mm_AS_NEEDED",
+      "quantity": 20,
+      "dimensions_mm": [
+        6.0,
+        6.0,
+        5.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 320,
+      "volume_mm3": 95.58,
+      "notes": ""
+    },
+    {
+      "name": "14_screen_tab_washer_PRINT_4",
+      "quantity": 4,
+      "dimensions_mm": [
+        9.0,
+        9.0,
+        1.5
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 384,
+      "volume_mm3": 85.94,
+      "notes": ""
+    },
+    {
+      "name": "15_fastener_fit_coupon",
+      "quantity": 1,
+      "dimensions_mm": [
+        46.0,
+        18.0,
+        4.0
+      ],
+      "nonmanifold_edges": 0,
+      "connected_solids": 1,
+      "stl_triangles": 676,
+      "volume_mm3": 3163.79,
+      "notes": ""
+    }
+  ]
+}

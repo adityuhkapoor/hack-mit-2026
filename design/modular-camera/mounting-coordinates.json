@@ -1,0 +1,88 @@
+{
+  "axes": "X width; front=-Y; display=+Y; Z up; mm",
+  "screen_chassis_centres": [
+    [
+      -91,
+      90,
+      36
+    ],
+    [
+      -91,
+      90,
+      164
+    ],
+    [
+      91,
+      90,
+      36
+    ],
+    [
+      91,
+      90,
+      164
+    ]
+  ],
+  "pi_PCB_centre": [
+    -51,
+    -20
+  ],
+  "pi_mount_centres_xy": [
+    [
+      -12,
+      4.5
+    ],
+    [
+      -12,
+      -44.5
+    ],
+    [
+      -70,
+      4.5
+    ],
+    [
+      -70,
+      -44.5
+    ]
+  ],
+  "uno_PCB_centre": [
+    49,
+    -20
+  ],
+  "uno_mount_centres_xy": [
+    [
+      68.05,
+      -44.13
+    ],
+    [
+      69.32,
+      4.1299999999999955
+    ],
+    [
+      17.249999999999993,
+      -28.89
+    ],
+    [
+      17.249999999999993,
+      -0.9500000000000028
+    ]
+  ],
+  "scope": [
+    "screen",
+    "Pi4B",
+    "UNO Q",
+    "Anker A110D",
+    "Logitech C270",
+    "Buttons",
+    "Light",
+    "Movement",
+    "Distance",
+    "thermal/universal sensor provision"
+  ],
+  "excluded": [
+    "ESP32/BOX-3",
+    "internal ASUS",
+    "printer",
+    "unverified speaker",
+    "internal TP-Link hub"
+  ]
+}
