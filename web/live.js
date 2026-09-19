@@ -1,5 +1,5 @@
 // Live viewfinder: webcam frames over a websocket to the pipeline, styled frames back.
-const DEFAULT_API = 'https://lookcam.akvaithi.page';
+const DEFAULT_API = 'https://nimbus.akvaithi.page';
 const out = document.getElementById('out'), hero = document.getElementById('hero');
 const octx = out.getContext('2d'), hctx = hero.getContext('2d');
 const hud = document.getElementById('hud'), statusEl = document.getElementById('status');

@@ -39,7 +39,7 @@ _gpu_lock = threading.Lock()  # one diffusion job at a time; the 8 GB card canno
 GALLERY_URL = os.environ.get("NIMBUS_GALLERY_URL", "https://lookcam-akvaithis-projects.vercel.app/captures.html")
 # The QR carries this short form instead (/c/<id> redirects to the gallery): fewer modules, so each one
 # is big enough to scan off a thermal print.
-PUBLIC_URL = os.environ.get("NIMBUS_PUBLIC_URL", "https://lookcam.akvaithi.page")
+PUBLIC_URL = os.environ.get("NIMBUS_PUBLIC_URL", "https://nimbus.akvaithi.page")
 
 SENSOR_MP = 12.0  # the camera's sensor; larger uploads are resized to what it would capture
 

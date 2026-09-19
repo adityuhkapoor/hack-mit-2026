@@ -88,7 +88,7 @@ Environment overrides:
 | Site (gallery, steal-a-look, live viewfinder) | Vercel project `nimbus`, built from `web/` — `vercel deploy --prod` |
 | Gallery images | `uv run python scripts/build_site.py` regenerates `web/public/gallery` from `Photos/looks` |
 | Backend | The API runs **on the GPU box** (`infra/win/deploy_api.sh` → task "NimbusAPI", localhost:8000) |
-| Public URL | `https://lookcam.akvaithi.page` via the box's existing cloudflared tunnel (`infra/win/expose_api.ps1`) |
+| Public URL | `https://nimbus.akvaithi.page` via the box's existing cloudflared tunnel (`infra/win/expose_api.ps1`) |
 
 The backend is unauthenticated on purpose so the page works for anyone, and therefore capped:
 `NIMBUS_MAX_SESSIONS` (default 3) live viewers and `NIMBUS_GPU_CALLS_PER_MIN` (default 20) GPU calls per

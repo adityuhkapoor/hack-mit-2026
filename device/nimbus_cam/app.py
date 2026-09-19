@@ -22,7 +22,7 @@ from nimbus import capture as lc, imageio, sense
 from . import instagram, tagger
 from .library import HOME, Photo, Query
 
-API = os.environ.get("NIMBUS_API", "https://lookcam.akvaithi.page")
+API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
 DIALS = sense.DIAL_NAMES
 
 

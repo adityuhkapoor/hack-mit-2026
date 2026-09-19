@@ -1,5 +1,5 @@
 // The gallery behind the printed card's QR code: /captures.html#<id> opens one shot.
-const API = new URLSearchParams(location.search).get('api') || 'https://lookcam.akvaithi.page';
+const API = new URLSearchParams(location.search).get('api') || 'https://nimbus.akvaithi.page';
 const $ = id => document.getElementById(id);
 const img = (id, which) => `${API}/captures/${id}/${which}.jpg`;
 

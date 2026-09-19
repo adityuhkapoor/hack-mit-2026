@@ -34,7 +34,7 @@ stays: `readings()` returns `key=value;…` with any subset of `temp_c rh lux db
 - [ ] UNO Q checked out (Arduino booth); App Lab runs Blink.
 - [ ] Bridge API names match the App Lab examples (`Bridge.provide` / `Bridge.call`).
 - [ ] Camera enumerates on the UNO Q (CSI carrier, or `/dev/video*` for USB).
-- [ ] `curl https://lookcam.akvaithi.page/health` from the board over venue Wi-Fi.
+- [ ] `curl https://nimbus.akvaithi.page/health` from the board over venue Wi-Fi.
 - [ ] On the board: `pip install -e pipeline` and `NIMBUS_SEG=human`, then time one Real shot (Real renders on the board).
 
 ## Run the camera on a Mac (no hardware needed)
@@ -62,7 +62,7 @@ Keys are read from the macOS Keychain, never from files. On the UNO Q, use envir
 |---|---|---|
 | `meta-model-api-key` | `MODEL_API_KEY` | ✅ stored |
 | `elevenlabs-api-key` | `ELEVENLABS_API_KEY` | needed for voice |
-| `ig-user-id`, `ig-token` | `IG_USER_ID`, `IG_TOKEN` | needed to post |
+| `ig-token` | `IG_TOKEN` | needed to post (the account id is looked up from it) |
 
 ```bash
 security add-generic-password -s elevenlabs-api-key -a $USER -w '<key>' -T /usr/bin/security -U
@@ -70,5 +70,5 @@ security add-generic-password -s elevenlabs-api-key -a $USER -w '<key>' -T /usr/
 
 Tests: `uv run pytest` (offline; no keys, models or network needed).
 
-Instagram needs an Instagram **business** account linked to a Facebook page, and a long-lived token with
+Instagram needs a professional (business or creator) Instagram account and one token from the Meta app dashboard (Instagram API with Instagram Login). Check it with `uv run python -m nimbus_cam.instagram`. Token scope:
 `instagram_content_publish`. The card image is what gets posted.

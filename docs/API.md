@@ -6,7 +6,7 @@ The image-processing service the camera frontend calls. It runs on the MacBook a
 cd pipeline && uv run uvicorn nimbus.api:app --host 0.0.0.0 --port 8000
 ```
 
-- Base URL: `http://<mac-ip>:8000` locally, or `https://lookcam.akvaithi.page` (the copy running on the GPU box, used by the public demo).
+- Base URL: `http://<mac-ip>:8000` locally, or `https://nimbus.akvaithi.page` (the copy running on the GPU box, used by the public demo).
 - Interactive docs: `http://<mac-ip>:8000/docs`.
 - CORS is open.
 - Every image upload is `multipart/form-data`.
@@ -256,7 +256,7 @@ JSON `{"detail": "..."}` with these statuses:
 
 Render and paint never fail over GPU trouble; they degrade to tier 0 or `fast`.
 
-**Public instance limits** (`https://lookcam.akvaithi.page`): 3 concurrent live-preview sockets, 20 GPU calls and
+**Public instance limits** (`https://nimbus.akvaithi.page`): 3 concurrent live-preview sockets, 20 GPU calls and
 12 new Looks per minute per address, and only the newest 300 Looks are kept on disk. All are environment
 variables (`NIMBUS_MAX_SESSIONS`, `NIMBUS_GPU_CALLS_PER_MIN`, `NIMBUS_LOOKS_PER_MIN`, `NIMBUS_MAX_LOOKS`).
 

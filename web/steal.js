@@ -1,5 +1,5 @@
 // Steal a look: upload a reference, the API extracts its grade, apply it to a photo.
-const API = new URLSearchParams(location.search).get('api') || 'https://lookcam.akvaithi.page';
+const API = new URLSearchParams(location.search).get('api') || 'https://nimbus.akvaithi.page';
 const GALLERY = '/public/gallery';
 const state = { look: null, target: null, targetName: '', busy: false, strength: 0.5 };
 
