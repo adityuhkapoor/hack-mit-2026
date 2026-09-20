@@ -211,7 +211,9 @@ class PiSensors:
             out["lux"] = lux
         if (db := self._db()) is not None:
             out["db"] = db
-        return out
+        # A mic that vanished mid-sample (USB reset) returns NaN, and NaN is not JSON: Elasticsearch
+        # refused a whole photo over one. Only finite numbers leave here.
+        return {k: float(v) for k, v in out.items() if v is not None and math.isfinite(float(v))}
 
     def status(self, s: int) -> None:
         pass
