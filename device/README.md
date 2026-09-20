@@ -122,7 +122,9 @@ capture currently waits for library indexing before showing review.
 ## Tested touchscreen configuration
 
 The touchscreen starts on the animated Nimbus welcome screen. Touch anywhere to
-enter the camera; that touch does not take a photo. The **IDLE** button in the
+enter the camera through a parting cloud curtain; that touch does not take a photo.
+The clouds wait briefly for a fresh preview frame, with a bounded timeout if the
+camera is unavailable. The **IDLE** button in the
 top-right corner of the viewfinder returns to the welcome screen. While idle,
 preview decoding and shutter actions are paused. The camera connection and other
 app services remain initialized for quick resume. Set `NIMBUS_START_IDLE=0` to

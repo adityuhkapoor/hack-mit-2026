@@ -26,6 +26,11 @@ def test_wake_tap_is_consumed_and_corner_can_return_to_idle():
     s=screen();event=SimpleNamespace(x=500,y=550)
     s._touch_down(event);s._touch_up(event)
     assert not s.app.state.idle
+    assert s.skin.waking and s.skin.cur == 1
+    now=s.skin.cur_t
+    for step in range(1,30):
+        s.skin._curtain_step(s.app.state,now+step*.05)
+    assert not s.skin.waking
     corner=SimpleNamespace(x=965,y=25)
     s._touch_down(corner);s._touch_up(corner)
     assert s.app.state.idle
@@ -46,3 +51,12 @@ def test_idle_button_scaling():
     s=screen();s.sx,s.sy=1024/800,600/480
     assert s._idle_hit(SimpleNamespace(x=755,y=20))
     assert not s._idle_hit(SimpleNamespace(x=20,y=20))
+
+
+def test_wake_clouds_hold_for_preview_then_part():
+    s=screen();s.skin.begin_wake(10)
+    s.skin._curtain_step(s.app.state,10.2,hold=True)
+    assert s.skin.cur == 1 and s.skin.waking
+    for step in range(1,25):
+        s.skin._curtain_step(s.app.state,10.2+step*.05)
+    assert s.skin.cur == 0 and not s.skin.waking

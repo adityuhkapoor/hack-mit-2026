@@ -205,7 +205,7 @@ class Screen:
         }
 
     def _screen_buttons(self) -> list[Button]:
-        if getattr(self.app.state, "idle", False):
+        if getattr(self.app.state, "idle", False) or getattr(self.skin, "waking", False):
             return []
         if (getattr(self, "_preview_wait_until", None) is not None
                 or getattr(self, "_photo_pending", False) and self.app.state.screen != "viewfinder"
@@ -218,7 +218,7 @@ class Screen:
         if getattr(self.app.state, "idle", False):
             self._wake_pressed = True
             return
-        if self._idle_hit(e) and not self.app.state.busy and self.app.state.screen == "viewfinder":
+        if self._idle_hit(e) and not self.app.state.busy and self.app.state.screen == "viewfinder" and not getattr(self.skin, "waking", False):
             self._idle_pressed = True
             return
         now, x, y = time.time(), e.x * self.sx, e.y * self.sy
@@ -268,18 +268,21 @@ class Screen:
         self._last_ctx = None
         self._preview_wait_until = None
         self.skin.t_start = time.time() if idle else time.time() - 3
+        if not idle:
+            self.skin.begin_wake(time.time())
+            self._preview_enabled = False  # hold the clouds until a fresh frame, bounded by the existing timeout
         if hasattr(self.app.camera, "set_preview_visible"):
             self.app.camera.set_preview_visible(not idle)
         if idle and self.voice and self.app.state.talking:
             self._talk_up(None)
 
     def _bg(self, fn, params) -> None:
-        if getattr(self.app.state, "idle", False):
+        if getattr(self.app.state, "idle", False) or getattr(self.skin, "waking", False):
             return
         threading.Thread(target=fn, args=(params,), daemon=True).start()
 
     def _dial(self, step: int) -> None:
-        if getattr(self.app.state, "idle", False):
+        if getattr(self.app.state, "idle", False) or getattr(self.skin, "waking", False):
             return
         self.app.set_mode({"mode": str((self.app.state.dial + step) % len(DIALS))})
 
@@ -432,7 +435,7 @@ class Screen:
             ctx.now = time.time()
             # Keep the drawn controls; _screen_buttons/_touch_up disable their hit targets.
         img = self.skin.frame(ctx)
-        if ctx.st.screen == "viewfinder" and not ctx.st.busy:
+        if ctx.st.screen == "viewfinder" and not ctx.st.busy and not getattr(self.skin, "waking", False):
             self.skin.idle_button(img)
         if not waiting and not ctx.photo_pending:
             self._last_ctx = copy(ctx)

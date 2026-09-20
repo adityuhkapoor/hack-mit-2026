@@ -1014,6 +1014,15 @@ class Skin:
             self.cur, self.cur_dir = min(target, self.cur + dt / 1.25), 1
         elif target < self.cur:
             self.cur, self.cur_dir = max(target, self.cur - dt / 0.9), -1
+        if self.cur == 0:
+            self.waking = False
+
+    def begin_wake(self, now):
+        """Open a sky full of clouds onto the fresh camera preview."""
+        self.waking = True
+        self.cur, self.cur_dir, self.cur_t = 1.0, -1, now
+        self.min_until = now + 0.12
+        self.was_busy = False
 
     def _curtain_backdrop(self, now: float) -> Image.Image:
         if self._cbg is None:
@@ -1069,7 +1078,7 @@ class Skin:
                 continue
             blit(img, sp, px_, py_)
         hs = E(clamp((cur - 0.5) / 0.45))                    # the cloud mascot: last in, first out
-        if hs > 0.02:
+        if hs > 0.02 and not getattr(self, "waking", False):
             self._hero(img, st, now, hs, poke)
 
     def _hero(self, img, st, now, hs, poke):
@@ -1454,6 +1463,7 @@ class Skin:
         """Persistent welcome scene, without the timed splash's fade-out."""
         if self.t_start is None:
             self.t_start = now
+        self._curtain_backdrop(now)  # warm cloud artwork before the wake tap
         img = self.sky.copy()
         self._clouds(img, now)
         self._splash(img, now, persistent=True)
