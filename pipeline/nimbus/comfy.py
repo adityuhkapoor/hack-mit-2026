@@ -37,6 +37,8 @@ class Profile:
 CUDA_FP8 = Profile("cuda-fp8", "flux-2-klein-4b-fp8.safetensors", "qwen_3_4b_fp8_mixed.safetensors")
 # The ASUS GB10 (Grace-Blackwell, 128 GB unified): same klein weights, the fp4 text encoder it ships with.
 GB10 = Profile("gb10", "flux-2-klein-4b-fp8.safetensors", "qwen_3_4b_fp4_flux2.safetensors")
+# klein 9B (bf16, gated on Hugging Face) with its 8B text encoder: better composition, and it can spell.
+GB10_9B = Profile("gb10-9b", "flux-2-klein-9b.safetensors", "qwen_3_8b_fp4mixed.safetensors")
 MPS_GGUF = Profile("mps-gguf", "flux-2-klein-4b-Q6_K.gguf", "Qwen3-4B-Q4_K_M.gguf", gguf=True)
 
 
