@@ -265,3 +265,12 @@ def _opt(v) -> str | None:
 def _host(url: str) -> str:
     from urllib.parse import urlparse
     return urlparse(url).netloc.removeprefix("www.")
+
+
+if __name__ == "__main__":       # uv run python -m nimbus_cam.shop  → which payment backend, and is the sandbox reachable
+    pay = payments()
+    print(f"payments: {pay.network}")
+    if isinstance(pay, VisaSandbox):
+        with httpx.Client(cert=pay.cert, auth=pay.auth, timeout=30) as c:
+            r = c.get("https://sandbox.api.visa.com/vdp/helloworld", headers={"Accept": "application/json"})
+        print(f"helloworld: {r.status_code} {r.text[:200]}")
