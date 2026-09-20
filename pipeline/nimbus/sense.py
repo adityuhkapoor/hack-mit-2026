@@ -350,8 +350,42 @@ SOUVENIRS = {
     "viking saga page": "an illuminated Norse saga manuscript: vellum, runes, knotwork borders, a longship",
     "shakespeare playbill": "an Elizabethan playbill: cream paper, ornate woodcut flourishes, the Globe theatre",
     "gravestone": "a weathered gravestone in a churchyard: carved granite, moss, ivy, a misty cemetery",
-    "police lineup": "a police lineup room: height-marked wall, harsh fluorescent light, a numbered card",
+    "police lineup": "an empty police lineup room: height-marked wall, harsh fluorescent light, a numbered card, nobody else in the line",
     "barbie doll packaging": "a fashion doll box: hot pink blister packaging, a dreamhouse backdrop, sparkle accents",
+    "wedding invitation": "a wedding invitation: cream card stock, letterpress florals, gold foil edges, soft botanical corners",
+    "tinder dating app profile": "a dating app profile screen: phone UI card, a rounded photo frame around the subject only, pastel gradient, heart and X buttons",
+    "prison mugshot": "a booking-photo backdrop: grey height-chart wall, flat flash light, a blank placard, no one else in frame",
+    "tattoo parlour": "a tattoo parlour flash sheet: black ink outlines, old-school roses, daggers, swallows on aged paper",
+    "auction catalogue": "a fine-art auction catalogue page: white page, a lot number box, a plinth, museum lighting",
+    "romance novel cover": "a paperback romance cover: windswept painterly backdrop, sunset glow, an embossed frame, swirling ribbons",
+    "couples therapy progress report": "a therapist's clipboard report: pastel office, a plant, a checklist form, a sofa",
+    "mafia family portrait": "a mafia patriarch's study, empty: dark wood panelling, a velvet armchair, a cigar and whisky, dramatic side light",
+    "skype video call screen": "a video-call window: laptop UI chrome, blank thumbnail tiles, mute and hang-up buttons, webcam grain",
+    "vinyl record": "a vinyl record and its sleeve: a black disc with a printed label, gatefold artwork, a record-shop crate",
+    "billboard chart": "a music chart page: numbered ranking rows, arrows up and down, a chart-topper banner, magazine layout",
+    "mixtape cover": "a cassette mixtape J-card: hand-drawn marker doodles, a plastic tape shell, tracklist lines, 90s colours",
+    "reality tv cover": "a reality TV show key art backdrop: glossy studio set, a dramatic spotlight, a mansion, sparkle lens flares, an empty stage",
+    "fishing photo": "a proud fishing catch photo: a lake at dawn, a boat rail, a tackle box, mist on the water",
+    "scuba diving": "an underwater scuba photo: blue depth, coral reef, bubbles rising, shafts of sunlight",
+    "lego instruction manual": "a brick-toy instruction manual page: numbered steps, blue-gradient page, exploded-view bricks, a parts inventory",
+    "gardening seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
+    "astronaut in space": "an EVA photo in orbit: the curved Earth below, a station truss, black space, a suit's visor reflection",
+    "playing cards": "a playing card face: the ornate corner pips, a mirrored court-card frame, red and black on ivory",
+    "github profile": "a developer profile page: dark-mode UI, a contribution heatmap, repository cards, monospace details",
+    "new york times best seller": "a hardback bestseller cover: bold typographic jacket, a medallion sticker, a bookstore display",
+    "artist sketchbook page": "a sketchbook spread: pencil studies, ink washes, coffee rings, torn tape corners on toned paper",
+    "driver's license": "a driver's license card: holographic security print, a state seal, a barcode strip, plain photo box",
+    "valentine's day card": "a Valentine's card: red and pink hearts, lace edges, a ribbon, glitter accents",
+    "circus poster": "a vintage circus poster: striped big top, ornate Victorian borders, lions and trapeze, faded reds and golds",
+    "ouija board": "a spirit board: dark varnished wood, a planchette, moons and suns, candlelight",
+    "jack o' lantern carving": "a pumpkin-carving night: glowing jack-o'-lanterns, autumn leaves, a porch at dusk, candle glow",
+    "christmas card": "a Christmas card: snowy village, fairy lights, pine branches and berries, warm window light",
+    "ugly sweater competition": "an ugly-sweater party: tinsel, knitted reindeer patterns, a festive stage, pom-poms",
+    "north pole passport": "a North Pole passport page: entry stamps, snowflake watermark, a holly-trimmed border",
+    "santa's naughty list": "Santa's naughty list: a parchment scroll, a quill, a red-and-gold ledger at a workshop desk",
+    "valentine's day love coupon": "a love coupon: a perforated ticket, hearts and arrows, a redeem-by stamp",
+    "easter egg": "a painted Easter egg scene: pastel eggs in grass, a wicker basket, spring blossom",
+    "reindeer team roster": "a reindeer team roster: a stable board, sleigh bells, antlers, a snowy workshop wall",
     # kept for older photos and voice requests
     "trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
     "ramen packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
@@ -361,30 +395,28 @@ SOUVENIRS = {
     "seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
     "stamp": "a postage stamp: engraved lines, perforated border, a flat single-colour field",
 }
-KINDS = list(SOUVENIRS)[:50]        # the fifty on the menu
+KINDS = [k for k in SOUVENIRS if k not in ("trading card", "ramen packet", "ticket stub", "postcard", "magazine cover",
+                                            "seed packet", "stamp")]        # the menu (the rest are old aliases)
 
 
 def souvenir_prompt(kind: str, subject: str, r: Readings, title: str = "") -> str:
     """AI Camera: the surroundings become the artwork of whatever the scene should be.
 
-    The model is allowed exactly one piece of text, the title, spelled out for it: asked for "no text" it
-    still fills a tabloid or a newspaper with lettering, and invented lettering comes out garbled. Told the
-    words, klein renders them legibly. Everything else stays wordless.
+    Written as an art-direction brief (composition, palette, lighting, finish): in a six-way test on the
+    same photos it was the only wording that reliably kept a calm area behind the subject for the headline
+    and never invented extra people. The measured air is the lighting line, so the same format comes out
+    foggy at 90 % RH and sun-bleached at 2000 lux. klein cannot spell, so the artwork is wordless and the
+    frame prints the real title.
     """
     look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
-    # The measured air shapes the artwork's mood: the same police lineup is a foggy one at 90 % RH and a
-    # sun-bleached one at 2000 lux. This is the sensors' main lever in AI Camera; the procedural effects
-    # (sense.effect_params, scaled by AI_EFFECT_SCALE) are the finish on top.
-    air = describe(r)
-    mood = f" The mood and light of the artwork follow the air the camera measured: {air}." if air else ""
-    # klein cannot spell (the headline came back "LOIDRAVE OVERDRIVE"), so the artwork is wordless and the
-    # frame prints the real title. Blank panels where lettering would go read as design, not as a mistake.
-    return (f"Replace the masked surroundings with {look}, featuring {subject}. Fill the whole background in "
-            "that style, bold and uncluttered right behind the subject so it stays the focus. Match the "
-            f"camera height and light direction of image 1.{mood} Purely graphic: absolutely no text, letters, "
-            "words, numbers or logos anywhere; where lettering would normally go, leave clean blank panels "
-            "and shapes. No other people, faces, figures or photographs of people anywhere in the artwork: "
-            "the subject is the only person.")
+    air = describe(r) or "natural light"
+    return (f"Art direction for image 1: the surroundings become {look}. Composition: {subject} stays the hero "
+            "at the same camera height and light direction; the artwork frames them, never crowds them, with a "
+            "calm area directly behind them. Palette: two dominant colours from the format plus one accent. "
+            f"Lighting: {air}. Finish: crisp, print-ready, professionally designed. Purely graphic: absolutely "
+            "no text, letters, words, numbers or logos anywhere; where lettering would normally go, leave clean "
+            "blank panels and shapes. No other people, faces, figures or photographs of people anywhere in the "
+            "artwork: the subject is the only person.")
 
 
 def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:

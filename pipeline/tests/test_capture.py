@@ -92,7 +92,7 @@ def test_prompts_mention_conditions():
     assert "frost" in p and "fog" in p and "same places" in p
     sv = sense.souvenir_prompt("energy drink can", "a can of Red Bull", sense.Readings())
     assert "energy drink can" in sv and "Red Bull" in sv and "no other people" in sv.lower()
-    assert len(sense.KINDS) == 50 and all(k in sense.SOUVENIRS for k in sense.KINDS)
+    assert len(sense.KINDS) >= 50 and all(k in sense.SOUVENIRS for k in sense.KINDS)
 
 
 def test_verify_catches_a_touched_subject():

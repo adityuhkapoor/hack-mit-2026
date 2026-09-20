@@ -218,10 +218,15 @@ class CameraApp:
         if which in ("viewfinder", "camera", "close"):
             self.state.screen = "viewfinder"
             return {"showing": "viewfinder"}
-        res = self.state.results or self.library.latest(20)
+        # Opening the gallery from the viewfinder starts fresh at the newest photo; the cached list is only
+        # kept while browsing, otherwise a photo taken after the first PHOTOS press never showed up.
+        if self.state.screen != "browse" or not self.state.results:
+            fresh = self.library.latest(20)
+            if fresh:
+                self.state.results, self.state.index = fresh, -1 if which == "next" else 0
+        res = self.state.results
         if not res:
             return {"error": "no photos yet"}
-        self.state.results = res
         if which in ("next", "previous", "prev", "back"):
             step = 1 if which == "next" else -1
             self.state.index = (self.state.index + step) % len(res)

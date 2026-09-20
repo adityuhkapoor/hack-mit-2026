@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+from pathlib import Path
 
 from PIL import Image
 
@@ -131,12 +132,57 @@ Pick the one that fits this scene best and is the most fun: a can of energy drin
 dog -> zoo enclosure sign or national geographic wildlife documentary; a friend pulling a face -> police
 lineup or celebrity gossip tabloid; a plate of food -> grocery store flyer or instant noodle packet. Be
 surprising but fitting. Use a kind from the list, spelled exactly as listed.
-Reply with JSON only:
+{recent}Reply with JSON only:
 {{"kind": "<one of the kinds above>",
+ "alternatives": ["<the second-best fitting kind>", "<the third-best>"],
  "subject": "<what it features, a few words: 'a can of Red Bull', 'two friends'>",
  "title": "<2-4 words, big on the front, in the voice of that format>",
  "subtitle": "<a short line under it, playful, in that format's voice>",
  "palette": ["#111827", "#d8b24a"]}}"""
+
+# The last few formats used, so the same one never comes up back to back. Persisted so a restart forgets nothing.
+RECENT_FILE = Path(os.environ.get("NIMBUS_HOME", Path.home() / ".nimbus" / "camera")) / "recent_kinds.json"
+RECENT_N = 3
+
+
+def recent_kinds() -> list[str]:
+    try:
+        return [k for k in json.loads(RECENT_FILE.read_text()) if isinstance(k, str)][-RECENT_N:]
+    except (OSError, ValueError):
+        return []
+
+
+def remember_kind(kind: str) -> None:
+    try:
+        RECENT_FILE.parent.mkdir(parents=True, exist_ok=True)
+        RECENT_FILE.write_text(json.dumps((recent_kinds() + [kind])[-RECENT_N:]))
+    except OSError:
+        pass
+
+
+def _recent_clause() -> str:
+    r = recent_kinds()
+    if not r:
+        return ""
+    return ("The last photos already became: " + ", ".join(r) + ". Do not choose any of those again; choose the "
+            "next best fit for THIS scene so the result still makes sense.\n")
+
+
+def avoid_repeat(d: dict) -> dict:
+    """If the model still picked a recent kind, take its own next-best that is not recent; remember the pick."""
+    r = recent_kinds()
+    kind = d.get("kind")
+    if kind in r:
+        for alt in d.get("alternatives") or []:
+            if isinstance(alt, str) and alt in sense.KINDS and alt not in r:
+                print(f"[souvenir] {kind!r} was used recently; taking the model's alternative {alt!r}")
+                d["kind"] = alt
+                break
+    if d.get("kind") in sense.KINDS:
+        remember_kind(d["kind"])
+    return d
+
+
 
 
 def souvenir(jpeg: bytes) -> dict:
@@ -149,7 +195,7 @@ def souvenir(jpeg: bytes) -> dict:
     try:
         r = client.chat.completions.create(model=MODEL, max_tokens=1500, reasoning_effort=REASONING,
                                            messages=[{"role": "user", "content": [
-                                               {"type": "text", "text": SOUVENIR_PROMPT.format(kinds=", ".join(sense.KINDS))},
+                                               {"type": "text", "text": SOUVENIR_PROMPT.format(kinds=", ".join(sense.KINDS), recent=_recent_clause())},
                                                {"type": "image_url", "image_url": {"url": _data_url(jpeg)}}]}])
         import json as _json
         import re as _re
@@ -159,7 +205,8 @@ def souvenir(jpeg: bytes) -> dict:
         print(f"[souvenir] Muse unavailable ({type(e).__name__}); plain card")
         return fallback
     pal = [p for p in (d.get("palette") or []) if isinstance(p, str) and p.startswith("#")][:2]
-    return {"kind": str(d.get("kind") or fallback["kind"])[:40],
-            "subject": str(d.get("subject") or fallback["subject"])[:60],
-            "title": str(d.get("title") or "")[:28], "subtitle": str(d.get("subtitle") or "")[:60],
-            "palette": pal or fallback["palette"]}
+    return avoid_repeat({"kind": str(d.get("kind") or fallback["kind"])[:40],
+                         "alternatives": [a for a in (d.get("alternatives") or []) if isinstance(a, str)][:3],
+                         "subject": str(d.get("subject") or fallback["subject"])[:60],
+                         "title": str(d.get("title") or "")[:28], "subtitle": str(d.get("subtitle") or "")[:60],
+                         "palette": pal or fallback["palette"]})

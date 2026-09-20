@@ -242,3 +242,18 @@ def test_review_screen_has_a_print_button_and_the_row_does_not_overlap():
     assert row[-1].x1 <= 1.0
     next(b for b in row if b.key == "print").action()
     assert printed == [{}]
+
+
+def test_souvenir_never_repeats_the_last_three(tmp_path, monkeypatch):
+    from nimbus_cam import tagger
+
+    monkeypatch.setattr(tagger, "RECENT_FILE", tmp_path / "recent.json")
+    for k in ("police lineup", "energy drink can", "cave painting"):
+        tagger.remember_kind(k)
+    assert tagger.recent_kinds() == ["police lineup", "energy drink can", "cave painting"]
+    assert "police lineup" in tagger._recent_clause()
+    d = tagger.avoid_repeat({"kind": "police lineup", "alternatives": ["energy drink can", "prison mugshot"]})
+    assert d["kind"] == "prison mugshot"                     # the first alternative not used recently
+    assert tagger.recent_kinds() == ["energy drink can", "cave painting", "prison mugshot"]
+    d = tagger.avoid_repeat({"kind": "wedding invitation", "alternatives": []})
+    assert d["kind"] == "wedding invitation"
