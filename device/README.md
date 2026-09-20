@@ -106,6 +106,19 @@ change between frames), the light level from the camera frame, and sound from th
 Humidity, wind and cloud come from the local weather and are labelled "(web)" on the card.
 `NIMBUS_SEG=human` picks the light segmentation model, which the Pi can actually run.
 
+Before using the Elasticsearch library, download and verify its search model while
+the network is available:
+
+```bash
+cd device
+uv run python -c 'from nimbus_cam.library import embed; print(embed(["setup check"]).shape)'
+```
+
+The model stays in `~/.nimbus/camera/models` (or `NIMBUS_EMBED_CACHE`), survives
+reboots, and loads offline when cached. Run this as the camera user with the same
+`NIMBUS_CAM_HOME` setting as the app. A missing model still requires a first download;
+capture currently waits for library indexing before showing review.
+
 ## Tested touchscreen configuration
 
 The existing Pi deployment uses `~/start_nimbus.sh`, called by labwc autostart.

@@ -107,7 +107,16 @@ def embed(texts: list[str]) -> np.ndarray:
     with _embed_lock:
         if _embedder is None:
             from fastembed import TextEmbedding
-            _embedder = TextEmbedding(EMBED_MODEL, threads=EMBED_THREADS)
+            # /tmp is cleared by a Pi reboot. Keep the model alongside camera data
+            # and try it offline first so a cached model never needs the network
+            # before capture can finish indexing the saved photo.
+            cache = Path(os.environ.get("NIMBUS_EMBED_CACHE", HOME / "models"))
+            cache.mkdir(parents=True, exist_ok=True)
+            options = dict(cache_dir=str(cache), threads=EMBED_THREADS)
+            try:
+                _embedder = TextEmbedding(EMBED_MODEL, local_files_only=True, **options)
+            except (ValueError, FileNotFoundError):
+                _embedder = TextEmbedding(EMBED_MODEL, **options)
         out = []
         for t in texts:                 # the same text (a photo re-saved after tagging or posting) costs nothing
             if t not in _embed_cache:
