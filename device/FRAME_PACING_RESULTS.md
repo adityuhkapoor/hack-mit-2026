@@ -107,3 +107,43 @@ scheduled shutter press/release, observed busy/review states, and scheduled a
 separate local-camera review cycle. Automatic posting is forcibly disabled in
 that driver. Capture API `172.20.10.12:8000` was unreachable before the test;
 therefore remote AI completion must not be inferred from display throughput.
+
+## Scripted capture/review acceptance
+
+The test driver invoked the existing touch-down/up handlers at the shutter
+coordinates, observed state from the UI loop, exercised the real webcam, and
+returned from photo review to preview. This is not physical touchscreen or
+photon-latency validation. It disabled automatic posting and never printed.
+
+- Initial shutter release-to-observed-busy: 355 ms. Preparing fixed cloud art
+  at startup reduced this to 41 ms in the next run and 43 ms in the final run.
+- A profile identified lazy AI SDK/model initialization during capture. Moving
+  client resource initialization before the interactive UI (without issuing a
+  request) improved the transition interval from about 19 to 22.25 callbacks/s.
+- Final local camera acquired a 1280x720 JPEG in 230 ms; earlier cycles took
+  921–937 ms. Exposure-settle branches and buffering make these variable, so
+  this is not a claim that every capture takes 230 ms.
+- Review settled at 24.00 callbacks/s; return to preview settled at
+  23.96–24.00. No render errors. Final temperature 62.8 °C, throttling 0x0.
+- Capture/reveal are not uniformly 24 FPS: final transition intervals measured
+  22.25–22.81 callbacks/s, with a worst callback around 249 ms. The initial
+  reveal still includes synchronous photo decoding/composition. Background
+  image loading and further frame-age work remain outstanding.
+- Remote AI capture did not complete: the configured API at
+  172.20.10.12:8000 was unreachable after the network change. The local photo
+  review cycle was separate and must not be reported as successful AI capture.
+
+Runtime source commit: `595bfc2`. The normal launcher now defaults to
+NIMBUS_UI_BACKEND=sdl, NIMBUS_UI_FPS=24, SDL_VIDEODRIVER=wayland, and diagnostics
+enabled. Environment overrides remain possible. The pre-change launcher and
+source files are backed up under `~/frame-pacing-test-20260920/original/`.
+`camera-release.json` records deployed hashes, the selected backend, and these
+validation limits. Revert presentation with NIMBUS_UI_BACKEND=tk (and optionally
+NIMBUS_UI_FPS=15) when invoking the launcher. The temporary test driver was
+removed from the running path after acceptance.
+
+Offline validation: 113 device tests passed, two native-build tests skipped on
+the root checkout. The C++ library compiled and ran on the Pi. A pixel-parity
+test compares prepared versus lazy curtain frames. Review/capture behavior,
+failure fallback, and native input routing have focused headless coverage;
+manual physical touch and scanout validation remain outstanding.
