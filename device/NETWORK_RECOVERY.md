@@ -37,9 +37,12 @@ outage may need to be retried once connectivity recovers.
 - Terminated the tunnel's main process: systemd restarted it (`NRestarts=1`),
   and API readiness recovered to HTTP 200.
 - Camera restarted using Elasticsearch over the tunnel.
+- Real AI capture over separate hotspots: shutter release at 20.328 seconds,
+  photo review at 43.833 seconds (23.505 seconds end to end), with
+  `AI Camera · subject unaltered · verified` in the camera log. Automatic
+  posting was disabled. This run did not substitute a local/fake capture.
 
-Capture acceptance is recorded separately with the live test results. Reboot
-and a full physical Wi-Fi outage have not been tested.
+Reboot and a full physical Wi-Fi outage have not been tested.
 
 ## Rollback
 

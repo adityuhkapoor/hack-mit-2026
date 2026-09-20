@@ -147,3 +147,13 @@ the root checkout. The C++ library compiled and ran on the Pi. A pixel-parity
 test compares prepared versus lazy curtain frames. Review/capture behavior,
 failure fallback, and native input routing have focused headless coverage;
 manual physical touch and scanout validation remain outstanding.
+
+## Remote capture recovered
+
+The old DHCP API address was replaced by persistent SSH forwarding over stable
+Tailscale device addresses; see NETWORK_RECOVERY.md. With Pi on Adi's hotspot
+and ASUS on Calvin's, both API and Elasticsearch returned HTTP 200. A real AI
+capture completed in 23.505 seconds and reported subject unaltered/verified.
+The UI reached review without the separate local-camera fallback. This resolves
+the previously recorded network failure, not all transient rendering hitches.
+Automatic posting was disabled during this acceptance run.
