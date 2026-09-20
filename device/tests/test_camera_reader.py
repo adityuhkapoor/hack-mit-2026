@@ -45,6 +45,34 @@ class FakeCap:
         self.released = True
 
 
+class V4L2Cap(FakeCap):
+    """A V4L2-shaped capture: grab advances the device and retrieve performs the expensive decode."""
+
+    def __init__(self):
+        super().__init__()
+        self.grabs = 0
+        self.retrieves = 0
+        self.grab_gate = threading.Event()
+        self.grab_gate.set()
+        self.grab_entered = threading.Event()
+
+    def getBackendName(self):
+        return "V4L2"
+
+    def grab(self):
+        self.grab_entered.set()
+        self.grab_gate.wait()
+        self.grabs += 1
+        time.sleep(0.002)
+        return not self.fail
+
+    def retrieve(self):
+        self.retrieves += 1
+        if self.fail:
+            return False, None
+        return True, np.full((4, 6, 3), self.pixel, np.uint8)
+
+
 def make_camera(monkeypatch, cap=None):
     cap = cap or FakeCap()
     monkeypatch.setattr(Camera, "_open", staticmethod(lambda index, wait_s=30: cap))
@@ -87,6 +115,121 @@ def test_frame_never_blocks_on_a_stalled_read(camera):
     assert np.array_equal(cam.frame(), last)            # instant: the slot, not the sensor
     assert time.monotonic() - t0 < 0.5
     cap.gate.set()
+
+
+def test_hidden_v4l2_preview_drains_without_decoding_and_resumes_fresh(monkeypatch):
+    cap = V4L2Cap()
+    cam, _ = make_camera(monkeypatch, cap)
+    try:
+        wait_for(lambda: cam.frame() is not None, what="first visible frame")
+        cam.set_preview_visible(False)
+        wait_for(lambda: cap.grabs >= 3, what="hidden buffer drains")
+        retrieves = cap.retrieves
+        grabs = cap.grabs
+        wait_for(lambda: cap.grabs >= grabs + 3, what="more hidden buffer drains")
+        assert cap.retrieves == retrieves
+
+        cap.pixel = 23
+        sensor = cam.sensor_frame()
+        assert sensor is not None and sensor[0, 0, 0] == 23
+        assert cap.retrieves == retrieves + 1
+
+        cap.pixel = 41
+        cap.grab_entered.clear()
+        cap.grab_gate.clear()
+        wait_for(lambda: cap.grab_entered.is_set(), what="reader held in hidden grab")
+        cam.set_preview_visible(True)
+        assert cam.frame() is None                       # never display the hidden sensor sample as live
+        cap.grab_gate.set()
+        wait_for(lambda: cam.frame() is not None and cam.frame()[0, 0, 0] == 41,
+                 what="fresh frame after resume")
+    finally:
+        cap.grab_gate.set()
+        cam.close()
+
+
+def test_non_v4l2_backend_keeps_decoding_while_hidden(monkeypatch):
+    cam, cap = make_camera(monkeypatch)
+    try:
+        wait_for(lambda: cam.frame() is not None)
+        cam.set_preview_visible(False)
+        reads = cap.reads
+        wait_for(lambda: cap.reads >= reads + 2, what="fallback preview reads")
+        cam.set_preview_visible(True)
+        assert cam.frame() is not None                    # fallback never suspends, so no resume blank
+    finally:
+        cap.gate.set()
+        cam.close()
+
+
+def test_hidden_sensor_request_is_satisfied_if_preview_resumes(monkeypatch):
+    cap = V4L2Cap()
+    cam, _ = make_camera(monkeypatch, cap)
+    try:
+        wait_for(lambda: cam.frame() is not None)
+        cap.gate.clear()
+        entered = cap.enter_count
+        wait_for(lambda: cap.enter_count > entered, what="visible read held")
+        cam.set_preview_visible(False)
+        result = []
+        t = threading.Thread(target=lambda: result.append(cam.sensor_frame()))
+        t.start()
+        wait_for(lambda: cam._sensor_needed, what="sensor request")
+        cam.set_preview_visible(True)
+        cap.gate.set()
+        t.join(2)
+        assert not t.is_alive() and result[0] is not None
+    finally:
+        cap.gate.set()
+        cam.close()
+
+
+def test_hidden_preview_does_not_change_shutter_reads(monkeypatch):
+    cap = V4L2Cap()
+    cam, _ = make_camera(monkeypatch, cap)
+    try:
+        wait_for(lambda: cam.frame() is not None)
+        cam.set_preview_visible(False)
+        monkeypatch.setattr(cam, "_exposure", lambda: 100)
+        reads = cap.reads
+        assert cam.jpeg()[:2] == b"\xff\xd8"
+        assert cap.reads - reads >= 3
+    finally:
+        cam.close()
+
+
+def test_timed_out_sensor_request_cannot_consume_the_next_request(monkeypatch):
+    cap = V4L2Cap()
+    cam, _ = make_camera(monkeypatch, cap)
+    try:
+        wait_for(lambda: cam.frame() is not None)
+        cam.set_preview_visible(False)
+        cap.grab_entered.clear()
+        cap.grab_gate.clear()
+        wait_for(lambda: cap.grab_entered.is_set(), what="blocked hidden grab")
+        assert cam.sensor_frame(timeout=0.01) is None
+        result = []
+        t = threading.Thread(target=lambda: result.append(cam.sensor_frame()))
+        t.start()
+        wait_for(lambda: cam._sensor_needed, what="second sensor request")
+        cap.grab_gate.set()
+        t.join(2)
+        assert not t.is_alive() and result[0] is not None
+    finally:
+        cap.grab_gate.set()
+        cam.close()
+
+
+def test_lux_requests_a_sensor_frame_instead_of_reusing_preview():
+    calls = []
+    camera = type("SensorCamera", (), {
+        "frame": lambda self: (_ for _ in ()).throw(AssertionError("preview slot used")),
+        "sensor_frame": lambda self: (calls.append("sensor"), np.full((8, 8, 3), 128, np.uint8))[1],
+    })()
+    sensors = hw.PiSensors.__new__(hw.PiSensors)
+    sensors.camera = camera
+    assert sensors._lux() is not None
+    assert calls == ["sensor"]
 
 
 def test_capture_caps_and_restores_exposure_on_reader_thread(camera, monkeypatch):
@@ -284,3 +427,53 @@ def test_failed_settle_read_aborts_and_restores_auto(camera, monkeypatch):
     assert calls[-1] == (0, 'auto_exposure=3', 'exposure_dynamic_framerate=1')
     assert cam.frame() is None
     cap.fail = False
+
+
+def test_sensor_result_survives_preview_clearing_slot_between_check_and_access(monkeypatch):
+    """Force the review's interleaving after fetching _latest but before the caller uses it."""
+    fetched, resume_done = threading.Event(), threading.Event()
+
+    class ScheduledCamera(Camera):
+        def __getattribute__(self, name):
+            value = super().__getattribute__(name)
+            if name == "_latest" and threading.current_thread().name == "sensor-race":
+                fetched.set()
+                assert resume_done.wait(2), "preview resumption did not run"
+            return value
+
+    cap = V4L2Cap()
+    cam, _ = make_camera(monkeypatch, cap)
+    result, errors = [], []
+    worker = None
+    try:
+        wait_for(lambda: cam.frame() is not None)
+        cam.set_preview_visible(False)
+        cap.grab_entered.clear()
+        cap.grab_gate.clear()
+        wait_for(lambda: cap.grab_entered.is_set(), what="held hidden grab")
+        cam.__class__ = ScheduledCamera
+
+        def sample():
+            try:
+                result.append(cam.sensor_frame())
+            except BaseException as exc:
+                errors.append(exc)
+
+        worker = threading.Thread(target=sample, name="sensor-race")
+        worker.start()
+        wait_for(lambda: cam._sensor_needed, what="sensor request")
+        cam._publish(np.full((4, 6, 3), 77, np.uint8))
+        assert fetched.wait(2)
+        cam.set_preview_visible(True)  # invalidates the slot after the sensor fetched it
+        assert cam._latest is None
+        resume_done.set()
+        worker.join(2)
+        assert not worker.is_alive()
+        assert errors == []
+        assert result[0] is not None and np.all(result[0] == 77)
+    finally:
+        resume_done.set()
+        cap.grab_gate.set()
+        if worker is not None:
+            worker.join(2)
+        cam.close()

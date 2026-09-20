@@ -78,3 +78,28 @@ the read path; its frame-age predictions were not physical measurements. It has 
 replaced with this actual-code benchmark. Verdict: useful responsiveness improvement,
 with lifecycle fixes required and a measurable CPU tradeoff; not a validated live
 camera deployment.
+
+## Hidden-preview decode suppression (not deployed)
+
+V4L2 previews now drain compressed frames with `grab()` while photo screens or a
+fully closed curtain hide the feed. Visible previews and shutter reads retain the
+existing decoding path. Camera-derived light sensing requests a fresh decoded
+frame on demand; other backends retain continuous decoding.
+
+The screen prewarms before a scheduled curtain opening. For an unannounced return,
+it keeps the previous photo scene or animated closed curtain until a fresh frame
+arrives, without blocking Tk. Touch actions are suppressed during that handover.
+A one-second monotonic deadline prevents a disconnected camera from trapping the
+user on the previous scene. The normal unavailable-camera display then resumes.
+The reader also retrieves its current buffer if visibility changes during grab,
+rather than unnecessarily waiting for another acquisition.
+
+This fixes the blank flash, but does not make camera warmup instantaneous: a direct
+return can defer the reveal until the next fresh decoded frame and UI tick. No
+claim of strict latency equivalence or measured thermal reduction is made. Physical
+Pi touchscreen/webcam A/B testing remains outstanding. Validation: 65 device tests
+pass, including photo return, late cloud completion, failed-resume timeout,
+real-render preservation of the photo controls, and the sensor-slot invalidation
+race reproduced during adversarial review. Both adversarial findings were fixed:
+the controls remain drawn while hit targets are disabled, and sensor results use
+a single local snapshot of the shared frame slot.

@@ -417,6 +417,10 @@ class Skin:
         """True while the cloud curtain hides the screen: the buttons under it are not there to press."""
         return self.cur > 0.6
 
+    def preview_visible_soon(self, st, now: float) -> bool:
+        """Whether the viewfinder is visible, or decoding should prewarm before the curtain opens."""
+        return self.cur < 0.985 or (not st.busy and now >= self.min_until - 0.2)
+
     def touch(self, x: float, y: float, key: str | None, now: float) -> None:
         self.puffs.append((x, y, now))
         if self.cur > 0.3:
@@ -504,7 +508,7 @@ class Skin:
             self._particles(img, now)
             self._puffs(img, now)
             return img
-        self._curtain_step(st, now)
+        self._curtain_step(st, now, hold=getattr(ctx, "hold_curtain", False))
         img = self.sky.copy()
         if self.cur < 0.985:                                # fully behind the clouds, the scene is not drawn at all
             self._clouds(img, now)
@@ -877,13 +881,13 @@ class Skin:
                             ph=rnd.uniform(0, math.tau), ph2=rnd.uniform(0, math.tau), amp=rnd.uniform(6, 12)))
         return sorted(out, key=lambda c: (c["color"] == WHITE, -c["w"]))
 
-    def _curtain_step(self, st, now: float) -> None:
+    def _curtain_step(self, st, now: float, hold: bool = False) -> None:
         if st.busy and not self.was_busy:
             self.min_until = now + 2.0                       # closes (1.25 s), lives a moment, then may open
         self.was_busy = bool(st.busy)
         if st.busy:
             self.busy_label = st.busy.replace("…", "").strip()
-        target = 1.0 if (st.busy or now < self.min_until) else 0.0
+        target = 1.0 if (hold or st.busy or now < self.min_until) else 0.0
         dt = clamp(now - self.cur_t, 0.0, 0.1)
         self.cur_t = now
         if target > self.cur:

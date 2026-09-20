@@ -168,7 +168,10 @@ class PiSensors:
         Replace with a real light sensor (APDS-9930) when one is fitted."""
         if self.camera is None:
             return None
-        f = self.camera.frame()
+        # A hidden viewfinder drains compressed camera buffers without decoding them. Ask its reader for
+        # one fresh decoded frame rather than relying on a preview slot that may intentionally be stale.
+        sensor_frame = getattr(self.camera, "sensor_frame", self.camera.frame)
+        f = sensor_frame()
         if f is None:
             return None
         mean = float(np.asarray(f[::8, ::8], np.float32).mean()) / 255
@@ -242,6 +245,7 @@ class Camera:
     CAPTURE_TIMEOUT_S = 20.0      # bounded wait for jpeg(): covers the exposure settle + reads + encode
     STALE_AFTER_S = 1.5          # application receipt age, not sensor exposure age
     REOPEN_EVERY_S = 2.0          # retry _open this often while the device stays failed
+    SENSOR_FRAME_TIMEOUT_S = 1.0  # readings run off the UI thread; one camera frame is normally <= 100 ms
 
     def __init__(self, index: int = 0, still: str | None = None):
         self.index = self._resolve(index)
@@ -249,11 +253,18 @@ class Camera:
         self.cap = None if still else self._open(self.index)
         self._latest: tuple[float, np.ndarray] | None = None  # immutable receipt-time/frame snapshot
         self._stop = threading.Event()
+        self._preview_visible = threading.Event()
+        self._preview_visible.set()
+        self._frame_condition = threading.Condition()
+        self._sensor_needed = False
+        self._publish_seq = 0
+        self._sensor_lock = threading.Lock()
         self._requests: queue.Queue[_Shot] = queue.Queue(maxsize=1)
         self._lifecycle = threading.Lock()
         self._active: _Shot | None = None
         self._reader = None if still else threading.Thread(target=self._reader_loop, daemon=True,
                                                            name="camera-reader")
+        self._grab_only = False if still else self._supports_grab_only()
         if self._reader:
             self._reader.start()
 
@@ -265,7 +276,10 @@ class Camera:
                 if self._stop.is_set():
                     break
                 try:
-                    self._read()
+                    if self._grab_only and not self._preview_visible.is_set():
+                        self._drain_hidden()
+                    else:
+                        self._read()
                 except Exception:
                     failures += 1
                     self._latest = None
@@ -287,6 +301,7 @@ class Camera:
             if not self._stop.is_set():
                 self.index = self._resolve(self.index)
                 self.cap = self._open(self.index, wait_s=5)
+                self._grab_only = self._supports_grab_only()
         except Exception as e:
             print(f"[camera] reopen failed: {e}")
 
@@ -351,13 +366,45 @@ class Camera:
             raise RuntimeError("camera returned no frame")
         return self._publish(f)
 
+    def _drain_hidden(self) -> None:
+        """Advance a V4L2 buffer without JPEG decoding, except for an explicit sensor sample.
+
+        OpenCV's V4L2 backend performs MJPEG decoding in retrieve(), so grab() alone keeps the webcam
+        current while avoiding work for pixels hidden behind a photo or the closed cloud curtain.
+        """
+        if not self.cap.grab():
+            self._latest = None
+            raise RuntimeError("camera returned no frame")
+        with self._frame_condition:
+            sensor_needed = self._sensor_needed
+        if not sensor_needed and not self._preview_visible.is_set():
+            return
+        ok, f = self.cap.retrieve()
+        if not ok or f is None:
+            self._latest = None
+            raise RuntimeError("camera returned no frame")
+        self._publish(f)
+
+    def _supports_grab_only(self) -> bool:
+        """Selective retrieve is verified only for OpenCV's Linux V4L2 backend."""
+        try:
+            return self.cap.getBackendName().upper() == "V4L2"
+        except Exception:
+            # Some third-party VideoCapture implementations expose getBackendName() but throw when
+            # queried. They keep the established read() path; only a positive V4L2 identification opts in.
+            return False
+
     def _publish(self, f: np.ndarray) -> np.ndarray:
         rot = self.ROTATE.get(os.environ.get("NIMBUS_ROTATE", "0"))
         if rot is not None:
             f = cv2.rotate(f, rot)
         f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
-        if not self._stop.is_set():
-            self._latest = (time.monotonic(), f)
+        with self._frame_condition:
+            if not self._stop.is_set():
+                self._latest = (time.monotonic(), f)
+                self._publish_seq += 1
+            self._sensor_needed = False
+            self._frame_condition.notify_all()
         return f
 
     @staticmethod
@@ -450,6 +497,38 @@ class Camera:
             return None
         return latest[1]
 
+    def set_preview_visible(self, visible: bool) -> None:
+        """Tell the reader whether a live preview can currently contribute pixels to the screen."""
+        if visible:
+            if self._grab_only and not self._preview_visible.is_set():
+                # A sensor sample decoded while hidden is not silently reused as the resumed live preview.
+                # The UI remains nonblocking and will receive the next frame from the continuously drained stream.
+                self._latest = None
+            self._preview_visible.set()
+        else:
+            self._preview_visible.clear()
+
+    def sensor_frame(self, timeout: float = SENSOR_FRAME_TIMEOUT_S) -> np.ndarray | None:
+        """Return a fresh frame for camera-derived sensors while the preview decode is suspended."""
+        if self._stop.is_set():
+            return None
+        if self.still is not None or self._preview_visible.is_set() or not self._grab_only:
+            return self.frame()
+        with self._sensor_lock:
+            if self._stop.is_set():
+                return None
+            with self._frame_condition:
+                published = self._publish_seq
+                self._sensor_needed = True
+                ready = self._frame_condition.wait_for(
+                    lambda: self._stop.is_set() or self._publish_seq > published, timeout)
+                if not ready or self._stop.is_set():
+                    self._sensor_needed = False
+                    return None
+                # Visibility changes and read failures may invalidate the shared slot concurrently.
+                latest = self._latest
+                return latest[1] if latest is not None else None
+
     def jpeg(self, timeout: float = CAPTURE_TIMEOUT_S) -> bytes:
         """The photo at the press: the reader thread caps exposure, settles, drops buffered frames and
         encodes the fresh one. Bounded wait; an expired request never runs (it is cancelled in the queue)."""
@@ -483,6 +562,9 @@ class Camera:
         with self._lifecycle:
             self._stop.set()
             self._latest = None
+            with self._frame_condition:
+                self._sensor_needed = False
+                self._frame_condition.notify_all()
             pending = [self._active] if self._active is not None else []
             while True:
                 try:

@@ -249,15 +249,120 @@ def test_screen_builds_what_the_skin_draws_from_the_app_state(tmp_path):
     ph.local_photo = str(pic)
     ph.link = "https://x/c/abc"
     st = state("shop", current=ph, product=PROD, offers=OFFERS)
-    app = NS(state=st, camera=NS(frame=lambda: np.zeros((480, 640, 3), np.uint8)), http=None)
+    visibility = []
+    app = NS(state=st, camera=NS(frame=lambda: np.zeros((480, 640, 3), np.uint8),
+                                 set_preview_visible=visibility.append), http=None)
     stub = NS(app=app, air="26°C", _photo_cache=None, _product_cache=None, W=1024, H=600, EXPECTED=ui.Screen.EXPECTED,
-              _screen_buttons=lambda: BUTTONS["shop"])
+              skin=skin.Skin(), _screen_buttons=lambda: BUTTONS["shop"])
     stub._photo = lambda path: ui.Screen._photo(stub, path)
     stub._product_image = lambda p: ui.Screen._product_image(stub, p)
     c = ui.Screen._ctx(stub, BASE)
     assert c.photo.size == (400, 300) and c.product_img.size == (200, 300) and c.frame is None
     assert c.link == "https://x/c/abc" and c.offer_url == "https://t" and c.buttons == BUTTONS["shop"]
+    assert visibility[-1] is False
     assert skin.Skin().frame(c).size == (1024, 600)
     st.screen = "viewfinder"                                        # back to shooting: the live frame, no photo
     c = ui.Screen._ctx(stub, BASE)
     assert c.frame is not None and c.product_img is None
+    assert visibility[-1] is True
+
+
+def test_preview_prewarms_before_fully_closed_curtain_opens():
+    sk = skin.Skin()
+    sk.cur = 1.0
+    sk.min_until = BASE + 1.0
+    st = state(busy="")
+    assert not sk.preview_visible_soon(st, BASE + 0.79)
+    assert sk.preview_visible_soon(st, BASE + 0.80)
+    st.busy = "Making image"
+    assert not sk.preview_visible_soon(st, BASE + 2.0)
+
+
+def transition_screen(monkeypatch, st):
+    """Real Screen context/render logic without Tk; record scenes handed to the renderer."""
+    from nimbus_cam import ui
+    clock = [BASE + 4]
+    monkeypatch.setattr(ui.time, "time", lambda: clock[0])
+    monkeypatch.setattr(ui.time, "monotonic", lambda: clock[0])
+    frames, drawn = [None], []
+    screen = ui.Screen.__new__(ui.Screen)
+    screen.app = NS(state=st, camera=NS(frame=lambda: frames[0], set_preview_visible=lambda v: None))
+    screen.skin = skin.Skin()
+    screen.skin.frame = lambda ctx: (drawn.append(ctx), Image.new("RGB", (1024, 600)))[1]
+    screen.air = ""
+    screen.W, screen.H = 1024, 600
+    screen._photo = lambda path: Image.new("RGB", (10, 10))
+    screen._product_image = lambda p: None
+    screen._screen_buttons = lambda: []
+    return screen, frames, drawn, clock
+
+
+def test_photo_remains_until_fresh_preview_without_blocking(monkeypatch):
+    screen, frames, drawn, clock = transition_screen(monkeypatch, state("review", current=photo()))
+    screen._screen_buttons = lambda: BUTTONS["review"]
+    screen.render()
+    screen.app.state.screen = "viewfinder"
+    screen.render()
+    assert drawn[-1].st.screen == "review"
+    assert drawn[-1].buttons == BUTTONS["review"]
+    assert screen._preview_wait_until is not None
+    frames[0] = np.ones((4, 6, 3), np.uint8)
+    screen.render()
+    assert drawn[-1].st.screen == "viewfinder"
+    assert drawn[-1].frame is frames[0]
+    assert screen._preview_wait_until is None
+
+
+def test_late_cloud_completion_holds_until_frame_then_opens(monkeypatch):
+    screen, frames, drawn, clock = transition_screen(monkeypatch, state(busy="Making image"))
+    screen.skin.cur = 1.0
+    screen.skin.min_until = BASE
+    screen.render()
+    screen.app.state.busy = ""
+    screen.render()
+    assert drawn[-1].hold_curtain
+    screen.skin.cur_t = clock[0] - 0.066
+    screen.skin._curtain_step(drawn[-1].st, clock[0], hold=drawn[-1].hold_curtain)
+    assert screen.skin.cur == 1.0
+    frames[0] = np.ones((4, 6, 3), np.uint8)
+    clock[0] += 0.066
+    screen.render()
+    assert not getattr(drawn[-1], "hold_curtain", False)
+    screen.skin._curtain_step(drawn[-1].st, clock[0])
+    assert screen.skin.cur < 0.985
+
+
+def test_resume_failure_timeout_does_not_hold_photo_forever(monkeypatch):
+    screen, frames, drawn, clock = transition_screen(monkeypatch, state("review", current=photo()))
+    screen.render()
+    screen.app.state.screen = "viewfinder"
+    screen.render()
+    assert drawn[-1].st.screen == "review"
+    clock[0] += 1.01
+    screen.render()
+    assert drawn[-1].st.screen == "viewfinder" and drawn[-1].frame is None
+    assert screen._preview_wait_until is None
+    screen.render()
+    assert screen._preview_wait_until is None
+
+
+def test_held_photo_keeps_real_rendered_controls_but_disables_touch(monkeypatch):
+    from nimbus_cam import ui
+    screen, frames, drawn, clock = transition_screen(monkeypatch, state("review", current=photo()))
+    screen.skin = skin.Skin()  # exercise the actual renderer, not the context-recording spy
+    screen.buttons = BUTTONS
+    del screen._screen_buttons
+    screen.render()  # initialize the renderer's animation timeline
+    clock[0] += 4.0  # splash and photo entrance are finished
+    screen.render()
+    before = np.asarray(screen.render()).copy()
+    assert screen._screen_buttons()
+    screen.app.state.screen = "viewfinder"
+    after = np.asarray(screen.render())
+    assert np.array_equal(before, after)  # same time, same photo and every control pixel retained
+    assert screen._screen_buttons() == []
+    clicked = []
+    screen._pressed = NS(down=True, hold=False, hit=lambda x, y: True,
+                         action=lambda: clicked.append(True))
+    ui.Screen._touch_up(screen, NS(x=0, y=0))
+    assert clicked == []

@@ -15,6 +15,7 @@ window, the touch targets and the state they act on.
 from __future__ import annotations
 
 import os
+from copy import copy
 import threading
 from pathlib import Path
 import time
@@ -72,6 +73,9 @@ class Screen:
         self._last_toast, self._toast_at = "", 0.0
         self.buttons = self._make_buttons()
         self.gpio = self._wire_gpio()
+        self._preview_enabled = True
+        self._preview_wait_until = None
+        self._last_ctx = None
         self._pressed: Button | None = None
         self.root.bind("<ButtonPress-1>", self._touch_down)
         self.root.bind("<ButtonRelease-1>", self._touch_up)
@@ -137,7 +141,8 @@ class Screen:
         }
 
     def _screen_buttons(self) -> list[Button]:
-        if self.skin.splashing(time.time()) or self.skin.covered():
+        if (getattr(self, "_preview_wait_until", None) is not None
+                or self.skin.splashing(time.time()) or self.skin.covered()):
             return []
         st = self.app.state
         return self.buttons.get("review" if st.screen in ("review", "browse") else st.screen, [])
@@ -156,6 +161,9 @@ class Screen:
     def _touch_up(self, e) -> None:
         b, self._pressed = self._pressed, None
         if b is None:
+            return
+        if getattr(self, "_preview_wait_until", None) is not None and not b.hold:
+            b.down = False
             return
         b.down = False
         if b.hold:
@@ -261,7 +269,18 @@ class Screen:
         p = st.current
         shown = p is not None and st.screen in ("review", "browse", "qr", "shop")
         photo = self._photo(p.local_photo) if shown and p.local_photo else None
+        preview_visible = ((st.screen == "viewfinder" or p is None)
+                           and self.skin.preview_visible_soon(st, now))
+        if hasattr(self.app.camera, "set_preview_visible"):
+            self.app.camera.set_preview_visible(preview_visible)
         frame = self.app.camera.frame() if st.screen == "viewfinder" or p is None else None
+        if preview_visible and not getattr(self, "_preview_enabled", True):
+            self._preview_wait_until = time.monotonic() + 1.0
+        self._preview_enabled = preview_visible
+        if (not preview_visible or frame is not None
+                or (getattr(self, "_preview_wait_until", None) is not None
+                    and time.monotonic() >= self._preview_wait_until)):
+            self._preview_wait_until = None
         return SimpleNamespace(
             st=st, now=now, frame=frame, air=self.air, buttons=self._screen_buttons(), photo=photo,
             photo_key=p.local_photo if p else None, product_img=self._product_image(p) if st.screen == "shop" else None,
@@ -270,7 +289,22 @@ class Screen:
             expected=self.EXPECTED)
 
     def render(self) -> Image.Image:
-        img = self.skin.frame(self._ctx(time.time()))
+        ctx = self._ctx(time.time())
+        waiting = getattr(self, "_preview_wait_until", None) is not None
+        previous = getattr(self, "_last_ctx", None)
+        if waiting and self.skin.cur >= 0.985:
+            # Keep animating closed clouds until a fresh preview is available. The timer below is
+            # bounded so a disconnected camera still reaches its normal unavailable presentation.
+            ctx.hold_curtain = True
+        elif waiting and previous is not None:
+            # Preserve the photo scene, including its animation, rather than flashing an empty feed.
+            ctx = copy(previous)
+            ctx.now = time.time()
+            # Keep the drawn controls; _screen_buttons/_touch_up disable their hit targets.
+        img = self.skin.frame(ctx)
+        if not waiting:
+            self._last_ctx = copy(ctx)
+            self._last_ctx.st = copy(ctx.st)  # app state mutates in place on worker/voice threads
         if img.size != (self.W, self.H):
             img = img.resize((self.W, self.H), Image.BILINEAR)
         return img
