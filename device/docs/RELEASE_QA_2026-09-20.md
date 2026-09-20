@@ -43,5 +43,18 @@ its direct Tailscale address. Access through the ASUS and the hotspot LAN showed
 a changed boot ID and roughly one minute uptime, confirming a reboot. Active
 undervoltage/throttling returned (`0x50005`), CPU frequency was about 600 MHz,
 and the restored experimental RGBX preview ran at roughly 15–16 callbacks/s.
-The boot launcher retained RGBX and the 24 FPS target as intended. Final hardware
-acceptance remains pending a stable power source; this release has not been pushed.
+The boot launcher retained RGBX and the 24 FPS target as intended. Performance
+acceptance at 24 FPS remains pending a stable power source.
+
+## Functional retest while charging
+
+The persistent model loaded successfully with `HF_HUB_OFFLINE=1`, returning a
+384-dimensional embedding in 7.925 seconds including import/model startup.
+With that cache provisioned, a fresh real capture completed prepare (321 ms),
+finish (14.758 seconds), and image download (161 ms), all HTTP 200. Review appeared
+28.289 seconds after shutter release; busy feedback took 99 ms. Automatic posting
+was disabled. No capture error or render failure was logged.
+
+This run was undervolted and does not establish normal rendering performance.
+The reveal interval included a 1.571-second callback, and throughput fell sharply.
+The functional pass must not be interpreted as a smooth-animation acceptance.

@@ -46,8 +46,9 @@ HTTP error handling, phase attribution, and not saving an error body as a JPEG.
 The complete device suite passed 165 tests with 2 native-build skips before two
 additional focused integration cases were added; all nine focused tests pass.
 
-No live files or services were changed. Root should deploy `app.py` and new
-`capture_http.py` together, then run capture with automatic posting disabled and
-check prepare/finish/photo-download phase logs. Preserve the other experimental
-Pi files; no ASUS restart or server patch is needed. Hardware capture acceptance
-and longer soak testing remain pending.
+The request fix has since been exercised on the Pi with automatic posting disabled:
+prepare, finish and photo-download returned HTTP 200. The first isolated release
+run then uncovered a separate cold embedding-cache stall after image download.
+See [release QA](RELEASE_QA_2026-09-20.md) for the cache fix and subsequent acceptance
+results. Deploy `app.py` and `capture_http.py` together; no ASUS restart or server
+patch is needed. Longer network soak testing remains outstanding.
