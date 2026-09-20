@@ -88,7 +88,7 @@ class PiSensors:
     one and `readings()` never blocks the shutter.
     """
 
-    ADDR, BUS, CMD_CHUNK, CHUNK, CHUNKS, PIXELS = 0x08, 1, 0x02, 256, 12, 768
+    ADDR, BUS, CMD_CHUNK, CMD_BUTTONS, CHUNK, CHUNKS, PIXELS = 0x08, 1, 0x02, 0x07, 256, 12, 768
     MOTION_FULL = 1.2      # mean absolute change (°C) between frames that counts as "moving fast"
 
     def __init__(self, camera=None, mic: str | None = None):
@@ -98,21 +98,37 @@ class PiSensors:
         self.motion: float = 0.0
         self._prev = None
         self._stop = threading.Event()
+        # One bus, two readers (thermal chunks and the buttons). Each command+read pair holds the lock so a
+        # button poll can never land between a chunk request and its read, which would corrupt the frame.
+        self._lock = threading.Lock()
+        self._bus = None
         threading.Thread(target=self._thermal_loop, daemon=True).start()
+
+    # -- the UNO Q over I2C ----------------------------------------------------------------------
+
+    def _ask(self, cmd: int, arg: int, n: int) -> bytes:
+        """Write [cmd, arg] then read n bytes, as the sketch expects."""
+        from smbus2 import i2c_msg
+        with self._lock:
+            bus = self._bus
+            if bus is None:
+                raise OSError("I2C bus not open")
+            bus.i2c_rdwr(i2c_msg.write(self.ADDR, bytes([cmd, arg])))
+            time.sleep(0.002)
+            read = i2c_msg.read(self.ADDR, n)
+            bus.i2c_rdwr(read)
+            return bytes(read)
+
+    def buttons(self) -> tuple[int, int]:
+        """(held, pressed-since-last-call) bit masks, bit n = Arduino digital pin Dn."""
+        raw = self._ask(self.CMD_BUTTONS, 0, 4)
+        return int.from_bytes(raw[:2], "little"), int.from_bytes(raw[2:], "little")
 
     # -- thermal ------------------------------------------------------------------------------
 
-    def _read_frame(self, bus) -> list[float] | None:
+    def _read_frame(self) -> list[float] | None:
         import struct
-
-        from smbus2 import i2c_msg
-        raw = b""
-        for idx in range(self.CHUNKS):
-            bus.i2c_rdwr(i2c_msg.write(self.ADDR, bytes([self.CMD_CHUNK, idx])))
-            time.sleep(0.01)
-            read = i2c_msg.read(self.ADDR, self.CHUNK)
-            bus.i2c_rdwr(read)
-            raw += bytes(read)
+        raw = b"".join(self._ask(self.CMD_CHUNK, idx, self.CHUNK) for idx in range(self.CHUNKS))
         if len(raw) != self.PIXELS * 4:
             return None
         return list(struct.unpack(f"<{self.PIXELS}f", raw))
@@ -122,12 +138,14 @@ class PiSensors:
         while not self._stop.is_set():
             try:
                 with SMBus(self.BUS) as bus:
+                    self._bus = bus
                     while not self._stop.is_set():
-                        f = self._read_frame(bus)
+                        f = self._read_frame()
                         if f:
                             self._update(f)
                         time.sleep(0.1)
             except OSError as e:          # the Arduino was unplugged or is busy; keep trying
+                self._bus = None
                 print(f"[thermal] {e}; retrying")
                 time.sleep(2)
 
@@ -271,6 +289,71 @@ class PiButtons:
     def close(self) -> None:
         for b in self.buttons.values():
             b.close()
+
+
+class I2CButtons:
+    """The four buttons on the UNO Q, read over the same I2C link as the thermal array (command 0x07).
+
+    Names come from NIMBUS_BUTTONS="shutter=4,mode=5,talk=6,browse=7" (Arduino digital pin numbers); the
+    default knows only the shutter on D4. A press on a pin with no name is logged as
+    `[buttons] unnamed pin D9 pressed`, which is how the other pins get found. `talk` is a hold: its press
+    handler runs on the way down and its release handler on the way up; the others fire on the press, and a
+    press shorter than one poll is still seen because the sketch latches it.
+    """
+
+    DEFAULT_PINS = {"shutter": 4}
+    POLL_S = 0.03
+
+    def __init__(self, sensors: PiSensors, handlers: dict[str, tuple]):
+        self.sensors, self.handlers = sensors, handlers
+        self.pins = self.pin_map()
+        self.names = {pin: name for name, pin in self.pins.items()}
+        self._held = 0
+        self._stop = threading.Event()
+        threading.Thread(target=self._loop, daemon=True).start()
+        print(f"[buttons] i2c {', '.join(f'{n}=D{p}' for n, p in self.pins.items())}")
+
+    @classmethod
+    def pin_map(cls) -> dict[str, int]:
+        pins = dict(cls.DEFAULT_PINS)
+        for part in filter(None, (p.strip() for p in os.environ.get("NIMBUS_BUTTONS", "").split(","))):
+            name, _, pin = part.partition("=")
+            if name.strip() and pin.strip().isdigit():
+                pins[name.strip()] = int(pin)
+        return pins
+
+    def _loop(self) -> None:
+        while not self._stop.is_set():
+            try:
+                held, latched = self.sensors.buttons()
+            except OSError:
+                time.sleep(1)
+                continue
+            self.step(held, latched)
+            time.sleep(self.POLL_S)
+
+    def step(self, held: int, latched: int) -> None:
+        """Turn one reading into press/release calls. Separate from the thread so it can be tested."""
+        pressed = (held & ~self._held) | latched      # newly down, or down and up again since last time
+        released = self._held & ~held
+        for pin in range(16):
+            bit = 1 << pin
+            if pressed & bit:
+                name = self.names.get(pin)
+                if name is None:
+                    print(f"[buttons] unnamed pin D{pin} pressed (name it in NIMBUS_BUTTONS)")
+                else:
+                    press = self.handlers.get(name, (None, None))[0]
+                    if press:
+                        press()
+            if released & bit and (name := self.names.get(pin)):
+                release = self.handlers.get(name, (None, None))[1]
+                if release:
+                    release()
+        self._held = held
+
+    def close(self) -> None:
+        self._stop.set()
 
 
 class PushToTalkAudio:

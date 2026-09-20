@@ -110,17 +110,25 @@ class Screen:
         self._tick()
 
     def _wire_gpio(self):
-        """The physical buttons, when the pins are wired (NIMBUS_GPIO=1 on the camera)."""
-        if os.environ.get("NIMBUS_GPIO", "0") != "1":
-            return None
+        """The physical buttons: on the UNO Q over I2C (NIMBUS_I2C_BUTTONS=1, the rig) or on the Pi's own
+        GPIO (NIMBUS_GPIO=1). Off by default; touch and keys always work."""
+        app = self.app
+        handlers = {"shutter": (lambda: self._bg(app.take_photo, {}), None),
+                    "mode": (lambda: self._dial(1), None),
+                    "talk": (lambda: self._talk_down(None), lambda: self._talk_up(None)),
+                    "browse": (lambda: self._bg(app.show_photo, {"which": "next"}), None)}
         try:
-            from .hw import PiButtons
-            return PiButtons({"shutter": (lambda: self._bg(self.app.take_photo, {}), None),
-                              "mode": (lambda: self._dial(1), None),
-                              "talk": (lambda: self._talk_down(None), lambda: self._talk_up(None))})
+            if os.environ.get("NIMBUS_I2C_BUTTONS", "0") == "1":
+                from .hw import I2CButtons, PiSensors
+                if not isinstance(app.sensors, PiSensors):
+                    raise RuntimeError("I2C buttons need the rig's sensors")
+                return I2CButtons(app.sensors, handlers)
+            if os.environ.get("NIMBUS_GPIO", "0") == "1":
+                from .hw import PiButtons
+                return PiButtons(handlers)
         except Exception as e:      # not wired, no gpiozero, or no permission: touch and keys still work
             print(f"[buttons] off: {type(e).__name__}: {e}")
-            return None
+        return None
 
     # -- touch ---------------------------------------------------------------------------------
 
@@ -136,9 +144,13 @@ class Screen:
                        Button("prev", "<", 0.18, 0.28, lambda: self._bg(app.show_photo, {"which": "previous"})),
                        Button("next", ">", 0.28, 0.38, lambda: self._bg(app.show_photo, {"which": "next"})),
                        Button("phone", "PHONE", 0.38, 0.55, lambda: self._bg(app.send_to_phone, {})),
-                       Button("post", "POST", 0.55, 0.72, lambda: self._bg(app.post_instagram, {}), accent=True),
-                       Button("talk", "TALK", 0.72, 0.98, None, hold=True)],
+                       Button("post", "POST", 0.55, 0.68, lambda: self._bg(app.post_instagram, {}), accent=True),
+                       Button("shop", "SHOP", 0.68, 0.82, lambda: self._bg(app.identify_product, {})),
+                       Button("talk", "TALK", 0.82, 0.98, None, hold=True)],
             "qr": [Button("back", "BACK", 0.02, 0.3, lambda: app.show_photo({"which": "viewfinder"}))],
+            "shop": [Button("back", "BACK", 0.02, 0.2, lambda: app.show_photo({"which": "viewfinder"})),
+                     Button("buy", "BUY WITH VISA", 0.2, 0.7, lambda: self._bg(app.buy_it, {}), accent=True),
+                     Button("talk", "TALK", 0.7, 0.98, None, hold=True)],
         }
 
     def _screen_buttons(self) -> list[Button]:
@@ -259,6 +271,8 @@ class Screen:
             d.text((self.W // 2, self.H - int(self.H * BAR) - int(self.H * 0.04)),
                    "Scan to get this photo on your phone",
                    font=self.F_MED, fill="black", anchor="mm")
+        elif st.screen == "shop":
+            img = self._render_shop()
         else:
             p = st.current
             img = _fit(self._photo(p.local_photo), self.W, self.H) if p.local_photo else Image.new("RGB", (self.W, self.H))
@@ -283,6 +297,43 @@ class Screen:
             top = int(self.H * 0.09)
             d.rectangle([0, top, self.W, top + int(self.H * 0.058)], fill=(0, 0, 0, 150))
             d.text((16, top + 4), st.toast[:95], font=self.F_SMALL, fill="white")
+        return img
+
+    def _render_shop(self) -> Image.Image:
+        """The photo on the left, the product and its offers on the right, the receipt when there is one."""
+        st = self.app.state
+        img = Image.new("RGB", (self.W, self.H), (18, 18, 22))
+        p = st.current
+        if p and p.local_photo:
+            side = int(self.H * (1 - BAR) * 0.9)
+            img.paste(_fit(self._photo(p.local_photo), side, side), (int(self.W * 0.02), int(self.H * 0.04)))
+        d = ImageDraw.Draw(img)
+        x, y = int(self.W * 0.02 + self.H * (1 - BAR) * 0.9 + self.W * 0.03), int(self.H * 0.05)
+        line = int(self.H * 0.07)
+        prod = st.product
+        if prod is None:
+            d.text((x, y), "Looking it up…", font=self.F_MED, fill="white")
+            return img
+        d.text((x, y), prod.label()[:38], font=self.F_MED, fill="white"); y += line
+        d.text((x, y), f"{prod.category} · {int(prod.confidence * 100)}% sure", font=self.F_SMALL, fill=(170, 170, 180)); y += line
+        for i, o in enumerate(st.offers[:3]):
+            fill = (255, 255, 255) if i == 0 else (190, 190, 200)
+            d.text((x, y), f"{o.price_text():>10}  {o.merchant[:22]}", font=self.F_SMALL, fill=fill); y += int(line * 0.8)
+        if not st.offers:
+            d.text((x, y), "nothing for sale found", font=self.F_SMALL, fill=(255, 155, 155)); y += line
+        if st.offers:                                   # scan to open the listing on a phone
+            q = qrcode.QRCode(border=1, box_size=3)
+            q.add_data(st.offers[0].url)
+            code = q.make_image(fill_color="white", back_color=(18, 18, 22)).convert("RGB")
+            side = int(self.H * 0.2)
+            img.paste(code.resize((side, side), Image.NEAREST), (self.W - side - 16, int(self.H * 0.04)))
+        r = st.receipt
+        if r:
+            y += int(line * 0.3)
+            d.rounded_rectangle([x - 8, y - 6, self.W - 16, y + int(line * 2.6)], radius=10, fill=(26, 60, 120))
+            d.text((x, y), f"{'APPROVED' if r.approved else 'DECLINED'}  ${r.amount:.2f} {r.currency}", font=self.F_MED, fill="white"); y += line
+            d.text((x, y), f"Visa ····{r.last4} · auth {r.auth_code} · {r.network}", font=self.F_SMALL, fill=(200, 215, 240)); y += int(line * 0.8)
+            d.text((x, y), r.message[:48], font=self.F_SMALL, fill=(200, 215, 240))
         return img
 
     def _watch_toast(self) -> None:

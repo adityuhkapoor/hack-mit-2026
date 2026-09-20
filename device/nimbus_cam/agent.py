@@ -43,6 +43,10 @@ Use your tools for everything you do or know about photos. Never invent a photo,
   cold: max_temp_c 10) as well as query words.
 - "next", "go back", "the second one" -> show_photo.  "send it to my phone" -> send_to_phone.
 - "post it" -> post_instagram.
+- "what is this", "what am I holding", "how much is it", "find this for sale" -> identify_product. Then say
+  the product and the best price and ask whether to buy it.
+- "buy it", "yes, order it", "pay with Visa" -> buy_it. Read back the amount, the merchant and the last four
+  digits of the card; say "simulated" if the receipt says so.
 If a tool returns an error, say so plainly in one sentence. A photo takes about thirty seconds while the
 GPU paints the surroundings: say you're on it before calling take_photo."""
 
@@ -78,6 +82,13 @@ TOOLS: dict[str, dict] = {
     "post_instagram": {"description": "Post the photo's card to the camera's Instagram account.",
                        "properties": {"photo": PHOTO,
                                       "caption": {"type": "string", "description": "optional caption; otherwise the camera writes one"}}},
+    "identify_product": {"description": "Name the product in the photo exactly and find it for sale: merchant, price, link. "
+                                        "Shows the offers on screen.",
+                         "properties": {"photo": PHOTO}, "timeout": 60},
+    "buy_it": {"description": "Buy the product found for the photo, paying with the camera's Visa card. Returns the receipt.",
+               "properties": {"photo": PHOTO,
+                              "offer": {"type": "number", "description": "which offer, 1 = the best (default)"}},
+               "timeout": 45},
 }
 
 

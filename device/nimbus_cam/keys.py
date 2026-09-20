@@ -13,6 +13,8 @@ KEYS = {
     "ig_user": ("ig-user-id", "IG_USER_ID"),
     "ig_token": ("ig-token", "IG_TOKEN"),
     "elastic": ("elastic-api-key", "ELASTIC_API_KEY"),
+    "visa_user": ("visa-sandbox-user", "VISA_USER_ID"),          # optional: real Visa sandbox checkout
+    "visa_password": ("visa-sandbox-password", "VISA_PASSWORD"),
 }
 
 

@@ -48,18 +48,44 @@ stays: `readings()` returns `key=value;…` with any subset of `temp_c rh lux db
 | Touch panel | HDMI + USB touch | the screen and its buttons |
 | Local weather | Open-Meteo | humidity → diffusion, wind, cloud (labelled "(web)") |
 
-**The three buttons** from the sketch — photo, viewfinder/mode, push-to-speak — wire between a GPIO pin and
-ground (internal pull-ups, no resistors):
+**The four buttons** are on the **UNO Q's** digital pins (active-low to ground; the sketch enables the
+pull-ups) and reach the Pi over the same I2C link as the thermal array (command `0x07`, see
+[unoq/nimbus_unoq.ino](unoq/nimbus_unoq.ino)). The Pi names them with
+`NIMBUS_BUTTONS="shutter=4,mode=5,talk=6,browse=7"` and turns them on with `NIMBUS_I2C_BUTTONS=1`:
 
-| Button | Pin | Header | Does |
-|---|---|---|---|
-| Shutter | GPIO17 | pin 11 | take a photo |
-| Mode | GPIO27 | pin 13 | switch mode: Nimbus ⇄ Souvenir |
-| Talk | GPIO22 | pin 15 | hold to speak to the camera |
+| Button | Does |
+|---|---|
+| `shutter` (D4) | take a photo |
+| `mode` | switch mode: Nimbus ⇄ Souvenir |
+| `talk` | hold to speak to the camera |
+| `browse` | next photo / open the gallery |
 
-Ground: any of pins 6, 9, 14, 20, 25, 30, 34, 39. Move them with
-`NIMBUS_PINS="shutter=17,mode=27,talk=22"`, and set `NIMBUS_GPIO=1` to switch them on (already set on the
-rig). Until they are wired, the same actions are on the touch screen and the keyboard.
+Only D4 is named so far. **A press on an unnamed pin is logged** (`[buttons] unnamed pin D9 pressed`) — press
+each button once while watching `~/nimbus-run.log`, put the numbers in `NIMBUS_BUTTONS` in
+`~/start_nimbus.sh` and `~/.config/labwc/autostart`, and restart. (Buttons straight on the Pi's GPIO still
+work too: `NIMBUS_GPIO=1`, `NIMBUS_PINS="shutter=17,mode=27,talk=22"`.)
+
+### Reflashing the UNO Q
+
+There is no Arduino IDE in the loop: the sketch is built and flashed **from the UNO Q's own Linux**, reached
+over ADB from the Pi (the board is on the Pi's USB).
+
+```bash
+ssh pi
+adb shell                                                    # user: arduino
+arduino-cli lib install "Adafruit MLX90640"                  # once
+python3 patch_mlx90640.py ~/Arduino/libraries/Adafruit_MLX90640/Adafruit_MLX90640.cpp   # once, see unoq/patches
+cd ~/nimbus_unoq && arduino-cli compile --fqbn arduino:zephyr:unoq . \
+  && arduino-cli upload --fqbn arduino:zephyr:unoq -p 192.168.8.122 --upload-field password=arduino .
+```
+
+(`adb push` the sketch and the patch script from the Pi first; the upload address is the board's own wlan0,
+`arduino-cli board list` prints it.) The MCU restarts ~30 s after the upload finishes. Its `Serial` output is
+`/dev/ttyACM0` on the Pi: `sudo timeout 5 cat /dev/ttyACM0` shows frames and `buttons=0x..` on every press.
+
+**Why the patch:** the Zephyr core's `Wire` always sends a STOP after the address write, and the MLX90640
+needs a repeated start, so every read came back from the wrong address and every pixel was NaN. The patch
+makes the driver read through Zephyr's `i2c_write_read()`.
 
 ## Run the camera on a Mac (no hardware needed)
 

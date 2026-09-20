@@ -15,6 +15,7 @@ scene becomes the keepsake it deserves — a can of Red Bull makes a trading car
 | [pipeline/](pipeline/) | The image pipeline and API (`nimbus`), deployed on the GPU box |
 | [infra/elastic/](infra/elastic/) | Elasticsearch for photo search |
 | [docs/HANDOFF.md](docs/HANDOFF.md) | **What is running where right now**, what is half-done, how to get in |
+| [docs/TRACKS.md](docs/TRACKS.md) | Sponsor tracks: what to show a judge for each, and the demo order |
 | [docs/demo/](docs/demo/) | Demo renders |
 
 Quick start on a Mac: see [device/README.md](device/README.md) (`uv run python -m nimbus_cam --mac`).

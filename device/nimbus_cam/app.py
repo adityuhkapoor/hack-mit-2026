@@ -19,7 +19,7 @@ import httpx
 
 from nimbus import capture as lc, imageio, sense
 
-from . import instagram, tagger
+from . import instagram, shop, tagger
 from .library import HOME, Photo, Query
 
 API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
@@ -45,6 +45,9 @@ class State:
     busy: str = ""                      # e.g. "rendering Sensed air…"
     toast: str = ""                     # one line of feedback on the screen
     talking: bool = False
+    product: shop.Product | None = None # Shop: what the current photo is, what it costs, the receipt
+    offers: list = field(default_factory=list)
+    receipt: shop.Receipt | None = None
 
 
 class CameraApp:
@@ -202,8 +205,57 @@ class CameraApp:
         self.say("Posted to Instagram")
         return {"posted": True, "id": post_id, "caption": caption}
 
+    # -- Shop (Visa): name the thing in the photo, find it for sale, buy it ----------------------
+
+    def identify_product(self, p: dict | None = None) -> dict:
+        photo = self._resolve((p or {}).get("photo"))
+        if photo is None or not photo.local_photo:
+            return {"error": "no photo to look at"}
+        pdir = Path(photo.local_photo).parent
+        cached = shop.load(pdir)
+        if cached and cached.get("offers"):
+            product = shop.Product(**cached["product"])
+            offers = [shop.Offer(**o) for o in cached["offers"]]
+        else:
+            self.state.busy = "looking it up"
+            try:
+                product = shop.identify(Path(photo.local_photo).read_bytes())
+                offers = shop.find(product) if product.confidence >= 0.3 else []
+            except Exception as e:
+                return {"error": f"could not identify it: {str(e)[:120]}"}
+            finally:
+                self.state.busy = ""
+            shop.save(pdir, product, offers)
+        self.state.current, self.state.screen = photo, "shop"
+        self.state.product, self.state.offers, self.state.receipt = product, offers, None
+        best = offers[0] if offers else None
+        self.say(f"{product.label()} — {best.price_text()} at {best.merchant}" if best else f"{product.label()} — nothing for sale found")
+        return {"product": product.label(), "category": product.category, "confidence": product.confidence,
+                "offers": [{"merchant": o.merchant, "price": o.price, "currency": o.currency, "url": o.url} for o in offers],
+                "buyable": bool(best), "next": "call buy_it to pay with Visa" if best else "nothing to buy"}
+
+    def buy_it(self, p: dict | None = None) -> dict:
+        st = self.state
+        if st.product is None or not st.offers:
+            r = self.identify_product(p)
+            if "error" in r or not r.get("buyable"):
+                return r if "error" in r else {"error": "nothing for sale was found for this photo"}
+        which = int((p or {}).get("offer", 1) or 1) - 1
+        offer = st.offers[max(0, min(which, len(st.offers) - 1))]
+        try:
+            receipt = shop.checkout(offer)
+        except Exception as e:
+            return {"error": f"payment failed: {str(e)[:120]}"}
+        st.receipt, st.screen = receipt, "shop"
+        if st.current and st.current.local_photo:
+            shop.save(Path(st.current.local_photo).parent, st.product, st.offers, receipt)
+        self.say(f"{'Paid' if receipt.approved else 'Declined'} · {receipt.network} ····{receipt.last4}")
+        return {"approved": receipt.approved, "amount": receipt.amount, "currency": receipt.currency,
+                "merchant": offer.merchant, "card": f"Visa ending {receipt.last4}", "network": receipt.network,
+                "auth_code": receipt.auth_code, "note": receipt.message, "link_on_screen": offer.url}
+
     TOOLS = ("take_photo", "set_mode", "read_air", "search_photos", "photo_details", "show_photo",
-             "send_to_phone", "post_instagram")
+             "send_to_phone", "post_instagram", "identify_product", "buy_it")
 
     # -----------------------------------------------------------------------------------------
     # capture, storage, tagging

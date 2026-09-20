@@ -51,6 +51,21 @@ ASUS.
 - **The venue wifi (HackMIT.2026) isolates hosts across subnets** and mDNS does not cross it. Use the tailnet
   for SSH; the Pi reaches the ASUS on the venue address because the tailnet ACL only opens port 22.
 
+## The UNO Q
+
+- **The sketch is flashed from the board's own Linux**, reached with `adb shell` from the Pi (the UNO Q is on
+  the Pi's USB and exposes ADB). Compile with `arduino-cli --fqbn arduino:zephyr:unoq`, upload to the board's
+  own wlan address with `--upload-field password=arduino`. The MCU restarts ~30 s later and the monitor drops
+  whatever `setup()` printed, so the sketch repeats its status on the periodic line.
+- **The Zephyr core's `Wire` ignores the stop bit**: every address write ends in a STOP. The MLX90640 needs a
+  repeated start, so with the stock Adafruit driver every read returns the wrong words and every pixel is NaN
+  (the serial number still reads fine, which is misleading). `device/unoq/patches/patch_mlx90640.py` routes the
+  driver's reads through Zephyr's `i2c_write_read()`.
+- **Buses**: `Wire` = header SDA/SCL (i2c2), `Wire1` = i2c4, `Wire2` = A4/A5 (i2c3). The thermal array is on
+  Wire2 and the Pi on Wire; the sketch scans for the array and serves 0x08 on every other bus.
+- **Muse starves at small `max_tokens` even with `reasoning_effort="minimal"`**: 600 tokens over a page of
+  search results came back as `None` with 463 reasoning tokens. Give ranking/extraction calls 2000+.
+
 ## Image pipeline notes
 
 - **Measured air beats what the picture looks like** in search ranking: a sunny field re-rendered at 94%

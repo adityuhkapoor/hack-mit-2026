@@ -1,4 +1,4 @@
-# Nimbus — handoff, 19 Sep 2026, 21:25 ET
+# Nimbus — handoff, 19 Sep 2026, 22:30 ET
 
 Written for whoever picks this up next: a teammate, or a fresh agent session. It says what exists, what is
 running where, what is still open, and how to get in. Design and rationale live in [DESIGN.md](DESIGN.md);
@@ -28,24 +28,28 @@ once and came back into Nimbus on its own.
 Machine-side scripts: `~/start_nimbus.sh` on the Pi (restart the camera), `~/restart_api.sh` and
 `~/start_all.sh` on the ASUS (restart the API; boot everything).
 
-## Buttons — the open hardware question
+## Buttons — reflashed, one pin named
 
-**Software currently sees zero buttons.** Nothing is wired to the Pi's GPIO, and the UNO Q's sketch exposes
-no button state: it answers only thermal commands (`0x01` stats, `0x02` frame chunks). Probing `0x03`–`0x10`
-returns stale buffer bytes, not buttons.
+The UNO Q now runs **our sketch** (`device/unoq/nimbus_unoq.ino`): thermal frames as before (commands `0x01`,
+`0x02`) plus **`0x07` → buttons** (held mask + pressed-since-last-read mask, bit n = digital pin Dn, all of
+D2–D13 pulled up). Flashed from the board's own Linux over ADB from the Pi; how-to in `device/README.md`.
 
-Arun says there should be **four buttons** and that one on **pin 4 of the Arduino** should be the shutter, and
-that rewiring is not possible because those pins are taken. So the path is: **get the sketch, add a buttons
-command, reflash the UNO Q.** Suggested protocol, matching what is already there:
+The Pi reads it (`hw.I2CButtons`, on with `NIMBUS_I2C_BUTTONS=1`) and knows **only `shutter=4`** so far.
+**Arun has not pressed the buttons yet.** When he does, the log names the other three
+(`[buttons] unnamed pin D9 pressed`); put them in `NIMBUS_BUTTONS="shutter=4,mode=…,talk=…,browse=…"` in
+`~/start_nimbus.sh` and `~/.config/labwc/autostart` on the Pi and run `~/start_nimbus.sh`.
 
-```
-cmd 0x07 -> one byte, bit per button: bit0 shutter(pin 4), bit1 mode, bit2 talk, bit3 spare
-```
+Two findings from the reflash: the Zephyr core's `Wire` cannot do a repeated start (the MLX90640 driver
+is patched, `device/unoq/patches/`), and the array delivers one chess subpage per read, so ~half the pixels
+are live at any moment — plenty for temperature and motion. The thermal array is on **Wire2 (A4/A5)** and the
+Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 
-The Pi side is ready for either route: `nimbus_cam/hw.py:PiButtons` handles GPIO buttons
-(shutter GPIO17, mode GPIO27, talk GPIO22, `NIMBUS_PINS` to move them, `NIMBUS_GPIO=1` to enable — armed and
-verified on the rig), and an I2C equivalent would slot in beside it. Until buttons exist, every action is on
-the touch screen, the keyboard and the voice.
+## Shop (Visa) — new
+
+"What am I holding?" → `identify_product` (Muse vision → live search → offers) → "buy it" → `buy_it`. A
+**SHOP** button is on the review screen. Checkout is **simulated** unless Visa sandbox credentials exist (see
+`docs/TRACKS.md`); the receipt always says which. Verified on the Mac with a Red Bull can: Target, Walmart,
+Instacart listings, simulated approval. Not yet run on the rig by voice.
 
 ## What works, verified
 
@@ -58,7 +62,7 @@ the touch screen, the keyboard and the voice.
   back/‹ ›/phone/post on a photo).
 - **Audio**: mic = C270 webcam, speaker = the Pi's 3.5 mm jack, both chosen by name. Tone out and 1 s in tested.
   **A speaker must be plugged into the jack to hear the camera.**
-- **Voice**: ElevenLabs agent `agent_3501m2xfqx3yemcb5ph6tr8ekjen`, brain = Muse Spark via custom LLM.
+- **Voice**: ElevenLabs agent `agent_3501m2xfqx3yemcb5ph6tr8ekjen`, brain = Muse Spark via custom LLM, ten tools.
   Tested in text mode: it read the air and answered "when did I take my last photo" from the record. **Nobody
   has spoken to it on the rig yet.**
 - **Search**: Elasticsearch 8.15 on the ASUS (tarball, no docker), the camera indexes and searches it live.
@@ -67,8 +71,7 @@ the touch screen, the keyboard and the voice.
 
 ## Not done
 
-1. **The four buttons.** Needs the UNO Q sketch reflashed (see above). Touch, keys and voice cover every action
-   meanwhile.
+1. **Three button pins unnamed** (see above) — a one-line env change once Arun presses them.
 2. **Voice untested by voice** on the rig: the session connects and the devices are right, but nobody has held
    the button and spoken yet. A speaker must be in the Pi's 3.5 mm jack.
 3. **The ASUS has no sudo for this user**, so ComfyUI, the API and Elasticsearch restart from a user `@reboot`
@@ -90,6 +93,7 @@ the repo.
 
 ```bash
 ssh pi                      # Pi, over the tailnet (~/.ssh/config alias)
+ssh pi adb shell            # the UNO Q's Linux (user arduino), for reflashing
 ssh -i ~/.ssh/hackmit_team_2026 asus@100.90.82.31
 ~/start_nimbus.sh           # on the Pi: restart the camera with keys and the right env
 ~/restart_api.sh            # on the ASUS: restart the GPU API
