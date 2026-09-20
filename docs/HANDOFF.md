@@ -14,8 +14,8 @@ answers, searches its own photos, posts to Instagram, and puts a photo on your p
 
 | Machine | Role | Address | State |
 |---|---|---|---|
-| **Pi 4** (`raspi4`) | the camera: sensors, screen, touch, voice | venue 10.189.57.130 · tailnet 100.72.177.61 | Nimbus on the panel, two-mode build; starts at boot with keys from `/etc/nimbus.env` |
-| **ASUS GB10** (`gx10-5493`) | the GPU: ComfyUI + Nimbus API :8000 + Elasticsearch :9200 | venue 10.189.73.14 · tailnet 100.90.82.31 | all three up; `@reboot` crontab brings them back (no sudo there, so no systemd) |
+| **Pi 4** (`raspi4`) | the camera: sensors, screen, touch, voice | hotspot 172.20.10.11 (venue 10.189.57.130) · tailnet 100.72.177.61 | Nimbus on the panel, two-mode build; starts at boot with keys from `/etc/nimbus.env` |
+| **ASUS GB10** (`gx10-5493`) | the GPU: ComfyUI + Nimbus API :8000 + Elasticsearch :9200 | hotspot 172.20.10.12 (venue 10.189.73.14) · tailnet 100.90.82.31 | all three up; `@reboot` crontab brings them back (no sudo there, so no systemd) |
 | **Windows box** | old GPU, fallback only | ZeroTier · `nimbus.akvaithi.page` | up, unused |
 | **MacBook** | development | venue 10.189.81.118 | repo, Keychain, the ElevenLabs agent |
 
@@ -46,7 +46,7 @@ Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 
 ## The two modes (changed 23:50 ET)
 
-**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning, 25 s. **Visa Buy** = the shutter takes a plain photo and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
+**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`, ~19 s a render at 1.5 MP; 4B is the `gb10` fallback, ~9 s). Portrait: `NIMBUS_ROTATE=90` on the Pi. **Visa Buy** = the shutter takes a plain photo and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
 
 ## Shop (Visa)
 

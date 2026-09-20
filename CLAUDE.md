@@ -88,8 +88,14 @@ ASUS.
 - **Render at the output size.** Everything is stored at 2400 px, so rendering a 12 MP frame wastes time and
   memory; shrink the JPEG while it is still 8-bit (`imageio.load_for_render`). That plus switching off the
   ONNX arena took a capture from 2.57 GB to 1.26 GB.
-- **The GB10 generates at 2 MP with no upscaler**; the 3060 Ti needed 1.5 MP plus ESRGAN. Its profile is
-  `gb10` (klein fp8 + the fp4 text encoder it ships with).
+- **The GB10 runs klein 9B** (`gb10-9b`: bf16 weights, gated on Hugging Face — token in Keychain `hf-token`
+  — plus the fp4 8B text encoder) at 1.5 MP, ~19 s a render. The A/B on the same photo was decisive: 4B kept
+  the room and pasted in a stranger's mugshot; 9B built the police-lineup wall. `gb10` (4B, ~9 s) stays as the
+  fast fallback. The 3060 Ti profile needed 1.5 MP plus ESRGAN.
+- **`mask.jpg` in a capture folder is an overlay for viewing, not the mask.** Feeding it back as a mask
+  inpaints nothing. Recompute with `subject.subject_mask`.
+- **klein 4B cannot spell**, and a headline given in the prompt comes back mangled ("LOIDRAVE"). The AI Camera
+  prompt asks for wordless artwork and the frame prints the real title.
 
 ## Working agreements
 
