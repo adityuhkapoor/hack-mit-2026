@@ -10,7 +10,7 @@ that is reachable from the public demo page cannot spend anyone's ink by default
 
 The queue is driverless IPP over USB (ipp-usb), so the option names below are the XP-4200's own.
 
-Every print is four polaroids on one 4x6 sheet (polaroid.py) unless the request asks for layout=single.
+A print is one polaroid filling a 3x4 page (polaroid.py) unless the request names another layout.
 """
 
 from __future__ import annotations
@@ -29,7 +29,7 @@ SIZES = ("3.5x5", "4x6", "5x7", "8x10", "A4", "A6", "Letter", "Legal")
 BORDERLESS_SIZES = ("3.5x5", "4x6", "5x7", "8x10", "A4", "Letter")
 MEDIA_TYPES = ("Stationery", "StationeryCoated", "Photographic", "PhotographicGlossy", "PhotographicHighGloss",
                "PhotographicSemiGloss", "PhotographicMatte")
-LAYOUTS = ("polaroid4", "polaroid1", "polaroid1full", "single")   # four on a 4x6 sheet (default) | one on a 3x4 page,
+LAYOUTS = ("polaroid4", "polaroid1", "polaroid1full", "single")   # four on a 4x6 sheet | one on a 3x4 page,
                                                                   # centred | one filling the 3x4 page | the picture as is
 # What each layout prints on when the request does not say: (paper size, borderless).
 LAYOUT_DEFAULTS = {"polaroid4": ("4x6", True), "polaroid1": ("3x4", False), "polaroid1full": ("3x4", True),
@@ -45,6 +45,7 @@ CUSTOM_3X4 = "Custom.3x4in"
 # high the slowest (IPP print-quality: 3 draft, 4 normal, 5 high). A request that names none gets the printer's own.
 QUALITIES = {"draft": 3, "normal": 4, "high": 5}
 MAX_COPIES = 10
+DEFAULT_LAYOUT = "polaroid1full"       # one polaroid filling the 3x4 page: what every print is unless it asks otherwise
 
 _QUEUE_NAME = re.compile(r"^[A-Za-z0-9_.\-]{1,127}$")
 _JOB = re.compile(r"request id is (\S+)")
@@ -78,6 +79,17 @@ def default_media() -> str | None:
     if media and media not in MEDIA_TYPES:
         raise PrintError(f"NIMBUS_PRINT_MEDIA must be one of {', '.join(MEDIA_TYPES)}")
     return media or None
+
+
+def default_quality() -> str | None:
+    """How fast to print when a request does not say: NIMBUS_PRINT_QUALITY, else draft (the quickest).
+    NIMBUS_PRINT_QUALITY=printer leaves it to the printer's own setting."""
+    q = os.environ.get("NIMBUS_PRINT_QUALITY", "draft").strip().lower()
+    if q == "printer":
+        return None
+    if q not in QUALITIES:
+        raise PrintError(f"NIMBUS_PRINT_QUALITY must be one of {', '.join(QUALITIES)}, or printer")
+    return q
 
 
 def _run(args: list[str], timeout: float = 10) -> subprocess.CompletedProcess:
@@ -143,7 +155,7 @@ def custom_page_options(media_type: str | None, borderless: bool = False) -> lis
 
 
 def submit(path: Path, *, title: str, size: str | None = None, borderless: bool | None = None,
-           media_type: str | None = None, scaling: str = "fit", copies: int = 1, layout: str = "polaroid4",
+           media_type: str | None = None, scaling: str = "fit", copies: int = 1, layout: str = DEFAULT_LAYOUT,
            quality: str | None = None) -> dict:
     """Spool `path` on the queue and return at once; the printer takes its own time after that."""
     name = queue()
@@ -163,6 +175,7 @@ def submit(path: Path, *, title: str, size: str | None = None, borderless: bool 
                          "use layout=polaroid1full to fill the page", 400)
     if layout == "polaroid1full" and not borderless:
         raise PrintError("layout=polaroid1full fills the page edge to edge, so it must be borderless", 400)
+    quality = quality or default_quality()
     if quality is not None and quality not in QUALITIES:
         raise PrintError(f"quality must be one of {', '.join(QUALITIES)}", 400)
     if not 1 <= copies <= MAX_COPIES:

@@ -62,22 +62,40 @@ def test_off_by_default(rig):
     assert rig.calls == []
 
 
-def test_prints_the_polaroid_sheet_by_default(rig):
+def test_prints_one_full_bleed_polaroid_on_3x4_by_default(rig):
     rig.enable()
     r = rig.client.post("/captures/abc123/print")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["job"] == "Epson_XP4200-7" and body["queue"] == "Epson_XP4200" and body["which"] == "photo"
-    assert body["layout"] == "polaroid4"
+    assert (body["layout"], body["size"], body["borderless"], body["quality"]) == ("polaroid1full", "3x4", True, "draft")
     (args,) = rig.calls
-    assert args[:3] == ["lp", "-d", "Epson_XP4200"]
-    assert "media=4x6.Borderless" in args and "print-scaling=fit" in args
-    assert args[-2] == "--"
+    assert args[:3] == ["lp", "-d", "Epson_XP4200"] and args[-2] == "--"
+    col = next(a for a in args if a.startswith("media-col="))
+    assert "x-dimension=7620 y-dimension=10160" in col and "media-top-margin=0" in col     # 3 x 4 in, zero margins
+    assert "print-scaling=none" in args and "print-quality=3" in args
     ((path, img),) = rig.sheets
     assert path.name.startswith("nimbus-sheet-") and path.suffix == ".jpg"
-    assert img.size == (1200, 1800) and img.format == "JPEG"      # four polaroids, turned to fill 4x6 portrait
+    assert img.size == (900, 1200) and img.format == "JPEG"        # one polaroid, the whole 3 x 4 page
     assert not path.exists()                                       # the temporary sheet is cleaned up
-    assert not any(a.startswith("MediaType=") for a in args)       # no paper type configured
+
+
+def test_an_older_camera_asking_for_4x6_still_gets_one_3x4_polaroid_never_four(rig):
+    rig.enable()
+    r = rig.client.post("/captures/abc123/print", params={"which": "photo", "size": "4x6"})   # what the Pi used to send
+    assert r.status_code == 200, r.text
+    assert (r.json()["layout"], r.json()["size"]) == ("polaroid1full", "3x4")
+    ((path, img),) = rig.sheets
+    assert img.size == (900, 1200)
+    assert not any("4x6" in a for a in rig.calls[0])
+
+
+def test_a_card_prints_as_it_is_and_four_up_only_when_asked_for_by_name(rig):
+    rig.enable()
+    r = rig.client.post("/captures/abc123/print", params={"which": "card", "size": "4x6"})
+    assert r.status_code == 200 and r.json()["layout"] == "single" and rig.sheets[0][1] is None
+    r = rig.client.post("/captures/abc123/print", params={"layout": "polaroid4"})
+    assert r.status_code == 200 and r.json()["layout"] == "polaroid4" and rig.sheets[-1][1].size == (1200, 1800)
 
 
 def test_layout_single_prints_the_picture_untouched(rig):
@@ -88,30 +106,39 @@ def test_layout_single_prints_the_picture_untouched(rig):
     assert args[-1] == str(rig.shot / "photo.jpg") and rig.sheets[0][1] is None
 
 
-def test_quality_sets_the_printers_speed(rig):
+def test_quality_sets_the_printers_speed(rig, monkeypatch):
     rig.enable()
-    assert not any(a.startswith("print-quality") for a in (rig.client.post("/captures/abc123/print"), rig.calls[-1])[1])
+    assert "print-quality=3" in (rig.client.post("/captures/abc123/print"), rig.calls[-1])[1]     # draft unless said
     for name, n in (("draft", 3), ("normal", 4), ("high", 5)):
-        r = rig.client.post("/captures/abc123/print", params={"quality": name, "layout": "polaroid1full"})
+        r = rig.client.post("/captures/abc123/print", params={"quality": name})
         assert r.status_code == 200 and r.json()["quality"] == name
         assert f"print-quality={n}" in rig.calls[-1]
     assert rig.client.post("/captures/abc123/print", params={"quality": "ultra"}).status_code == 422
+    monkeypatch.setenv("NIMBUS_PRINT_QUALITY", "normal")
+    rig.client.post("/captures/abc123/print")
+    assert "print-quality=4" in rig.calls[-1]
+    monkeypatch.setenv("NIMBUS_PRINT_QUALITY", "printer")
+    rig.client.post("/captures/abc123/print")
+    assert not any(a.startswith("print-quality") for a in rig.calls[-1])
 
 
 def test_paper_type_comes_from_the_server_setting(rig):
     rig.enable()
     rig.env("NIMBUS_PRINT_MEDIA", "PhotographicSemiGloss")
     assert rig.client.post("/captures/abc123/print").json()["media_type"] == "PhotographicSemiGloss"
-    assert "MediaType=PhotographicSemiGloss" in rig.calls[-1]
+    assert "media-type=photographic-semi-gloss" in next(a for a in rig.calls[-1] if a.startswith("media-col="))
     rig.client.post("/captures/abc123/print", params={"media_type": "PhotographicMatte"})   # a request can override it
-    assert "MediaType=PhotographicMatte" in rig.calls[-1] and "MediaType=PhotographicSemiGloss" not in rig.calls[-1]
+    col = next(a for a in rig.calls[-1] if a.startswith("media-col="))
+    assert "media-type=photographic-matte" in col and "semi-gloss" not in col
+    rig.client.post("/captures/abc123/print", params={"layout": "single"})
+    assert "MediaType=PhotographicSemiGloss" in rig.calls[-1]
     rig.env("NIMBUS_PRINT_MEDIA", "cardboard")
     assert rig.client.post("/captures/abc123/print").status_code == 503
 
 
-def test_polaroid_layout_only_for_4x6(rig):
+def test_four_up_is_only_for_4x6(rig):
     rig.enable()
-    r = rig.client.post("/captures/abc123/print", params={"size": "5x7"})
+    r = rig.client.post("/captures/abc123/print", params={"size": "5x7", "layout": "polaroid4"})
     assert r.status_code == 400 and "4x6" in r.json()["detail"]
     assert rig.calls == []
     assert rig.client.post("/captures/abc123/print", params={"size": "5x7", "layout": "single"}).status_code == 200
@@ -177,7 +204,7 @@ def test_options_reach_lp(rig):
 
 
 @pytest.mark.parametrize("params", [
-    {"size": "99x99"}, {"size": "Legal", "layout": "single"},   # Legal has no borderless mode
+    {"size": "99x99", "layout": "single"}, {"size": "Legal", "layout": "single"},   # Legal has no borderless mode
     {"copies": 0}, {"copies": 99}, {"layout": "grid9"},
     {"media_type": "Stationery; rm -rf /"}, {"scaling": "stretch"}, {"which": "mask"},
 ])

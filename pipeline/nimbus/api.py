@@ -641,17 +641,17 @@ def print_capture(capture_id: str, request: Request, which: Literal["photo", "ca
                   size: str | None = None, borderless: bool | None = None, media_type: str | None = None,
                   scaling: Literal["fit", "fill"] = "fit", copies: int = 1,
                   quality: Literal["draft", "normal", "high"] | None = None,
-                  layout: Literal["polaroid4", "polaroid1", "polaroid1full", "single"] = "polaroid4"):
+                  layout: Literal["polaroid4", "polaroid1", "polaroid1full", "single"] | None = None):
     """Send a stored capture's `photo` (the picture) or `card` (with its QR code) to the printer.
 
     Returns as soon as CUPS has the job ({"job": "Epson_XP4200-7", …}); the paper comes out after that.
     size: 3.5x5 4x6 5x7 8x10 A4 A6 Letter Legal (borderless except A6 and Legal). media_type is the paper
     in the tray (Photographic…, Stationery); leave it out for the printer's setting. scaling `fit` keeps
-    the whole picture, `fill` crops to cover the paper. layout `polaroid4` (the default, 4x6 only) prints four
-    identical upright polaroids with the HackMIT logo on the thick border; `polaroid1` prints one of them, scaled
-    up, centred on a 3x4 in page (half a 4x6 sheet; size 3x4, not borderless, printed at its own size);
-    `polaroid1full` fills that page edge to edge (borderless); `single` prints the picture as it is. `size` and
-    `borderless` default to what the layout needs. quality `draft` prints fastest, `high` slowest; leave it out for
+    the whole picture, `fill` crops to cover the paper. With no layout, a photo prints as `polaroid1full`: one
+    polaroid filling a 3x4 in page edge to edge (whatever `size` the caller names is ignored) and a card prints
+    as it is (`single`). Name a layout to choose: `polaroid4` prints four identical upright polaroids on a 4x6
+    sheet; `polaroid1` prints one, centred on a 3x4 page with a white margin; `polaroid1full` fills that page;
+    `single` prints the picture as it is. `size` and `borderless` default to what the layout needs. quality `draft` prints fastest, `high` slowest; leave it out for
     the printer's own setting. copies is 1 to 10.
     503 when printing is not enabled on this server.
     """
@@ -665,6 +665,11 @@ def print_capture(capture_id: str, request: Request, which: Literal["photo", "ca
     if not enabled:
         raise HTTPException(503, "printing is not enabled on this server (NIMBUS_PRINTER is not set)")
     _rate_limit(request, cost="print", per_minute=PRINTS_PER_MINUTE)
+    if layout is None:
+        if which == "card":
+            layout = "single"
+        else:
+            layout, size, borderless = printing.DEFAULT_LAYOUT, None, None
     meta = get_capture(capture_id)
     try:
         job = printing.submit(captures.dir(capture_id) / f"{which}.jpg", title=f"Nimbus {meta.id} {which}",
