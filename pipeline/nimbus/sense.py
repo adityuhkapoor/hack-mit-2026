@@ -372,13 +372,14 @@ def souvenir_prompt(kind: str, subject: str, r: Readings, title: str = "") -> st
     words, klein renders them legibly. Everything else stays wordless.
     """
     look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
-    words = (f' The only text anywhere is the headline "{title}", spelled exactly like that, in large clear '
-             "letters; no other words, letters or numbers." if title else
-             " No text, lettering, numbers or logos anywhere.")
+    # klein cannot spell (the headline came back "LOIDRAVE OVERDRIVE"), so the artwork is wordless and the
+    # frame prints the real title. Blank panels where lettering would go read as design, not as a mistake.
     return (f"Replace the masked surroundings with {look}, featuring {subject}. Fill the whole background in "
             "that style, bold and uncluttered right behind the subject so it stays the focus. Match the "
-            f"camera height and light direction of image 1.{words} No other people, faces, figures or "
-            "photographs of people anywhere in the artwork: the subject is the only person.")
+            "camera height and light direction of image 1. Purely graphic: absolutely no text, letters, "
+            "words, numbers or logos anywhere; where lettering would normally go, leave clean blank panels "
+            "and shapes. No other people, faces, figures or photographs of people anywhere in the artwork: "
+            "the subject is the only person.")
 
 
 def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:

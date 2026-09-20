@@ -339,24 +339,33 @@ def souvenir_frame(img: np.ndarray, kind: str, title: str, subtitle: str = "", f
     if abs(sum(accent) - sum(ink)) < 90:          # accent too close to the card to read
         accent = body
     border = max(8, int(min(h, w) * 0.035))
-    band = int(min(h, w) * 0.16)
+    band = int(min(h, w) * 0.22)          # the title is the print's headline: the model paints no text
     card = Image.new("RGB", (w + 2 * border, h + 2 * border + band), ink)
     card.paste(to_pil_local(img), (border, border))
     d = ImageDraw.Draw(card)
     d.rectangle([border - 3, border - 3, border + w + 2, border + h + 2], outline=accent, width=3)
 
-    def font(size):
+    def font(size, bold=False):
+        for name in (["DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "Arial Bold.ttf"] if bold else []):
+            try:
+                return ImageFont.truetype(name, size)
+            except OSError:
+                continue
         try:
             return ImageFont.load_default(size=size)
         except TypeError:
             return ImageFont.load_default()
 
-    y = border + h + int(band * 0.12)
-    d.text((border, y), title.upper()[:28], font=font(int(band * 0.42)), fill=accent)
+    y = border + h + int(band * 0.08)
+    head = title.upper()[:28]
+    size = int(band * 0.5)                # as big as fits the width
+    while size > int(band * 0.2) and d.textbbox((0, 0), head, font=font(size, True))[2] > w:
+        size -= 2
+    d.text((border, y), head, font=font(size, True), fill=accent)
     if subtitle:
-        d.text((border, y + int(band * 0.46)), subtitle[:60], font=font(int(band * 0.22)), fill=body)
+        d.text((border, y + int(band * 0.55)), subtitle[:60], font=font(int(band * 0.19)), fill=body)
     if footer:
-        d.text((border, y + int(band * 0.74)), footer[:80], font=font(int(band * 0.17)), fill=quiet)
+        d.text((border, y + int(band * 0.78)), footer[:80], font=font(int(band * 0.13)), fill=quiet)
     tag = kind.upper()[:18]
     tw = d.textbbox((0, 0), tag, font=font(int(band * 0.17)))[2]
     d.text((card.width - border - tw, border + int(band * 0.06)), tag, font=font(int(band * 0.17)), fill=accent)

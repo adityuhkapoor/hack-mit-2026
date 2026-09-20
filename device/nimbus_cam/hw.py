@@ -291,13 +291,23 @@ class Camera:
                     self._cap_exposure(self.index)
         return cm()
 
+    # The rig shoots in portrait: the webcam is mounted on its side and every frame is turned upright here,
+    # so the viewfinder, the photo and the print are all portrait. NIMBUS_ROTATE=90 (default on the Pi),
+    # 270 if the camera is mounted the other way, 0 for landscape.
+    ROTATE = {"0": None, "90": cv2.ROTATE_90_CLOCKWISE, "180": cv2.ROTATE_180, "270": cv2.ROTATE_90_COUNTERCLOCKWISE}
+
     def frame(self) -> np.ndarray | None:
-        """RGB uint8, full resolution."""
+        """RGB uint8, full resolution, upright."""
         if self.still is not None:
             return self.still.copy()
         with self._lock:
             ok, f = self.cap.read()
-        return cv2.cvtColor(f, cv2.COLOR_BGR2RGB) if ok else None
+        if not ok:
+            return None
+        rot = self.ROTATE.get(os.environ.get("NIMBUS_ROTATE", "0"))
+        if rot is not None:
+            f = cv2.rotate(f, rot)
+        return cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
 
     def jpeg(self) -> bytes:
         f = None
