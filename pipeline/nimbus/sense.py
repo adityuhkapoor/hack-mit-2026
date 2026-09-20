@@ -364,12 +364,21 @@ SOUVENIRS = {
 KINDS = list(SOUVENIRS)[:50]        # the fifty on the menu
 
 
-def souvenir_prompt(kind: str, subject: str, r: Readings) -> str:
-    """Dial 3: the surroundings become the artwork of a keepsake about whatever is in the picture."""
+def souvenir_prompt(kind: str, subject: str, r: Readings, title: str = "") -> str:
+    """AI Camera: the surroundings become the artwork of whatever the scene should be.
+
+    The model is allowed exactly one piece of text, the title, spelled out for it: asked for "no text" it
+    still fills a tabloid or a newspaper with lettering, and invented lettering comes out garbled. Told the
+    words, klein renders them legibly. Everything else stays wordless.
+    """
     look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
+    words = (f' The only text anywhere is the headline "{title}", spelled exactly like that, in large clear '
+             "letters; no other words, letters or numbers." if title else
+             " No text, lettering, numbers or logos anywhere.")
     return (f"Replace the masked surroundings with {look}, featuring {subject}. Fill the whole background in "
             "that style, bold and uncluttered right behind the subject so it stays the focus. Match the "
-            "camera height and light direction of image 1. No text, no lettering, no logos, no other people.")
+            f"camera height and light direction of image 1.{words} No other people, faces, figures or "
+            "photographs of people anywhere in the artwork: the subject is the only person.")
 
 
 def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:

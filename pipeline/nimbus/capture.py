@@ -98,7 +98,7 @@ def _ai_surroundings(src: np.ndarray, mask: np.ndarray, r: sense.Readings, dial:
     work = imageio.fit_within(src, AI_WORK_LONG)
     bg = 1 - subject.hard(cv2.resize(mask, (work.shape[1], work.shape[0])))
     sv = souvenir or Souvenir()
-    prompt = (sense.souvenir_prompt(sv.kind, sv.subject, r) if dial == sense.SOUVENIR
+    prompt = (sense.souvenir_prompt(sv.kind, sv.subject, r, sv.title) if dial == sense.SOUVENIR
               else sense.scene_prompt(r, dial))
     names = [comfy.upload(work), comfy.upload(np.repeat(bg[..., None], 3, -1))]
     s = min(1.0, AI_OUT_LONG / max(h, w))

@@ -223,8 +223,13 @@ class Camera:
         while True:
             cap = cv2.VideoCapture(index)
             if cap.isOpened():
+                # MJPG first: the C270 does 1280x720 at 30 fps compressed but only 10 fps raw YUYV, and at
+                # 10 fps its auto-exposure stretches to 100 ms and every hand-held shot smears.
+                cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
+                cap.set(cv2.CAP_PROP_FPS, 30)
+                Camera._cap_exposure(index)
                 return cap
             cap.release()
             if time.time() > deadline:
@@ -232,6 +237,17 @@ class Camera:
                                    "Security → Camera → allow the terminal app, then relaunch)")
             print("[camera] waiting for camera permission…", flush=True)
             time.sleep(1.5)
+
+    @staticmethod
+    def _cap_exposure(index: int) -> None:
+        """On Linux, stop the webcam trading frame rate for exposure time (v4l2 "dynamic framerate"), so
+        the exposure stays under the frame interval and moving subjects stay sharp."""
+        import shutil
+        import subprocess
+        if not shutil.which("v4l2-ctl"):
+            return
+        subprocess.run(["v4l2-ctl", "-d", f"/dev/video{index}", "-c", "exposure_dynamic_framerate=0"],
+                       capture_output=True)
 
     def frame(self) -> np.ndarray | None:
         """RGB uint8, full resolution."""
