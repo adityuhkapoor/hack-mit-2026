@@ -46,6 +46,7 @@ class Voice:
         print(f"[voice] audio: {self.audio.devices()}")
         self.conv = None
         self.started = False
+        self.blocked = 0.0          # when the server refused us for credits
         self._lock = threading.Lock()
         if hasattr(app.sensors, "attach_audio"):
             app.sensors.attach_audio(self.audio)    # one owner of the microphone
@@ -71,6 +72,9 @@ class Voice:
         with self._lock:
             if self.started and self.conv is not None and self.conv._thread is not None and self.conv._thread.is_alive():
                 return
+            if self.blocked and time.time() - self.blocked < 300:      # quota: do not hammer the server
+                self.app.say("Voice is off: the ElevenLabs account is out of credits")
+                return
             try:
                 self.conv = self._make_conversation()
                 self.conv.start_session()
@@ -93,6 +97,12 @@ class Voice:
     def _ended(self) -> None:
         print("[voice] session ended (the next press reconnects)")
         self.started = False
+        # The SDK prints the close reason as a traceback; a quota close is the one worth telling the user.
+        import sys
+        exc = sys.exc_info()[1]
+        if exc is not None and "quota_exceeded" in str(exc):
+            self.blocked = time.time()
+            self.app.say("Voice is off: the ElevenLabs account is out of credits")
 
     def close(self) -> None:
         if self.started and self.conv is not None:
