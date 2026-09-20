@@ -98,6 +98,13 @@ ASUS.
   — plus the fp4 8B text encoder) at 1.5 MP, ~19 s a render. The A/B on the same photo was decisive: 4B kept
   the room and pasted in a stranger's mugshot; 9B built the police-lineup wall. `gb10` (4B, ~9 s) stays as the
   fast fallback. The 3060 Ti profile needed 1.5 MP plus ESRGAN.
+- **The GB10 is compute-bound on klein 9B; ComfyUI flags do nothing.** Measured at 1.5 MP: stock 16.9 s,
+  `--fast` 17.5, fp8 weights + fp8 matmul 17.4, `--gpu-only` 16.7. Resolution is the only lever: 1.0 MP is
+  10.9 s, and the 3x4 print (1.08 MP at 300 dpi) and the 1080² post need no more. `NIMBUS_AI_MP=1.0`.
+- **Capture is two-phase** (`/capture/prepare` then `/capture/finish`): the frame uploads and the mask is
+  computed while the camera waits on Muse (~6 s). End to end from the Pi: 28 s → 16.5 s warm.
+- **A ComfyUI restarted by hand can leave the API fetching from a dead instance** (`/view … 404` after a
+  successful prompt): restart ComfyUI, then the API.
 - **`mask.jpg` in a capture folder is an overlay for viewing, not the mask.** Feeding it back as a mask
   inpaints nothing. Recompute with `subject.subject_mask`.
 - **klein 4B cannot spell**, and a headline given in the prompt comes back mangled ("LOIDRAVE"). The AI Camera

@@ -127,3 +127,25 @@ def test_haze_follows_particulates():
     bg = mask == 0
     assert smoky[bg].std() < clear[bg].std()              # haze drains contrast from the surroundings
     assert "smoky" in sense.describe(sense.Readings(pm25=50))
+
+
+def test_two_phase_capture_matches_one_shot(tmp_path, monkeypatch):
+    """prepare + finish stores the same capture as /capture would, mask computed in the background."""
+    from fastapi.testclient import TestClient
+
+    from nimbus import api, capture as lc, imageio
+
+    monkeypatch.setattr(api, "captures", lc.CaptureStore(tmp_path))
+    monkeypatch.setattr(api.backends, "pick", lambda: None)
+    img = np.zeros((96, 128, 3), np.float32)
+    img[20:70, 40:90] = 0.8
+    jpeg = imageio.encode(img, quality=95)
+    c = TestClient(api.app)
+    r = c.post("/capture/prepare", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data={"readings": '{"temp_c": 20}'})
+    assert r.status_code == 200
+    pid = r.json()["prepared"]
+    r = c.post("/capture/finish", data={"prepared": pid, "dial": "0", "seed": "1"})
+    assert r.status_code == 200, r.text
+    m = r.json()
+    assert m["id"] == pid and m["untouched"] and (tmp_path / pid / "card.jpg").exists()
+    assert c.post("/capture/finish", data={"prepared": pid, "dial": "0"}).status_code == 404

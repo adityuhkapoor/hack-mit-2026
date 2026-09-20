@@ -53,7 +53,7 @@ The QR card (`card.jpg`) still carries the readings for the phone.
 
 ## The two modes (changed 23:50 ET)
 
-**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`, ~19 s a render at 1.5 MP; 4B is the `gb10` fallback, ~9 s). Landscape (portrait was tried: `NIMBUS_ROTATE=90/270`). **Visa Buy** = the shutter saves the frame as shot (no segmentation, no diffusion, no server) and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
+**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`) at **1.0 MP** (~11 s a render; 4B is the `gb10` fallback). Capture is two-phase: **~16.5 s end to end** from the shutter. Landscape (portrait was tried: `NIMBUS_ROTATE=90/270`). **Visa Buy** = the shutter saves the frame as shot (no segmentation, no diffusion, no server) and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
 
 ## Shop (Visa)
 

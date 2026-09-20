@@ -575,6 +575,74 @@ def take_capture(request: Request, photo: UploadFile = File(...), readings: str 
     return captures.save(cid, cap, capture.card(cap, f"{PUBLIC_URL}/c/{cid}"))
 
 
+# Two-phase capture: the camera uploads the frame the instant the shutter fires and the subject mask is
+# computed here while the camera is still asking Muse what the scene should become (~6 s); `finish` then
+# only has the diffusion left. Prepared frames live in memory for a couple of minutes.
+_prepared: dict[str, dict] = {}
+_prepared_lock = threading.Lock()
+
+
+def _prepare_mask(pid: str) -> None:
+    from . import subject
+    entry = _prepared[pid]
+    try:
+        entry["mask"] = subject.subject_mask(entry["img"].astype(np.float32))
+    except Exception as e:      # take() recomputes it if this failed
+        entry["error"] = str(e)
+    entry["done"].set()
+
+
+@app.post("/capture/prepare")
+def prepare_capture(request: Request, photo: UploadFile = File(...), readings: str = Form("{}")):
+    """Upload the frame now; get an id for /capture/finish. The mask is computed in the background."""
+    _rate_limit(request, "prepare", LOOKS_PER_MINUTE)
+    try:
+        r = sense.Readings.from_dict(json.loads(readings or "{}"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"bad readings: {e}") from e
+    img = _read(photo)
+    pid = captures.new_id()
+    now = time.time()
+    with _prepared_lock:
+        for k in [k for k, v in _prepared.items() if now - v["at"] > 180]:
+            del _prepared[k]
+        _prepared[pid] = {"img": img, "readings": r, "at": now, "done": threading.Event(), "mask": None}
+    threading.Thread(target=_prepare_mask, args=(pid,), daemon=True).start()
+    return {"prepared": pid}
+
+
+@app.post("/capture/finish", response_model=capture.CaptureMeta)
+def finish_capture(request: Request, prepared: str = Form(...), dial: int = Form(1), seed: int = Form(1),
+                   souvenir: str = Form("{}")):
+    """Render a frame uploaded with /capture/prepare, now that the camera knows what it should become."""
+    if dial not in sense.DIAL_NAMES:
+        raise HTTPException(400, f"dial must be one of {sorted(sense.DIAL_NAMES)}")
+    with _prepared_lock:
+        entry = _prepared.pop(prepared, None)
+    if entry is None:
+        raise HTTPException(404, "no such prepared capture (they expire after three minutes)")
+    try:
+        sv = capture.Souvenir.from_dict(json.loads(souvenir or "{}"))
+    except (ValueError, TypeError) as e:
+        raise HTTPException(400, f"bad souvenir: {e}") from e
+    if dial > 0:
+        _rate_limit(request)
+    entry["done"].wait(30)
+    r, web = capture.with_web_weather(entry["readings"])
+    comfy = backends.pick() if dial > 0 else None
+    mask = entry["mask"]
+    if comfy is not None:
+        with _gpu_lock:
+            cap = capture.take(entry["img"], r, dial, comfy, seed=seed, web=web, souvenir=sv, mask=mask)
+        if cap.fallback_reason:
+            backends.invalidate()
+    else:
+        cap = capture.take(entry["img"], r, dial, None, seed=seed, web=web, souvenir=sv, mask=mask)
+        if dial > 0:
+            cap.fallback_reason = "; ".join(f"{b.url}: {b.reason}" for b in backends.status())[:300]
+    return captures.save(prepared, cap, capture.card(cap, f"{PUBLIC_URL}/c/{prepared}"))
+
+
 @app.post("/captures/publish", response_model=capture.CaptureMeta)
 def publish_capture(request: Request, meta: str = Form(...), photo: UploadFile = File(...),
                     as_shot: UploadFile = File(...), mask: UploadFile = File(...)):

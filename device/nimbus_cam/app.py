@@ -381,12 +381,31 @@ class CameraApp:
         readings = self.sensors.readings()
         if dial == VISA_BUY:
             return self._capture_plain(jpeg, readings)
+        # The upload and the server's segmentation run while Muse is still choosing (~6 s): two phases.
+        prepared: dict = {}
+
+        def upload():
+            try:
+                r = self.http.post(f"{self.api}/capture/prepare", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
+                                   data={"readings": json.dumps(readings)}, timeout=30)
+                r.raise_for_status()
+                prepared["id"] = r.json()["prepared"]
+            except Exception as e:
+                prepared["error"] = e
+        up = threading.Thread(target=upload, daemon=True)
+        up.start()
         sv = tagger.souvenir(jpeg)
         self.say(f"Making a {sv['kind']}…")
         self.state.busy = f"Making a {sv['kind']}"
-        data = {"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": str(int(time.time()) % 100000),
-                "souvenir": json.dumps(sv)}
-        r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
+        up.join(30)
+        seed = str(int(time.time()) % 100000)
+        if prepared.get("id"):
+            r = self.http.post(f"{self.api}/capture/finish", data={"prepared": prepared["id"], "dial": str(sense.SOUVENIR),
+                                                                   "seed": seed, "souvenir": json.dumps(sv)})
+        else:   # an older server, or the upload failed: the one-shot route
+            r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
+                               data={"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": seed,
+                                     "souvenir": json.dumps(sv)})
         r.raise_for_status()
         return self._store_server(r.json())
 

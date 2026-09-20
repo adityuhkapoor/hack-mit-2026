@@ -326,3 +326,11 @@ The frames are fixed templates (`nimbus/data/polaroid_frame*.png`, built once by
 `scripts/build_polaroid_template.py`); nothing is generated per print. The Nimbus and HackMIT logos are one shape
 (`polaroid_logo*.png`) filled with the photo's most prominent colour. `nimbus/print_dev.py` is a localhost dev page
 with Print, Print lines (a cutting guide), copies and speed.
+
+
+## Two-phase capture
+
+`POST /capture/prepare` (photo, readings) → `{"prepared": id}`; the subject mask is computed in the background.
+`POST /capture/finish` (prepared, dial, seed, souvenir) → the same `CaptureMeta` as `/capture`, stored under that
+id. Prepared frames expire after three minutes. The camera uses this so the upload and segmentation overlap the
+~6 s Muse takes to choose the format.
