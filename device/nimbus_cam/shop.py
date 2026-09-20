@@ -23,6 +23,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import httpx
+from jwcrypto.common import json_encode
 
 from . import keys, tagger
 
@@ -200,6 +201,50 @@ class VisaSandbox:
     def __init__(self, user: str, password: str, cert_dir: Path):
         self.auth = (user, password)
         self.cert = (str(cert_dir / "cert.pem"), str(cert_dir / "key.pem"))
+        # Message Level Encryption: mandatory on the payment APIs (without it: 9125 "expected input
+        # credential was not present"). Visa's public cert encrypts our body; our MLE key decrypts theirs.
+        self.mle_key_id = (cert_dir / "mle_key_id.txt").read_text().strip() if (cert_dir / "mle_key_id.txt").exists() else None
+        self.mle_server_cert = next(iter(sorted(cert_dir.glob("server_cert*.pem"))), None)
+        self.mle_private_key = next(iter(sorted(cert_dir.glob("mle_key*.pem"))), None)
+
+    @property
+    def mle(self) -> bool:
+        return bool(self.mle_key_id and self.mle_server_cert and self.mle_private_key)
+
+    def _encrypt(self, body: dict) -> dict:
+        from jwcrypto import jwe, jwk
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        cert = x509.load_pem_x509_certificate(self.mle_server_cert.read_bytes())
+        pub = jwk.JWK.from_pem(cert.public_key().public_bytes(serialization.Encoding.PEM,
+                                                              serialization.PublicFormat.SubjectPublicKeyInfo))
+        token = jwe.JWE(json.dumps(body).encode(), json_encode({"alg": "RSA-OAEP-256", "enc": "A128GCM",
+                                                                  "kid": self.mle_key_id, "iat": int(time.time() * 1000)}))
+        token.add_recipient(pub)
+        return {"encData": token.serialize(compact=True)}
+
+    def _decrypt(self, text: str) -> dict:
+        from jwcrypto import jwe, jwk
+        d = json.loads(text)
+        if "encData" not in d:
+            return d
+        key = jwk.JWK.from_pem(self.mle_private_key.read_bytes())
+        token = jwe.JWE()
+        token.deserialize(d["encData"], key=key)
+        return json.loads(token.payload)
+
+    def post(self, url: str, body: dict) -> tuple[int, dict]:
+        headers = {"Accept": "application/json"}
+        if self.mle:
+            headers["keyId"] = self.mle_key_id
+            body = self._encrypt(body)
+        with httpx.Client(cert=self.cert, auth=self.auth, timeout=30) as c:
+            r = c.post(url, json=body, headers=headers)
+        try:
+            data = self._decrypt(r.text) if self.mle else r.json()
+        except Exception:
+            data = {"raw": r.text[:300]}
+        return r.status_code, data
 
     @classmethod
     def available(cls) -> "VisaSandbox | None":
@@ -212,20 +257,20 @@ class VisaSandbox:
     def charge(self, offer: Offer, amount: float) -> Receipt:
         now = time.strftime("%Y-%m-%dT%H:%M:%S")
         stan = random.randint(100000, 999999)
-        body = {"systemsTraceAuditNumber": stan, "retrievalReferenceNumber": time.strftime("%y%j%H") + f"{stan:06d}",
+        # RRN is exactly 12 digits: ydddhh + the 6-digit STAN
+        body = {"systemsTraceAuditNumber": stan, "retrievalReferenceNumber": time.strftime("%y%j%H")[1:] + f"{stan:06d}",
                 "localTransactionDateTime": now, "acquiringBin": 408999, "acquirerCountryCode": "840",
                 "senderPrimaryAccountNumber": self.TEST_PAN, "senderCardExpiryDate": "2030-10",
                 "senderCurrencyCode": "USD", "amount": f"{amount:.2f}", "businessApplicationId": "AA",
                 "cardAcceptor": {"name": offer.merchant[:25], "terminalId": "NIMBUS01", "idCode": "NIMBUSCAM",
                                  "address": {"country": "USA", "zipCode": "02139", "state": "MA"}}}
-        with httpx.Client(cert=self.cert, auth=self.auth, timeout=30) as c:
-            r = c.post(self.URL, json=body, headers={"Accept": "application/json"})
-        ok = r.status_code == 200
-        d = r.json() if ok else {}
+        status, d = self.post(self.URL, body)
+        ok = status == 200
+        err = (d.get("responseStatus") or {}).get("message") or d.get("raw") or str(d)[:120]
         return Receipt(approved=ok and str(d.get("actionCode")) == "00", amount=amount, currency="USD",
                        merchant=offer.merchant, last4=self.TEST_PAN[-4:], auth_code=str(d.get("approvalCode", "")),
                        transaction_id=str(d.get("transactionIdentifier", "")), network=self.network,
-                       message="Visa sandbox approval (test card, no money moved)." if ok else f"Visa sandbox said {r.status_code}: {r.text[:120]}")
+                       message="Visa sandbox approval (test card, no money moved)." if ok else f"Visa sandbox said {status}: {err}")
 
 
 def payments():
@@ -274,3 +319,4 @@ if __name__ == "__main__":       # uv run python -m nimbus_cam.shop  → which p
         with httpx.Client(cert=pay.cert, auth=pay.auth, timeout=30) as c:
             r = c.get("https://sandbox.api.visa.com/vdp/helloworld", headers={"Accept": "application/json"})
         print(f"helloworld: {r.status_code} {r.text[:200]}")
+        print(f"MLE: {'configured, key ' + pay.mle_key_id if pay.mle else 'NOT configured (payments will be refused with 9125)'}")

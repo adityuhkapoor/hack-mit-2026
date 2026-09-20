@@ -15,6 +15,7 @@ dependencies = [
     "qrcode>=8.0",
     "smbus2>=0.4",          # the thermal array behind the UNO Q, on the Pi rig
     "ddgs>=9.0",            # live product search for Shop (no key)
+    "jwcrypto>=1.6.1",
 ]
 
 [tool.uv.sources]
