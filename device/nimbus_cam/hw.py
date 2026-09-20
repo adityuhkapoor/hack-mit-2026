@@ -232,6 +232,47 @@ class Camera:
         return cv2.imencode(".jpg", cv2.cvtColor(f, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
 
 
+class PiButtons:
+    """The three buttons on the camera's back: shutter, mode, push-to-talk.
+
+    Wire each one between its GPIO pin and ground; the internal pull-ups do the rest. Defaults follow the
+    sketch (photo, viewfinder/mode, push to speak) and can be moved with
+    NIMBUS_PINS="shutter=17,mode=27,talk=22". Needs gpiozero (apt: python3-gpiozero, or pip install
+    gpiozero lgpio); without it the camera simply runs on touch and keys.
+    """
+
+    DEFAULT_PINS = {"shutter": 17, "mode": 27, "talk": 22}
+
+    def __init__(self, handlers: dict[str, tuple]):
+        from gpiozero import Button as GpioButton
+        self.buttons = {}
+        for name, pin in self.pins().items():
+            press, release = handlers.get(name, (None, None))
+            if press is None and release is None:
+                continue
+            b = GpioButton(pin, pull_up=True, bounce_time=0.05, hold_time=0.4)
+            if press:
+                b.when_pressed = lambda p=press: p()
+            if release:
+                b.when_released = lambda r=release: r()
+            self.buttons[name] = b
+        print(f"[buttons] {', '.join(f'{n}=GPIO{p}' for n, p in self.pins().items())}")
+
+    @classmethod
+    def pins(cls) -> dict[str, int]:
+        spec = os.environ.get("NIMBUS_PINS", "")
+        pins = dict(cls.DEFAULT_PINS)
+        for part in filter(None, (p.strip() for p in spec.split(","))):
+            name, _, pin = part.partition("=")
+            if name.strip() in pins and pin.strip().isdigit():
+                pins[name.strip()] = int(pin)
+        return pins
+
+    def close(self) -> None:
+        for b in self.buttons.values():
+            b.close()
+
+
 class PushToTalkAudio:
     """ElevenLabs AudioInterface: 16 kHz mono PCM16 in and out. While talk is released the mic sends
     silence, so the session stays open (instant replies) but only a held button is ever heard."""

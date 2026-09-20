@@ -92,6 +92,7 @@ class Screen:
         self._photo_cache: tuple[str, Image.Image] | None = None
         self._last_toast, self._toast_at = "", 0.0
         self.buttons = self._make_buttons()
+        self.gpio = self._wire_gpio()
         self._pressed: Button | None = None
         self.root.bind("<ButtonPress-1>", self._touch_down)
         self.root.bind("<ButtonRelease-1>", self._touch_up)
@@ -107,6 +108,19 @@ class Screen:
             self.root.bind(key, fn)
         self._refresh_air()
         self._tick()
+
+    def _wire_gpio(self):
+        """The physical buttons, when the pins are wired (NIMBUS_GPIO=1 on the camera)."""
+        if os.environ.get("NIMBUS_GPIO", "0") != "1":
+            return None
+        try:
+            from .hw import PiButtons
+            return PiButtons({"shutter": (lambda: self._bg(self.app.take_photo, {}), None),
+                              "mode": (lambda: self._dial(1), None),
+                              "talk": (lambda: self._talk_down(None), lambda: self._talk_up(None))})
+        except Exception as e:      # not wired, no gpiozero, or no permission: touch and keys still work
+            print(f"[buttons] off: {type(e).__name__}: {e}")
+            return None
 
     # -- touch ---------------------------------------------------------------------------------
 

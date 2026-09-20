@@ -37,6 +37,30 @@ stays: `readings()` returns `key=value;…` with any subset of `temp_c rh lux db
 - [ ] `curl https://nimbus.akvaithi.page/health` from the board over venue Wi-Fi.
 - [ ] On the board: `pip install -e pipeline` and `NIMBUS_SEG=human`, then time one Real shot (Real renders on the board).
 
+## The rig (Raspberry Pi 4 + Arduino UNO Q + C270 + 1024x600 touch panel)
+
+| Part | Where | Feeds |
+|---|---|---|
+| MLX90640 thermal array | behind the UNO Q, I2C `0x08` (12 chunks, ~3 fps) | temperature → hue, frame change → motion → blur |
+| C270 webcam | USB | the picture, and the light level → grain |
+| C270 microphone | USB (ALSA card 3) | sound → saturation, and your voice |
+| Speaker | the Pi's 3.5 mm jack (or HDMI) | the camera's voice |
+| Touch panel | HDMI + USB touch | the screen and its buttons |
+| Local weather | Open-Meteo | humidity → diffusion, wind, cloud (labelled "(web)") |
+
+**The three buttons** from the sketch — photo, viewfinder/mode, push-to-speak — wire between a GPIO pin and
+ground (internal pull-ups, no resistors):
+
+| Button | Pin | Header | Does |
+|---|---|---|---|
+| Shutter | GPIO17 | pin 11 | take a photo |
+| Mode | GPIO27 | pin 13 | next mode: Real → Sensed air → New world → Souvenir |
+| Talk | GPIO22 | pin 15 | hold to speak to the camera |
+
+Ground: any of pins 6, 9, 14, 20, 25, 30, 34, 39. Move them with
+`NIMBUS_PINS="shutter=17,mode=27,talk=22"`, and set `NIMBUS_GPIO=1` to switch them on (already set on the
+rig). Until they are wired, the same actions are on the touch screen and the keyboard.
+
 ## Run the camera on a Mac (no hardware needed)
 
 ```bash
