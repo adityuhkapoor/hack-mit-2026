@@ -516,6 +516,18 @@ class PushToTalkAudio:
 
     def output(self, audio: bytes) -> None:
         self._out.put(audio)
+        tap = os.environ.get("NIMBUS_AUDIO_TAP")        # host:port — also stream the voice to another machine
+        if tap:
+            try:
+                import socket
+                if not hasattr(self, "_tap"):
+                    host, _, port = tap.partition(":")
+                    self._tap = (socket.socket(socket.AF_INET, socket.SOCK_DGRAM), (host, int(port or 5005)))
+                sock, addr = self._tap
+                for i in range(0, len(audio), 1400):      # under one UDP datagram each
+                    sock.sendto(audio[i:i + 1400], addr)
+            except OSError:
+                pass
 
     def interrupt(self) -> None:
         try:

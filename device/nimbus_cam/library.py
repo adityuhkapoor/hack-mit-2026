@@ -96,6 +96,10 @@ class Query:
 
 _embedder = None
 _embed_lock = threading.Lock()
+_embed_cache: dict[str, np.ndarray] = {}
+# On the Pi the embedder would otherwise take all four cores for seconds at a time and the voice session's
+# audio and WebSocket threads starve (a reply "extremely delayed" right after a photo). One core is enough.
+EMBED_THREADS = int(os.environ.get("NIMBUS_EMBED_THREADS", "1"))
 
 
 def embed(texts: list[str]) -> np.ndarray:
@@ -103,8 +107,13 @@ def embed(texts: list[str]) -> np.ndarray:
     with _embed_lock:
         if _embedder is None:
             from fastembed import TextEmbedding
-            _embedder = TextEmbedding(EMBED_MODEL)
-        return np.asarray(list(_embedder.embed(texts)), np.float32)
+            _embedder = TextEmbedding(EMBED_MODEL, threads=EMBED_THREADS)
+        out = []
+        for t in texts:                 # the same text (a photo re-saved after tagging or posting) costs nothing
+            if t not in _embed_cache:
+                _embed_cache[t] = np.asarray(next(iter(_embedder.embed([t]))), np.float32)
+            out.append(_embed_cache[t])
+        return np.stack(out)
 
 
 # ---------------------------------------------------------------------------------------------

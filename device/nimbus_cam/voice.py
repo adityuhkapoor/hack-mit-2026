@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import threading
+import time
 
 from . import agent, keys
 from .tagger import REASONING
@@ -62,8 +63,8 @@ class Voice:
             tools.register(name, _wrap(self.app, name))
         return Conversation(
             ElevenLabs(api_key=self.key), self.aid, requires_auth=True, audio_interface=self.audio, client_tools=tools,
-            callback_user_transcript=lambda t: print(f"[you] {t}"),
-            callback_agent_response=lambda t: (print(f"[Nimbus] {t}"), self.app.say(t)),
+            callback_user_transcript=lambda t: print(f"[you {time.strftime('%H:%M:%S')}] {t}"),
+            callback_agent_response=lambda t: (print(f"[Nimbus {time.strftime('%H:%M:%S')}] {t}"), self.app.say(t)),
             callback_end_session=self._ended)
 
     def _ensure_session(self) -> None:
