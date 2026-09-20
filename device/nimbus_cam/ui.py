@@ -407,39 +407,27 @@ class Screen:
         return img
 
     def _draw_terminal(self, d: ImageDraw.ImageDraw, st) -> None:
-        """A payment terminal: the card taps, the contactless waves ripple out, then "Processing".
-        Plays while the Visa sandbox answers (buy_it holds the screen for at least 2.2 s)."""
+        """Paying: the Visa card slides in and settles while the sandbox answers (buy_it holds the screen
+        for at least 2.2 s). No terminal and no tap: nothing is tapped, the camera is buying online."""
         import math
         t = time.time() - st.paying_since
-        cx, cy = self.W // 2, int(self.H * (1 - BAR) * 0.5)
+        cx, cy = self.W // 2, int(self.H * (1 - BAR) * 0.45)
         d.rectangle([0, 0, self.W, self.H], fill=(SLATE[0], SLATE[1], SLATE[2], 235))
-        # the terminal body and its screen
-        tw, th = int(self.W * 0.22), int(self.H * 0.42)
-        tx, ty = cx - tw // 2, cy - th // 2
-        d.rounded_rectangle([tx, ty, tx + tw, ty + th], radius=18, fill=SLATE_DIM, outline=SLATE_TEXT, width=2)
-        d.rounded_rectangle([tx + 14, ty + 14, tx + tw - 14, ty + int(th * 0.42)], radius=8, fill=SKY)
-        # contactless waves, rippling
-        for i in range(3):
-            phase = (t * 1.6 - i * 0.33) % 1.0
-            r0 = int(th * 0.06) + int(phase * th * 0.16)
-            alpha = int(255 * (1 - phase))
-            d.arc([cx - r0, ty + int(th * 0.28) - r0, cx + r0, ty + int(th * 0.28) + r0], 200, 340,
-                  fill=(WHITE[0], WHITE[1], WHITE[2], alpha), width=4)
-        # the card slides in from the right and taps
-        slide = min(1.0, t / 0.8)
+        slide = min(1.0, t / 0.7)
         ease = 1 - (1 - slide) ** 3
-        cw, ch = int(self.W * 0.20), int(self.H * 0.20)
-        cxr = int(self.W * 0.95 - (self.W * 0.95 - (cx + tw // 2 - cw * 0.35)) * ease)
-        cyr = ty - ch // 3 + int(4 * math.sin(t * 9)) * (slide >= 1.0)
-        d.rounded_rectangle([cxr, cyr, cxr + cw, cyr + ch], radius=14, fill=(0x14, 0x34, 0xCB))
-        d.text((cxr + cw - 12, cyr + ch - 10), "VISA", font=self.F_MED, fill=WHITE, anchor="rb")
-        d.rounded_rectangle([cxr + 16, cyr + 22, cxr + 52, cyr + 46], radius=4, fill=LIME)
-        # status
-        msg = "Tap to pay" if t < 0.9 else ("Processing" + "." * (int(t * 3) % 4) if t < 2.0 else "Contacting Visa…")
-        d.text((cx, ty + th + int(self.H * 0.07)), msg, font=self.F_BIG, fill=WHITE, anchor="mm")
+        cw, ch = int(self.W * 0.34), int(self.H * 0.36)
+        cxr = int(self.W * 1.05 - (self.W * 1.05 - (cx - cw // 2)) * ease)
+        cyr = cy - ch // 2 + int(5 * math.sin(t * 4)) * (slide >= 1.0)
+        d.rounded_rectangle([cxr + 6, cyr + 10, cxr + cw + 6, cyr + ch + 10], radius=18, fill=(0, 0, 0, 90))   # shadow
+        d.rounded_rectangle([cxr, cyr, cxr + cw, cyr + ch], radius=18, fill=(0x14, 0x34, 0xCB))
+        d.rounded_rectangle([cxr + 28, cyr + 40, cxr + 84, cyr + 80], radius=6, fill=LIME)                     # chip
+        d.text((cxr + 28, cyr + ch - 58), "····  ····  ····  0006", font=self.F_SMALL, fill=WHITE)
+        d.text((cxr + cw - 24, cyr + ch - 22), "VISA", font=self.F_BIG, fill=WHITE, anchor="rb")
+        msg = "Paying" + "." * (int(t * 3) % 4) if t < 1.6 else "Contacting Visa…"
+        d.text((cx, cyr + ch + int(self.H * 0.09)), msg, font=self.F_BIG, fill=WHITE, anchor="mm")
         if st.offers:
             o = st.offers[0]
-            d.text((cx, ty + th + int(self.H * 0.14)), f"{o.price_text()} · {o.merchant[:24]}", font=self.F_SMALL, fill=SLATE_TEXT, anchor="mm")
+            d.text((cx, cyr + ch + int(self.H * 0.16)), f"{o.price_text()} · {o.merchant[:24]}", font=self.F_SMALL, fill=SLATE_TEXT, anchor="mm")
 
     # How long each kind of wait usually takes, so the bar can move honestly and never quite finish early.
     EXPECTED = {"AI Camera": 32.0, "Visa Buy": 14.0, "looking it up": 14.0}
