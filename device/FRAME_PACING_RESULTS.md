@@ -83,3 +83,27 @@ The Pi then became unreachable again during candidate transfer. ASUS remained
 reachable on the same hotspot but could reach neither Pi port 22 on its last
 local IP nor its Tailscale peer. The app restart command did not connect. Full
 application SDL measurements remain outstanding; do not claim 24–30 FPS achieved.
+
+## Live application at 24 FPS
+
+Connectivity recovered and the opt-in UI was deployed with SDL Wayland/OpenGL,
+acceleration required, vsync disabled, and a 24 FPS target. The saved
+`sdl-home-24.json` contains a 61.11-second resource sample and frame logs. After
+the startup interval (20.37 callbacks/s), six consecutive intervals measured
+23.91–23.95 callbacks/s with zero render failures. Representative median total
+frame work was 31–33 ms, including 9–10 ms presentation and RGB extraction.
+Temperature stayed 63.8–65.2 °C with no throttling. Process CPU was 133.5% of one
+core; Xwayland was 0% in the final sample. Later live intervals measured
+24.00, 23.98, and 24.01 callbacks/s.
+
+These establish approximately 24 completed frames/s on the live home screen,
+not perfectly uniform scanout or a verified capture/review experience. Startup
+and occasional missed deadlines remain. The initial stats label incorrectly
+called native presentation “Tk image/upload”; it is now backend-neutral.
+
+The Pi was switched successfully to the user's saved `iPh16P-Adi` hotspot after
+its signal measured 100 versus 44 for Calvin's. A temporary test driver then
+scheduled shutter press/release, observed busy/review states, and scheduled a
+separate local-camera review cycle. Automatic posting is forcibly disabled in
+that driver. Capture API `172.20.10.12:8000` was unreachable before the test;
+therefore remote AI completion must not be inferred from display throughput.

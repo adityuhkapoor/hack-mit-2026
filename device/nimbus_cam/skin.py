@@ -395,6 +395,23 @@ class Skin:
         self.cl = self._curtain_layout()
         self._cbg, self._dist = None, None
         self.busy_label = "One moment"
+        self._prepare_curtain_assets()
+
+    def _prepare_curtain_assets(self):
+        """Build fixed capture art before input starts, not on the first shutter frame."""
+        self._curtain_backdrop(0.0)
+        for c in self.cl:
+            cloud_sh(c["w"], c["color"])
+        for width, color in ((380, WHITE), (110, PINK), (84, LIME), (96, WHITE)):
+            cloud_sh(width, color)
+        yy, xx = np.mgrid[0:H // 2, 0:W // 2].astype(np.float32)
+        self._dist = np.hypot(xx * 2 - 512, yy * 2 - 300)
+        # Fixed review borders also otherwise rasterize on the first photo frame.
+        rrect(430, 390, 20, (27, 49, 57, 36))
+        rrect(430, 390, 20, WHITE + (255,))
+        mask_rrect(410, 370, 12)
+        rrect(996, 70, 24, SLATE + (255,))
+        rrect(996, 70, 24, WHITE + (255,), SLATE + (255,), 3)
 
     # ------------------------------------------------------------ assets
 

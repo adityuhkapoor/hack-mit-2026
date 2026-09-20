@@ -366,3 +366,16 @@ def test_held_photo_keeps_real_rendered_controls_but_disables_touch(monkeypatch)
                          action=lambda: clicked.append(True))
     ui.Screen._touch_up(screen, NS(x=0, y=0))
     assert clicked == []
+
+
+def test_prepared_curtain_matches_lazy_assets(monkeypatch):
+    warm = skin.Skin()
+    monkeypatch.setattr(skin.Skin, '_prepare_curtain_assets', lambda self: None)
+    cold = skin.Skin()
+    assert cold._cbg is None and warm._cbg is not None
+    st = state(busy='AI Camera…')
+    _, _, ctx = scene(st, sk=warm)
+    scene(st, sk=cold)
+    for step in range(1, 35):
+        current = ctx(BASE + 3 + step * .04)
+        assert warm.frame(current).tobytes() == cold.frame(current).tobytes()

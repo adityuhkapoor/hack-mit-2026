@@ -261,7 +261,7 @@ class FrameStats:
                 "[screen stats] target={target_fps} FPS; callbacks={callback_rate_fps:.2f}/s "
                 "(callback throughput; display presentation FPS not measured); "
                 "render p50/p95/max={r[p50_ms]}/{r[p95_ms]}/{r[max_ms]} ms; "
-                "Tk image/upload p50/p95/max={i[p50_ms]}/{i[p95_ms]}/{i[max_ms]} ms; "
+                "image/upload p50/p95/max={i[p50_ms]}/{i[p95_ms]}/{i[max_ms]} ms; "
                 "configure p50/p95/max={c[p50_ms]}/{c[p95_ms]}/{c[max_ms]} ms; "
                 "callback p50/p95/max={callback_duration_ms_p50}/{callback_duration_ms_p95}/"
                 "{callback_duration_ms_max} ms; missed={missed_scheduling_deadlines}; "
