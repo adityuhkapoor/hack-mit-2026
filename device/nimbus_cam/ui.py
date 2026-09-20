@@ -3,11 +3,13 @@
 Touch and keys do the same things, and both call the same functions the voice agent calls:
 
     viewfinder   MODE · shutter · HOLD TO TALK · GALLERY
-    review       BACK · ‹ › · PHONE (QR) · POST
-    keys         ←/→ mode · space shutter · hold T talk · ↑/↓ browse · P phone · I post · Esc back
+    review       BACK · ‹ › · PHONE (QR) · PRINT · POST · SHOP · TALK
+    keys         ←/→ mode · space shutter · hold T talk · ↑/↓ browse · P phone · I post · R print · Esc back
                  F/H fake fog/heat (simulated sensors only)
 
-Anything slow (a capture, a search) runs off the UI thread, so the viewfinder never freezes.
+Anything slow (a capture, a search) runs off the UI thread, so the viewfinder never freezes. What the screen
+looks like (the sky, clouds, waves, sticker buttons and their motion) lives in skin.py; this file owns the
+window, the touch targets and the state they act on.
 """
 
 from __future__ import annotations
@@ -18,52 +20,13 @@ from pathlib import Path
 import time
 import tkinter as tk
 
-import cv2
-import numpy as np
-import qrcode
-from PIL import Image, ImageDraw, ImageFont, ImageTk
+from PIL import Image, ImageTk
 
 from .app import DIALS, CameraApp
+from .skin import H as DESIGN_H, W as DESIGN_W, Skin
 
 W, H = 800, 480          # the default window; a real panel overrides it (NIMBUS_FULLSCREEN=1)
-
-
-# The brand: sky, clouds, a dark slate.
-SKY = (0x70, 0xC8, 0xFB)
-PINK = (0xFF, 0x9E, 0xC6)
-LIME = (0xE2, 0xF5, 0x42)
-SLATE = (0x1B, 0x31, 0x39)
-WHITE = (0xFF, 0xFF, 0xFF)
-CORAL = (0xFF, 0x7B, 0x9C)
-SLATE_DIM = (0x2A, 0x45, 0x50)     # a step up from slate, for buttons and rails
-SLATE_TEXT = (0xB8, 0xCF, 0xD8)    # quiet text on slate
-
-
-def _font(size: int, weight: str = "Medium"):
-    """Plus Jakarta Sans, bundled with the pipeline (OFL); PIL's default if it is missing."""
-    try:
-        from nimbus.effects import FONT_DIR
-        return ImageFont.truetype(str(FONT_DIR / f"PlusJakartaSans-{weight}.ttf"), size)
-    except (OSError, ImportError):
-        try:
-            return ImageFont.load_default(size=size)
-        except TypeError:
-            return ImageFont.load_default()
-
-
-F_BIG, F_MED, F_SMALL = _font(28), _font(20), _font(16)
-
-
-def _fit(img: Image.Image, w: int, h: int) -> Image.Image:
-    img = img.copy()
-    img.thumbnail((w, h))
-    canvas = Image.new("RGB", (w, h), SLATE)
-    canvas.paste(img, ((w - img.width) // 2, (h - img.height) // 2))
-    return canvas
-
-
-def _bar(d: ImageDraw.ImageDraw, y: int, h: int, w: int = W) -> None:
-    d.rectangle([0, y, w, y + h], fill=SLATE)
+BAR = 0.155              # share of the height taken by the touch button bar
 
 
 class Button:
@@ -84,9 +47,6 @@ class Button:
         return x0 <= x <= x1 and y0 <= y <= y1
 
 
-BAR = 0.155      # share of the height taken by the touch button bar
-
-
 class Screen:
     def __init__(self, app: CameraApp, voice=None, fullscreen: bool | None = None):
         self.app, self.voice = app, voice
@@ -101,16 +61,16 @@ class Screen:
             self.W, self.H = W, H
             self.root.geometry(f"{W}x{H}")
             self.root.resizable(False, False)
-        self.F_BIG, self.F_MED, self.F_SMALL = (_font(max(12, int(self.H * sz)), w)
-                                               for sz, w in ((0.058, "ExtraBold"), (0.042, "Bold"), (0.033, "Medium")))
+        self.sx, self.sy = DESIGN_W / self.W, DESIGN_H / self.H      # window pixels -> the 1024 x 600 the skin draws
         self.label = tk.Label(self.root, bd=0)
         self.label.pack()
+        self.skin = Skin()
         self.air = ""
         self._release_job = None
         self._photo_cache: tuple[str, Image.Image] | None = None
+        self._product_cache: tuple[tuple, Image.Image | None] | None = None
         self._last_toast, self._toast_at = "", 0.0
         self.buttons = self._make_buttons()
-        self._busy_since, self._busy_text = None, ""
         self.gpio = self._wire_gpio()
         self._pressed: Button | None = None
         self.root.bind("<ButtonPress-1>", self._touch_down)
@@ -175,16 +135,21 @@ class Screen:
         }
 
     def _screen_buttons(self) -> list[Button]:
+        if self.skin.splashing(time.time()):
+            return []
         st = self.app.state
         return self.buttons.get("review" if st.screen in ("review", "browse") else st.screen, [])
 
     def _touch_down(self, e) -> None:
+        now, x, y = time.time(), e.x * self.sx, e.y * self.sy
         for b in self._screen_buttons():
             if b.hit(e.x, e.y, self.W, self.H):
                 b.down, self._pressed = True, b
+                self.skin.touch(x, y, b.key, now)
                 if b.hold:
                     self._talk_down(e)
                 return
+        self.skin.touch(x, y, None, now)
 
     def _touch_up(self, e) -> None:
         b, self._pressed = self._pressed, None
@@ -195,28 +160,6 @@ class Screen:
             self._talk_up(e)
         elif b.hit(e.x, e.y, self.W, self.H) and b.action:
             b.action()
-
-    def _draw_buttons(self, d: ImageDraw.ImageDraw) -> None:
-        for b in self._screen_buttons():
-            x0, y0, x1, y1 = b.box(self.W, self.H)
-            face = LIME if b.down else (CORAL if b.accent else SLATE_DIM)
-            text = SLATE if b.down else WHITE
-            if b.key == "talk" and self.app.state.talking:
-                face, text = PINK, SLATE
-            d.rounded_rectangle([x0, y0, x1, y1], radius=int(self.H * 0.02), fill=face,
-                                outline=SLATE_TEXT, width=1)
-            if b.key == "shoot":                      # the shutter is a circle, not a word
-                r = int((y1 - y0) * 0.30)
-                cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
-                d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=text, width=max(2, r // 6))
-                d.ellipse([cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6], fill=text)
-                continue
-            label = "LISTENING" if (b.key == "talk" and self.app.state.talking) else b.label
-            cur = self.app.state.current
-            if b.key == "post" and cur is not None and cur.instagram_id:
-                label = "POSTED ✓"
-            font = self.F_MED if len(label) <= 2 else self.F_SMALL
-            d.text(((x0 + x1) // 2, (y0 + y1) // 2), label, font=font, fill=text, anchor="mm")
 
     # -- controls ------------------------------------------------------------------------------
 
@@ -281,199 +224,64 @@ class Screen:
                     except Exception as e:
                         print(f"[screen] no photo for {path}: {e}")
                 if im is None:
-                    im = Image.new("RGB", (self.W, self.H), SLATE_DIM)
+                    im = Image.new("RGB", (self.W, self.H), (0x2A, 0x45, 0x50))
             self._photo_cache = (path, im)
         return self._photo_cache[1]
 
-    def render(self) -> Image.Image:
-        st = self.app.state
-        if st.screen == "viewfinder" or st.current is None:
-            f = self.app.camera.frame()
-            img = _fit(Image.fromarray(cv2.resize(f, (self.W, round(f.shape[0] * self.W / f.shape[1])))) if f is not None
-                       else Image.new("RGB", (self.W, self.H)), self.W, self.H)
-            d = ImageDraw.Draw(img, "RGBA")
-            _bar(d, 0, int(self.H * 0.09), self.W)
-            d.text((16, int(self.H * 0.015)), DIALS[st.dial].upper(), font=self.F_BIG, fill="white")
-            hint = {0: "shoot · it becomes one of fifty things · auto-posts", 1: "shoot a product · find it · buy it with Visa"}[st.dial]
-            d.text((int(self.W * 0.30), int(self.H * 0.03)), hint, font=self.F_SMALL, fill=SLATE_TEXT)
-            for i in DIALS:                                  # the dial position, as dots
-                x = self.W - 30 - 26 * (len(DIALS) - 1 - i)
-                cy = int(self.H * 0.046)
-                d.ellipse([x - 7, cy - 7, x + 7, cy + 7], outline="white", width=2,
-                          fill="white" if i == st.dial else None)
-            strip = int(self.H * 0.075)
-            _bar(d, self.H - int(self.H * BAR) - strip, strip, self.W)
-            d.text((16, self.H - int(self.H * BAR) - strip + int(strip * 0.2)), self.air,
-                   font=self.F_SMALL, fill=(220, 220, 220))
-        elif st.screen == "qr":
-            img = Image.new("RGB", (self.W, self.H), "white")
-            q = qrcode.QRCode(border=2, box_size=10)
-            q.add_data(st.current.public_link or st.current.link or "")
-            side = int(min(self.W, self.H * (1 - BAR)) * 0.70)
-            code = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((side, side), Image.NEAREST)
-            img.paste(code, ((self.W - side) // 2, int(self.H * 0.06)))
-            d = ImageDraw.Draw(img)
-            d.text((self.W // 2, self.H - int(self.H * BAR) - int(self.H * 0.04)),
-                   "Scan to get this photo on your phone",
-                   font=self.F_MED, fill="black", anchor="mm")
-        elif st.screen == "shop":
-            img = self._render_shop()
-        else:
-            p = st.current
-            img = _fit(self._photo(p.local_photo), self.W, self.H) if p.local_photo else Image.new("RGB", (self.W, self.H))
-            d = ImageDraw.Draw(img, "RGBA")
-            block = int(self.H * 0.135)
-            top = self.H - int(self.H * BAR) - block
-            _bar(d, top, block, self.W)
-            d.text((16, top + int(block * 0.12)), (p.caption or p.dial_name)[:90], font=self.F_SMALL, fill="white")
-            pos = f"{st.index + 1}/{len(st.results)}  ·  " if st.screen == "browse" and st.results else ""
-            d.text((16, top + int(block * 0.58)), f"{pos}{p.dial_name}  ·  {p.proof}", font=self.F_SMALL,
-                   fill=(143, 227, 168) if p.untouched else (255, 155, 155))
-            if p.instagram_id:
-                badge = "POSTED ✓"
-                bw = d.textbbox((0, 0), badge, font=self.F_SMALL)[2] + 20
-                d.rounded_rectangle([self.W - bw - 16, top + int(block * 0.14), self.W - 16, top + int(block * 0.14) + int(block * 0.36)],
-                                    radius=8, fill=LIME)
-                d.text((self.W - 16 - bw // 2, top + int(block * 0.32)), badge, font=self.F_SMALL, fill=SLATE, anchor="mm")
-        d = ImageDraw.Draw(img, "RGBA")
-        if st.busy:
-            self._draw_busy(d, st)
-        if st.talking:
-            d.ellipse([self.W - 44, int(self.H * 0.12), self.W - 20, int(self.H * 0.12) + 24], fill=(255, 60, 60))
-        if st.toast and time.time() - self._toast_at > 4:
-            st.toast = ""
-        self._draw_buttons(d)
-        if st.toast and st.screen != "qr":            # the QR code must stay clean to scan
-            top = int(self.H * 0.09)
-            d.rectangle([0, top, self.W, top + int(self.H * 0.058)], fill=(0, 0, 0, 150))
-            d.text((16, top + 4), st.toast[:95], font=self.F_SMALL, fill="white")
-        return img
-
-    def _render_shop(self) -> Image.Image:
-        """The photo on the left, the product and its offers on the right, the receipt when there is one."""
-        st = self.app.state
-        img = Image.new("RGB", (self.W, self.H), SLATE)
-        p = st.current
-        if p and p.local_photo:
-            side = int(self.H * (1 - BAR) * 0.9)
-            prod_img = Path(p.local_photo).parent / "product.jpg"
-            if prod_img.exists():          # the product's own picture beside the shot of it
-                half = side // 2 - 4
-                img.paste(_fit(self._photo(p.local_photo), half, side), (int(self.W * 0.02), int(self.H * 0.04)))
-                try:
-                    img.paste(_fit(Image.open(prod_img).convert("RGB"), half, side), (int(self.W * 0.02) + half + 8, int(self.H * 0.04)))
-                except OSError:
-                    pass
-            else:
-                img.paste(_fit(self._photo(p.local_photo), side, side), (int(self.W * 0.02), int(self.H * 0.04)))
-        d = ImageDraw.Draw(img, "RGBA")
-        x, y = int(self.W * 0.02 + self.H * (1 - BAR) * 0.9 + self.W * 0.03), int(self.H * 0.05)
-        line = int(self.H * 0.07)
-        prod = st.product
-        if prod is None:
-            d.text((x, y), "Looking it up…", font=self.F_MED, fill="white")
-            return img
-        qr_side = int(self.H * 0.2) if st.offers else 0
-        room = self.W - 16 - qr_side - 12 - x
-        title, tf = prod.label(), self.F_MED
-        while d.textbbox((0, 0), title, font=tf)[2] > room and len(title) > 8:   # never under the QR
-            title = title[:-2].rstrip() + "…" if title.endswith("…") else title[:-1] + "…"
-        d.text((x, y), title, font=tf, fill="white"); y += line
-        d.text((x, y), f"{prod.category} · {int(prod.confidence * 100)}% sure", font=self.F_SMALL, fill=SLATE_TEXT); y += line
-        for i, o in enumerate(st.offers[:3]):
-            fill = WHITE if i == 0 else SLATE_TEXT
-            if i == 0:
-                d.rounded_rectangle([x - 8, y - 4, self.W - 16, y + int(line * 0.72)], radius=8, fill=SLATE_DIM)
-            d.text((x, y), f"{o.price_text():>9}   {o.merchant[:22]}" + ("   ← best" if i == 0 else ""),
-                   font=self.F_SMALL, fill=fill); y += int(line * 0.8)
-        if not st.offers:
-            d.text((x, y), "nothing for sale found", font=self.F_SMALL, fill=(255, 155, 155)); y += line
-        if st.offers:                                   # scan to open the listing on a phone
-            q = qrcode.QRCode(border=1, box_size=3)
-            q.add_data(st.offers[0].url)
-            code = q.make_image(fill_color="white", back_color=SLATE).convert("RGB")
-            side = int(self.H * 0.2)
-            img.paste(code.resize((side, side), Image.NEAREST), (self.W - side - 16, int(self.H * 0.04)))
-        if st.paying_since:
-            self._draw_terminal(d, st)
-            return img
-        r = st.receipt
-        if r:
-            y += int(line * 0.3)
-            d.rounded_rectangle([x - 8, y - 6, self.W - 16, y + int(line * 2.6)], radius=10, fill=SKY)
-            d.text((x, y), f"{'APPROVED' if r.approved else 'DECLINED'}  ${r.amount:.2f} {r.currency}", font=self.F_MED, fill=SLATE); y += line
-            d.text((x, y), f"Visa ····{r.last4} · auth {r.auth_code} · {r.network}", font=self.F_SMALL, fill=SLATE); y += int(line * 0.8)
-            d.text((x, y), r.message[:48], font=self.F_SMALL, fill=SLATE)
-        return img
-
-    def _draw_terminal(self, d: ImageDraw.ImageDraw, st) -> None:
-        """Paying: the Visa card slides in and settles while the sandbox answers (buy_it holds the screen
-        for at least 2.2 s). No terminal and no tap: nothing is tapped, the camera is buying online."""
-        import math
-        t = time.time() - st.paying_since
-        cx, cy = self.W // 2, int(self.H * (1 - BAR) * 0.45)
-        d.rectangle([0, 0, self.W, self.H], fill=(SLATE[0], SLATE[1], SLATE[2], 235))
-        slide = min(1.0, t / 0.7)
-        ease = 1 - (1 - slide) ** 3
-        cw, ch = int(self.W * 0.34), int(self.H * 0.36)
-        cxr = int(self.W * 1.05 - (self.W * 1.05 - (cx - cw // 2)) * ease)
-        cyr = cy - ch // 2 + int(5 * math.sin(t * 4)) * (slide >= 1.0)
-        d.rounded_rectangle([cxr + 6, cyr + 10, cxr + cw + 6, cyr + ch + 10], radius=18, fill=(0, 0, 0, 90))   # shadow
-        d.rounded_rectangle([cxr, cyr, cxr + cw, cyr + ch], radius=18, fill=(0x14, 0x34, 0xCB))
-        d.rounded_rectangle([cxr + 28, cyr + 40, cxr + 84, cyr + 80], radius=6, fill=LIME)                     # chip
-        d.text((cxr + 28, cyr + ch - 58), "····  ····  ····  0006", font=self.F_SMALL, fill=WHITE)
-        d.text((cxr + cw - 24, cyr + ch - 22), "VISA", font=self.F_BIG, fill=WHITE, anchor="rb")
-        msg = "Paying" + "." * (int(t * 3) % 4) if t < 1.6 else "Contacting Visa…"
-        d.text((cx, cyr + ch + int(self.H * 0.09)), msg, font=self.F_BIG, fill=WHITE, anchor="mm")
-        if st.offers:
-            o = st.offers[0]
-            d.text((cx, cyr + ch + int(self.H * 0.16)), f"{o.price_text()} · {o.merchant[:24]}", font=self.F_SMALL, fill=SLATE_TEXT, anchor="mm")
+    def _product_image(self, photo) -> Image.Image | None:
+        """The product's own picture (from Open Food Facts), when the shop found one for this photo."""
+        if not photo or not photo.local_photo:
+            return None
+        path = Path(photo.local_photo).parent / "product.jpg"
+        try:
+            key = (str(path), path.stat().st_mtime_ns)
+        except OSError:
+            return None
+        if not self._product_cache or self._product_cache[0] != key:
+            try:
+                self._product_cache = (key, Image.open(path).convert("RGB"))
+            except OSError:
+                self._product_cache = (key, None)
+        return self._product_cache[1]
 
     # How long each kind of wait usually takes, so the bar can move honestly and never quite finish early.
     EXPECTED = {"AI Camera": 32.0, "Visa Buy": 14.0, "looking it up": 14.0}
 
-    def _draw_busy(self, d: ImageDraw.ImageDraw, st) -> None:
-        import math
-        now = time.time()
-        if self._busy_since is None or self._busy_text != st.busy and not st.busy.startswith("Making"):
-            self._busy_since = now
-        self._busy_text = st.busy
-        elapsed = now - self._busy_since
-        expected = next((v for k, v in self.EXPECTED.items() if st.busy.startswith(k)), 30.0)
-        frac = min(0.96, 1 - math.exp(-elapsed / (expected * 0.55)))   # fast start, slows near the end
-        d.rectangle([0, 0, self.W, self.H], fill=(0, 0, 0, 150))
-        cx, cy = self.W // 2, int(self.H * 0.40)
-        # a ring of clouds chasing each other (it is a camera that paints the air)
-        r = int(self.H * 0.11)
-        for i in range(8):
-            a = now * 2.2 + i * math.pi / 4
-            x, y = cx + r * math.cos(a), cy + r * math.sin(a)
-            size = 6 + 9 * ((i + 1) / 8)
-            glow = int(120 + 135 * ((i + 1) / 8))
-            d.ellipse([x - size, y - size, x + size, y + size], fill=(PINK if i % 2 else WHITE) if i > 4 else SKY)
-        label = st.busy if st.busy.startswith("Making") else f"{st.busy}…"
-        d.text((cx, cy + r + int(self.H * 0.06)), label.replace("…", "").strip(), font=self.F_MED, fill="white", anchor="mm")
-        bw, bh = int(self.W * 0.5), max(8, int(self.H * 0.022))
-        bx, by = cx - bw // 2, cy + r + int(self.H * 0.12)
-        d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=bh // 2, fill=SLATE_DIM)
-        d.rounded_rectangle([bx, by, bx + int(bw * frac), by + bh], radius=bh // 2, fill=LIME)
-        d.text((cx, by + bh + int(self.H * 0.045)), f"{int(frac * 100)}%  ·  about {max(1, int(expected - elapsed))} s to go",
-               font=self.F_SMALL, fill=SLATE_TEXT, anchor="mm")
+    def _ctx(self, now: float):
+        from types import SimpleNamespace
+        st = self.app.state
+        p = st.current
+        shown = p is not None and st.screen in ("review", "browse", "qr", "shop")
+        photo = self._photo(p.local_photo) if shown and p.local_photo else None
+        frame = self.app.camera.frame() if st.screen == "viewfinder" or p is None else None
+        return SimpleNamespace(
+            st=st, now=now, frame=frame, air=self.air, buttons=self._screen_buttons(), photo=photo,
+            photo_key=p.local_photo if p else None, product_img=self._product_image(p) if st.screen == "shop" else None,
+            link=(p.public_link or p.link or "") if p else "", offer_url=st.offers[0].url if st.offers else "",
+            expected=self.EXPECTED)
+
+    def render(self) -> Image.Image:
+        img = self.skin.frame(self._ctx(time.time()))
+        if img.size != (self.W, self.H):
+            img = img.resize((self.W, self.H), Image.BILINEAR)
+        return img
 
     def _watch_toast(self) -> None:
-        if self.app.state.toast != self._last_toast:
-            self._last_toast, self._toast_at = self.app.state.toast, time.time()
+        st = self.app.state
+        if st.toast != self._last_toast:
+            self._last_toast, self._toast_at = st.toast, time.time()
+        if st.toast and time.time() - self._toast_at > 4:
+            st.toast = ""
 
     def _tick(self) -> None:
+        t0 = time.time()
         self._watch_toast()
-        if not self.app.state.busy:
-            self._busy_since = None
         try:
             self._tk = ImageTk.PhotoImage(self.render())
             self.label.configure(image=self._tk)
         except Exception as e:
             print(f"[screen] {e}")
-        self.root.after(66, self._tick)
+        self.root.after(max(8, 66 - int((time.time() - t0) * 1000)), self._tick)
 
     def run(self) -> None:
         self.root.mainloop()
