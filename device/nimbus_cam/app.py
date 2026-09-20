@@ -29,6 +29,29 @@ AI_CAMERA, VISA_BUY = 0, 1
 DIALS = {AI_CAMERA: "AI Camera", VISA_BUY: "Visa Buy"}
 # A copy of each shared photo goes here so Instagram and phones off our network can fetch it.
 PUBLIC_API = os.environ.get("NIMBUS_PUBLIC_API", "https://nimbus.akvaithi.page").rstrip("/")
+AUTO_POST = os.environ.get("NIMBUS_AUTO_POST", "1") == "1"     # every AI Camera photo goes to Instagram
+
+
+def square(jpeg: bytes) -> bytes:
+    """A 1080×1080 version for Instagram: the picture fitted whole on a blurred, darkened copy of itself
+    (the Instagram look), never cropped — the headline band and the subject both stay."""
+    import io
+
+    from PIL import Image, ImageFilter
+    im = Image.open(io.BytesIO(jpeg)).convert("RGB")
+    side = 1080
+    bg = im.copy()
+    bg.thumbnail((side, side))
+    scale = side / min(bg.size)
+    bg = bg.resize((int(bg.width * scale) + 1, int(bg.height * scale) + 1)).filter(ImageFilter.GaussianBlur(28))
+    bg = bg.crop(((bg.width - side) // 2, (bg.height - side) // 2, (bg.width - side) // 2 + side, (bg.height - side) // 2 + side))
+    bg = Image.eval(bg, lambda v: int(v * 0.55))
+    fg = im.copy()
+    fg.thumbnail((side - 40, side - 40))
+    bg.paste(fg, ((side - fg.width) // 2, (side - fg.height) // 2))
+    out = io.BytesIO()
+    bg.save(out, "JPEG", quality=92)
+    return out.getvalue()
 
 
 def _now_iso() -> str:
@@ -142,6 +165,8 @@ class CameraApp:
         if dial == VISA_BUY:                      # the photo is the shopping query
             return self.identify_product({"photo": photo.id})
         self.say(f"{photo.dial_name} · {photo.proof}")
+        if AUTO_POST and photo.card_url:
+            threading.Thread(target=self._auto_post, args=(photo, t), daemon=True).start()
         out = self._summary(photo)
         if photo.processed_on == "camera":
             out["note"] = "the GPU server was unavailable, so the surroundings carry only the sensor effects"
@@ -200,6 +225,9 @@ class CameraApp:
                                                      if photo.photo_url else None)
             if not data:
                 return photo
+            if k == "photo":                  # Instagram gets the picture alone, square, no card or QR
+                data = square(data)
+                (d / "square.jpg").write_bytes(data)
             files[k] = (f"{k}.jpg", data, "image/jpeg")
         meta = self.http.get(f"{self.api}/captures/{photo.id}", timeout=15).json() if photo.photo_url else None
         if meta is None:
@@ -207,8 +235,8 @@ class CameraApp:
         r = self.http.post(f"{PUBLIC_API}/captures/publish", data={"meta": json.dumps(meta)}, files=files, timeout=60)
         r.raise_for_status()
         pid = r.json()["id"]
-        photo.public_card_url = f"{PUBLIC_API}/captures/{pid}/card.jpg"
-        photo.public_link = f"{PUBLIC_API}/c/{pid}"
+        photo.public_card_url = f"{PUBLIC_API}/captures/{pid}/photo.jpg"     # the square photo, not the card
+        photo.public_link = f"{PUBLIC_API}/captures/{pid}/card.jpg"          # the phone gets the full card
         self.library.add(photo)
         return photo
 
@@ -232,6 +260,9 @@ class CameraApp:
             return {"error": "no photo to post"}
         if not photo.card_url:
             return {"error": "this photo is not on the server yet, so Instagram cannot fetch it"}
+        if photo.instagram_id and not (p or {}).get("again"):
+            self.say("Already on Instagram ✓")
+            return {"posted": True, "id": photo.instagram_id, "note": "it was already posted"}
         caption = (p or {}).get("caption") or self._instagram_caption(photo)
         try:
             photo = self._public(photo)
@@ -240,7 +271,9 @@ class CameraApp:
             return {"error": str(e)}
         except Exception as e:
             return {"error": f"Instagram refused it: {str(e)[:160]}"}
-        self.say("Posted to Instagram")
+        photo.instagram_id = str(post_id)
+        self.library.add(photo)
+        self.say("Posted to Instagram ✓")
         return {"posted": True, "id": post_id, "caption": caption}
 
     # -- Shop (Visa): name the thing in the photo, find it for sale, buy it ----------------------
@@ -304,7 +337,7 @@ class CameraApp:
         jpeg = self.camera.jpeg()
         readings = self.sensors.readings()
         if dial == VISA_BUY:
-            return self._capture_here(jpeg, readings)
+            return self._capture_plain(jpeg, readings)
         sv = tagger.souvenir(jpeg)
         self.say(f"Making a {sv['kind']}…")
         self.state.busy = f"Making a {sv['kind']}"
@@ -313,6 +346,21 @@ class CameraApp:
         r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
         r.raise_for_status()
         return self._store_server(r.json())
+
+    def _capture_plain(self, jpeg: bytes, readings: dict) -> Photo:
+        """Visa Buy: the frame as shot, saved on the camera. No segmentation, no effects, no server — the
+        only AI that runs is the product identification that follows."""
+        pid = "buy" + datetime.now().strftime("%Y%m%d%H%M%S")
+        d = HOME / "photos" / pid
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "photo.jpg").write_bytes(jpeg)
+        rr, web = lc.with_web_weather(sense.Readings.from_dict(readings))
+        photo = Photo(id=pid, created_at=_now_iso(), dial=VISA_BUY, dial_name=DIALS[VISA_BUY], readings=rr.to_dict(),
+                      web=sorted(web), untouched=True, proof="as shot", local_photo=str(d / "photo.jpg"),
+                      processed_on="camera")
+        photo.caption, photo.tags = "a product to buy", ["shopping"]
+        self.library.add(photo)
+        return photo
 
     def _capture_here(self, jpeg: bytes, readings: dict) -> Photo:
         """The photo as shot, processed on this machine (sensor effects only, no GPU)."""
@@ -372,9 +420,16 @@ class CameraApp:
         self.library.add(photo)
         print(f"[tagger] {photo.id}: {photo.caption}")
 
+    def _auto_post(self, photo: Photo, tagger_thread: threading.Thread) -> None:
+        """Every AI Camera photo goes to the account (NIMBUS_AUTO_POST=0 to stop). Waits for the tags so the
+        caption is Muse's, then posts the square photo."""
+        tagger_thread.join(45)
+        res = self.post_instagram({"photo": photo.id})
+        if "error" in res:
+            self.say(f"Auto-post failed: {res['error'][:60]}")
+
     def _instagram_caption(self, photo: Photo) -> str:
         tags_file = Path(photo.local_photo).parent / "tags.json" if photo.local_photo else None
         line = json.loads(tags_file.read_text()).get("instagram") if tags_file and tags_file.exists() else None
         line = line or tagger.from_readings(photo.readings, photo.dial_name)["instagram"]
-        air = sense.Readings.from_dict(photo.readings).strip(set(photo.web))
-        return f"{line}\n\n{photo.dial_name} · {air}\nThe person is exactly as shot. #HackMIT"
+        return f"{line}\n\nShot on Nimbus, a camera that photographs the air. The subject is exactly as shot. #HackMIT"

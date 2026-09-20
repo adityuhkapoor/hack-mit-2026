@@ -54,6 +54,7 @@ class Photo:
     processed_on: str = "server"
     public_card_url: str | None = None   # a copy on the public server, for Instagram and phones off the LAN
     public_link: str | None = None
+    instagram_id: str | None = None      # set once it is on the account
 
     def weather_words(self) -> str:
         return sense.describe(sense.Readings.from_dict(self.readings))

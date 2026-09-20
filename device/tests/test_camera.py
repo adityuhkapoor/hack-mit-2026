@@ -121,7 +121,7 @@ def test_app_tools_without_network(tmp_path, monkeypatch):
     assert a.buy_it({})["approved"]
     a.wait_for_tags()
     shot = a.photo_details({"photo": "current"})
-    assert "unaltered" in shot["proof"] and shot["rendered_on"] == "the camera itself"
+    assert shot["proof"] == "as shot" and shot["rendered_on"] == "the camera itself"   # Visa Buy: no AI render at all
     assert a.search_photos({"query": "fog", "min_rh": 80})["count"] == 1
     assert a.search_photos({"query": "fog", "min_temp_c": 30})["count"] == 0
     assert "error" in a.send_to_phone({})          # offline photo: no link to send

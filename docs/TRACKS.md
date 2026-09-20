@@ -36,7 +36,7 @@ An ElevenLabs Conversational AI agent, push-to-talk from a physical button, Muse
 Not used; ElevenLabs handles STT and TTS inside its agent.
 
 **Meta - Instagram Graph API ✅**
-Muse Spark (muse-spark-1.3) runs the agent's reasoning and tool calls, tags every photo, chooses which of fifty formats a scene becomes and writes the headline in that format's voice, and identifies products. "Post it" publishes the card to @arunningaround through the Instagram Graph API; "send it to my phone" shows a QR.
+Muse Spark (muse-spark-1.3) runs the agent's reasoning and tool calls, tags every photo, chooses which of fifty formats a scene becomes and writes the headline in that format's voice, and identifies products. "Post it" publishes the card to @nimbus_hackmit2026 through the Instagram Graph API; "send it to my phone" shows a QR.
 
 ## Cheat sheet for the booth
 
@@ -47,7 +47,7 @@ One camera, one demo. Each track below names the exact thing to point at. Honest
 | **Arduino** — Uno Q + sensors | ✅ | The UNO Q reads the MLX90640 thermal array and the four buttons and serves both to the Pi over I2C (`device/unoq/nimbus_unoq.ino`). Temperature → hue, motion → blur, light → grain, sound → saturation, humidity → diffusion, all printed on the card. |
 | **ASUS** — use ASUS hardware | ✅ | Every AI render runs on the ASUS GB10: FLUX.2 klein inpainting at 2 MP, Elasticsearch, and the Nimbus API. `curl 10.189.73.14:8000/health`. |
 | **Long Lake** — convince a non-believer | ✅ pitch | The photographer's objection is "AI fakes the photo". Nimbus never touches the subject's pixels, checks it in 8-bit inside the mask, and prints "subject unaltered · verified" on every card. Show a Souvenir card, then the proof. |
-| **Meta** — Muse Spark + Instagram | ✅ | Muse Spark is the camera's brain: it runs the voice agent's reasoning and tool calls, tags every photo (vision), names the Souvenir keepsake, and identifies products for Shop. "Post it" publishes to @arunningaround through the Instagram Graph API. |
+| **Meta** — Muse Spark + Instagram | ✅ | Muse Spark is the camera's brain: it runs the voice agent's reasoning and tool calls, tags every photo (vision), names the Souvenir keepsake, and identifies products for Shop. "Post it" publishes to @nimbus_hackmit2026 through the Instagram Graph API. |
 | **ElevenLabs** — voice | ✅ | Hold TALK and speak. An ElevenLabs Agent (Muse as its custom LLM) with ten client tools that run on the camera: take a photo, read the air, search, show, send to phone, post, identify, buy. The camera answers in its own voice. |
 | **Elastic** — search | ✅ | Every photo is indexed in Elasticsearch 8.15 on the ASUS: hybrid BM25 + kNN (bge-small) with range filters on the readings. "Find the foggy ones from this morning" → `search_photos` builds the query. |
 | **Visa** — reimagine shopping with generative AI | ✅ | **Discovery + checkout.** Photograph a thing, say "what is this?": Muse names it exactly (brand, variant, size), a live search (Open Food Facts + web) finds real listings — Target, Walmart, Instacart — with prices, and "buy it" pays with Visa — **a real call to the Visa Developer sandbox** (Visa Direct pull-funds with Message Level Encryption, Visa's test card): the receipt shows Visa's approval code and transaction id. Verified from the rig. (Without the sandbox credentials it falls back to a simulated approval and says so.) Prices not on the listing are marked `~` (estimated). Code: `device/nimbus_cam/shop.py`. |

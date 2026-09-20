@@ -46,7 +46,7 @@ Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 
 ## The two modes (changed 23:50 ET)
 
-**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`, ~19 s a render at 1.5 MP; 4B is the `gb10` fallback, ~9 s). Portrait: `NIMBUS_ROTATE=90` on the Pi. **Visa Buy** = the shutter takes a plain photo and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
+**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`, ~19 s a render at 1.5 MP; 4B is the `gb10` fallback, ~9 s). Landscape (portrait was tried: `NIMBUS_ROTATE=90/270`). **Visa Buy** = the shutter saves the frame as shot (no segmentation, no diffusion, no server) and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
 
 ## Shop (Visa)
 
@@ -72,7 +72,7 @@ the rig by voice.
   Tested in text mode: it read the air and answered "when did I take my last photo" from the record. **Nobody
   has spoken to it on the rig yet.**
 - **Search**: Elasticsearch 8.15 on the ASUS (tarball, no docker), the camera indexes and searches it live.
-- **Instagram**: posting as **@arunningaround**, token verified.
+- **Instagram**: posting as **@nimbus_hackmit2026**, token verified. **Every AI Camera photo auto-posts** (`NIMBUS_AUTO_POST=0` to stop): the picture alone, 1080² on a blurred pad, no card/QR, Muse's caption.
 - **Souvenir**: Muse saw daisies, chose a seed packet, and produced "WILD DAISY MIX — sunshine you can plant".
 
 ## What's next (agreed 20 Sep, 01:00)

@@ -193,6 +193,9 @@ class Screen:
                 d.ellipse([cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6], fill=text)
                 continue
             label = "LISTENING" if (b.key == "talk" and self.app.state.talking) else b.label
+            cur = self.app.state.current
+            if b.key == "post" and cur is not None and cur.instagram_id:
+                label = "POSTED ✓"
             font = self.F_MED if len(label) <= 2 else self.F_SMALL
             d.text(((x0 + x1) // 2, (y0 + y1) // 2), label, font=font, fill=text, anchor="mm")
 
@@ -272,6 +275,8 @@ class Screen:
             d = ImageDraw.Draw(img, "RGBA")
             _bar(d, 0, int(self.H * 0.09), self.W)
             d.text((16, int(self.H * 0.015)), DIALS[st.dial].upper(), font=self.F_BIG, fill="white")
+            hint = {0: "shoot · it becomes one of fifty things · auto-posts", 1: "shoot a product · find it · buy it with Visa"}[st.dial]
+            d.text((int(self.W * 0.30), int(self.H * 0.03)), hint, font=self.F_SMALL, fill=(180, 180, 190))
             for i in DIALS:                                  # the dial position, as dots
                 x = self.W - 30 - 26 * (len(DIALS) - 1 - i)
                 cy = int(self.H * 0.046)
@@ -305,6 +310,12 @@ class Screen:
             pos = f"{st.index + 1}/{len(st.results)}  ·  " if st.screen == "browse" and st.results else ""
             d.text((16, top + int(block * 0.58)), f"{pos}{p.dial_name}  ·  {p.proof}", font=self.F_SMALL,
                    fill=(143, 227, 168) if p.untouched else (255, 155, 155))
+            if p.instagram_id:
+                badge = "POSTED ✓"
+                bw = d.textbbox((0, 0), badge, font=self.F_SMALL)[2] + 20
+                d.rounded_rectangle([self.W - bw - 16, top + int(block * 0.14), self.W - 16, top + int(block * 0.14) + int(block * 0.36)],
+                                    radius=8, fill=(60, 140, 90))
+                d.text((self.W - 16 - bw // 2, top + int(block * 0.32)), badge, font=self.F_SMALL, fill="white", anchor="mm")
         d = ImageDraw.Draw(img, "RGBA")
         if st.busy:
             self._draw_busy(d, st)
@@ -337,8 +348,11 @@ class Screen:
         d.text((x, y), prod.label()[:38], font=self.F_MED, fill="white"); y += line
         d.text((x, y), f"{prod.category} · {int(prod.confidence * 100)}% sure", font=self.F_SMALL, fill=(170, 170, 180)); y += line
         for i, o in enumerate(st.offers[:3]):
-            fill = (255, 255, 255) if i == 0 else (190, 190, 200)
-            d.text((x, y), f"{o.price_text():>10}  {o.merchant[:22]}", font=self.F_SMALL, fill=fill); y += int(line * 0.8)
+            fill = (255, 255, 255) if i == 0 else (170, 170, 180)
+            if i == 0:
+                d.rounded_rectangle([x - 8, y - 4, self.W - 16, y + int(line * 0.72)], radius=8, fill=(40, 60, 100))
+            d.text((x, y), f"{o.price_text():>9}   {o.merchant[:22]}" + ("   ← best" if i == 0 else ""),
+                   font=self.F_SMALL, fill=fill); y += int(line * 0.8)
         if not st.offers:
             d.text((x, y), "nothing for sale found", font=self.F_SMALL, fill=(255, 155, 155)); y += line
         if st.offers:                                   # scan to open the listing on a phone
