@@ -47,9 +47,11 @@ Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 ## Shop (Visa) — new
 
 "What am I holding?" → `identify_product` (Muse vision → live search → offers) → "buy it" → `buy_it`. A
-**SHOP** button is on the review screen. Checkout is **simulated** unless Visa sandbox credentials exist (see
-`docs/TRACKS.md`); the receipt always says which. Verified on the Mac with a Red Bull can: Target, Walmart,
-Instacart listings, simulated approval. Not yet run on the rig by voice.
+**SHOP** button is on the review screen. Checkout is a **real Visa Developer sandbox call** (Visa Direct pull-funds, MLE-encrypted, test card) —
+verified approved from both the Mac and the Pi. Credentials: Keychain `visa-sandbox-user`/`-password`,
+`/etc/nimbus.env` on the Pi, certs and MLE keys in `~/.nimbus/visa/` on both. Without them it falls back to
+a simulated approval and the receipt says so. `python -m nimbus_cam.shop` is the self-check. Not yet run on
+the rig by voice.
 
 ## What works, verified
 
@@ -84,7 +86,8 @@ Instacart listings, simulated approval. Not yet run on the rig by voice.
 ## Secrets — rotate after the event
 
 All of these were pasted into a chat transcript: the **Meta Model API key**, the **ElevenLabs key**, the
-**Instagram token**, the **Tailscale auth key** and the **team SSH private key**. They live in the MacBook's
+**Instagram token**, the **Tailscale auth key**, the **team SSH private key**, and the **Visa sandbox user
+id, password and MLE private key**. They live in the MacBook's
 Keychain (`meta-model-api-key`, `elevenlabs-api-key`, `ig-token`, `ig-user-id`) and, so the rig survives a
 reboot, in **`/etc/nimbus.env` on the Pi** (root:raspi4, 0640 — the only copy outside the Keychain). Never in
 the repo.

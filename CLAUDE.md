@@ -66,6 +66,16 @@ ASUS.
 - **Muse starves at small `max_tokens` even with `reasoning_effort="minimal"`**: 600 tokens over a page of
   search results came back as `None` with 463 reasoning tokens. Give ranking/extraction calls 2000+.
 
+## Visa sandbox
+
+- **Payment APIs need Message Level Encryption**; without it every call is `9125 Expected input credential
+  was not present`, which looks like an auth problem and is not (helloworld passes). JWE RSA-OAEP-256 +
+  A128GCM with `kid` = the MLE key id, header `keyId`, body `{"encData": …}`; the response is encrypted too.
+- The MLE private key downloads as a **single-line PEM**; re-wrap it at 64 columns or nothing parses it.
+- `retrievalReferenceNumber` is exactly 12 digits.
+- Credentials: Keychain `visa-sandbox-user` / `visa-sandbox-password`; certs and MLE keys in `~/.nimbus/visa/`.
+  The `visa/` folder in the repo root is git-ignored and holds the downloads.
+
 ## Image pipeline notes
 
 - **Measured air beats what the picture looks like** in search ranking: a sunny field re-rendered at 94%
