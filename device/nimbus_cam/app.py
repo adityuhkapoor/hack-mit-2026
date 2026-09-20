@@ -71,6 +71,7 @@ def _when(iso: str) -> str:
 
 @dataclass
 class State:
+    idle: bool = False                 # touch-to-start screen; captures are disabled
     screen: str = "viewfinder"          # viewfinder | review | browse | qr
     dial: int = 0
     current: Photo | None = None        # the photo on screen ("this one")
@@ -151,6 +152,8 @@ class CameraApp:
         return {"readings": r.strip(web), "in_words": sense.describe(r), "from_the_web": sorted(web)}
 
     def take_photo(self, p: dict | None = None) -> dict:
+        if self.state.idle:
+            return {"error": "touch the screen to start the camera"}
         # Touch, GPIO and voice can arrive together. Reject duplicate requests
         # instead of serializing them into unexpected additional generations.
         if not self.lock.acquire(blocking=False):

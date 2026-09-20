@@ -562,7 +562,8 @@ class Skin:
         if first:
             a.update(screen_t0=-9, mode_t0=-9, photo_t0=-9, photo_kind="in", cap_t0=-9, stamp_t0=-9, shop_t0=-9,
                      offers_t0=-9, receipt_t0=-9, busy_t0=-9, flash_t0=-9, talk_t0=-9, qr_t0=-9)
-            self.t_start = now
+            if self.t_start is None:
+                self.t_start = now
         if p.get("group") != group:
             a["screen_t0"] = now
             self.waves_from, self.waves_t0 = self.waves_y, now
@@ -1449,7 +1450,22 @@ class Skin:
 
     # ------------------------------------------------------------ splash
 
-    def _splash(self, img, now):
+    def idle_frame(self, now):
+        """Persistent welcome scene, without the timed splash's fade-out."""
+        if self.t_start is None:
+            self.t_start = now
+        img = self.sky.copy()
+        self._clouds(img, now)
+        self._splash(img, now, persistent=True)
+        blit_text(img, "Touch to start", 512, 442, 26, "ExtraBold", SLATE, "m")
+        return img
+
+    def idle_button(self, img):
+        pill = rrect(92, 40, 20, WHITE + (255,), SLATE + (255,), 2)
+        blit(img, pill, 920, 8)
+        blit_text(img, "IDLE", 966, 35, 15, "ExtraBold", SLATE, "m")
+
+    def _splash(self, img, now, persistent=False):
         t = now - self.t_start
         for strip, period, rev in self.splash_waves:
             o = (now / period % 1) * 1024 if not rev else 1024 - (now / period % 1) * 1024
@@ -1478,7 +1494,7 @@ class Skin:
         pill = pill.resize((max(1, int(pill.width * k)), max(1, int(pill.height * k))), Image.BILINEAR)
         blit(img, pill, 512 - pill.width / 2, 320 - pill.height / 2 + 4, clamp(p2 / 0.3))
         out = clamp((now - self.t_start - 2.3) / 0.4)
-        if out > 0:
+        if out > 0 and not persistent:
             veil = Image.new("RGBA", img.size, SKY + (int(255 * out),))
             img.paste(veil, (0, 0), veil)
 

@@ -121,6 +121,14 @@ capture currently waits for library indexing before showing review.
 
 ## Tested touchscreen configuration
 
+The touchscreen starts on the animated Nimbus welcome screen. Touch anywhere to
+enter the camera; that touch does not take a photo. The **IDLE** button in the
+top-right corner of the viewfinder returns to the welcome screen. While idle,
+preview decoding and shutter actions are paused. The camera connection and other
+app services remain initialized for quick resume. Set `NIMBUS_START_IDLE=0` to
+start directly in the viewfinder for automated capture tests. Script mode is
+unaffected. The IDLE button is unavailable during capture.
+
 The existing Pi deployment uses `~/start_nimbus.sh`, called by labwc autostart.
 It selects `NIMBUS_UI_BACKEND=sdl`, `NIMBUS_UI_FPS=24`,
 `SDL_VIDEODRIVER=wayland` and `NIMBUS_UI_FRAME_STATS=1`. The SDL presenter must

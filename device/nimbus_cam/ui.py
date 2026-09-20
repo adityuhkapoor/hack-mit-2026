@@ -52,6 +52,10 @@ class Button:
 class Screen:
     def __init__(self, app: CameraApp, voice=None, fullscreen: bool | None = None):
         self.app, self.voice = app, voice
+        self.app.state.idle = os.environ.get("NIMBUS_START_IDLE", "1") != "0"
+        self._wake_pressed = self._idle_pressed = False
+        if self.app.state.idle and hasattr(app.camera, "set_preview_visible"):
+            app.camera.set_preview_visible(False)
         self.root = tk.Tk()
         self.root.title("Nimbus")
         pacing = parse_config()
@@ -122,6 +126,7 @@ class Screen:
             return
         for event in self._native.poll_events():
             if event.type == "focus_lost":
+                self._wake_pressed = self._idle_pressed = False
                 if self._pressed is not None:
                     self._pressed.down = False
                     self._pressed = None
@@ -200,6 +205,8 @@ class Screen:
         }
 
     def _screen_buttons(self) -> list[Button]:
+        if getattr(self.app.state, "idle", False):
+            return []
         if (getattr(self, "_preview_wait_until", None) is not None
                 or getattr(self, "_photo_pending", False) and self.app.state.screen != "viewfinder"
                 or self.skin.splashing(time.time()) or self.skin.covered()):
@@ -208,6 +215,12 @@ class Screen:
         return self.buttons.get("review" if st.screen in ("review", "browse") else st.screen, [])
 
     def _touch_down(self, e) -> None:
+        if getattr(self.app.state, "idle", False):
+            self._wake_pressed = True
+            return
+        if self._idle_hit(e) and not self.app.state.busy and self.app.state.screen == "viewfinder":
+            self._idle_pressed = True
+            return
         now, x, y = time.time(), e.x * self.sx, e.y * self.sy
         for b in self._screen_buttons():
             if b.hit(e.x, e.y, self.W, self.H):
@@ -219,6 +232,15 @@ class Screen:
         self.skin.touch(x, y, None, now)
 
     def _touch_up(self, e) -> None:
+        if getattr(self, "_wake_pressed", False):
+            self._wake_pressed = False
+            self._set_idle(False)
+            return  # the wake tap must never also press the shutter
+        if getattr(self, "_idle_pressed", False):
+            self._idle_pressed = False
+            if self._idle_hit(e) and not self.app.state.busy:
+                self._set_idle(True)
+            return
         b, self._pressed = self._pressed, None
         if b is None:
             return
@@ -234,10 +256,31 @@ class Screen:
 
     # -- controls ------------------------------------------------------------------------------
 
+    def _idle_hit(self, e):
+        return 920 <= e.x * self.sx <= 1012 and 8 <= e.y * self.sy <= 48
+
+    def _set_idle(self, idle):
+        if self.app.state.busy:
+            return
+        self.app.state.idle = idle
+        self.app.state.screen = "viewfinder"
+        self._pressed = None
+        self._last_ctx = None
+        self._preview_wait_until = None
+        self.skin.t_start = time.time() if idle else time.time() - 3
+        if hasattr(self.app.camera, "set_preview_visible"):
+            self.app.camera.set_preview_visible(not idle)
+        if idle and self.voice and self.app.state.talking:
+            self._talk_up(None)
+
     def _bg(self, fn, params) -> None:
+        if getattr(self.app.state, "idle", False):
+            return
         threading.Thread(target=fn, args=(params,), daemon=True).start()
 
     def _dial(self, step: int) -> None:
+        if getattr(self.app.state, "idle", False):
+            return
         self.app.set_mode({"mode": str((self.app.state.dial + step) % len(DIALS))})
 
     def _toggle(self, what: str) -> None:
@@ -249,6 +292,8 @@ class Screen:
             self._refresh_air(once=True)
 
     def _talk_down(self, e) -> None:
+        if getattr(self.app.state, "idle", False):
+            return
         # Key auto-repeat sends press/release pairs while held: a release followed quickly by a press is
         # still one hold, so releases are confirmed after a short delay.
         if self._release_job:
@@ -371,6 +416,9 @@ class Screen:
             expected=self.EXPECTED)
 
     def render(self) -> Image.Image:
+        if getattr(self.app.state, "idle", False):
+            img = self.skin.idle_frame(time.time())
+            return img if img.size == (self.W, self.H) else img.resize((self.W, self.H), Image.BILINEAR)
         ctx = self._ctx(time.time())
         waiting = getattr(self, "_preview_wait_until", None) is not None
         previous = getattr(self, "_last_ctx", None)
@@ -384,6 +432,8 @@ class Screen:
             ctx.now = time.time()
             # Keep the drawn controls; _screen_buttons/_touch_up disable their hit targets.
         img = self.skin.frame(ctx)
+        if ctx.st.screen == "viewfinder" and not ctx.st.busy:
+            self.skin.idle_button(img)
         if not waiting and not ctx.photo_pending:
             self._last_ctx = copy(ctx)
             self._last_ctx.st = copy(ctx.st)  # app state mutates in place on worker/voice threads
