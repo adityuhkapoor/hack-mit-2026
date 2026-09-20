@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import math
+import os
 import queue
 import random
 import threading
@@ -90,7 +91,8 @@ class PiSensors:
     ADDR, BUS, CMD_CHUNK, CHUNK, CHUNKS, PIXELS = 0x08, 1, 0x02, 256, 12, 768
     MOTION_FULL = 1.2      # mean absolute change (°C) between frames that counts as "moving fast"
 
-    def __init__(self, camera=None, mic: str | None = "C270"):
+    def __init__(self, camera=None, mic: str | None = None):
+        mic = mic or os.environ.get("NIMBUS_MIC", "WEBCAM,C270,USB")
         self.camera, self.mic = camera, mic
         self.temp_c: float | None = None
         self.motion: float = 0.0
@@ -158,11 +160,12 @@ class PiSensors:
         try:
             import sounddevice as sd
             device = None
-            if self.mic:
-                for i, d in enumerate(sd.query_devices()):
-                    if self.mic.lower() in d["name"].lower() and d["max_input_channels"] > 0:
-                        device = i
-                        break
+            for want in (self.mic or "WEBCAM,C270,USB").split(","):
+                hit = [i for i, d in enumerate(sd.query_devices())
+                       if want.strip().lower() in d["name"].lower() and d["max_input_channels"] > 0]
+                if hit:
+                    device = hit[0]
+                    break
             rec = sd.rec(4000, samplerate=16000, channels=1, dtype="float32", device=device, blocking=True)
             rms = float(np.sqrt(np.mean(np.square(rec))))
             # float(): numpy scalars do not survive json.dumps, and these readings are posted as JSON
@@ -235,12 +238,31 @@ class PushToTalkAudio:
 
     RATE, BLOCK = 16000, 4000
 
-    def __init__(self):
+    def __init__(self, mic: str | None = None, speaker: str | None = None):
         import sounddevice as sd
         self.sd = sd
+        # On the rig the mic is the webcam and the speaker is whatever is plugged into the Pi's jack;
+        # neither is the system default, so pick them by name (NIMBUS_MIC / NIMBUS_SPEAKER override).
+        self.mic_dev = self._find(mic or os.environ.get("NIMBUS_MIC", "WEBCAM,C270,USB"), "max_input_channels")
+        self.speaker_dev = self._find(speaker or os.environ.get("NIMBUS_SPEAKER", "Headphones,USB,vc4hdmi"),
+                                      "max_output_channels")
         self.talking = threading.Event()
         self.speaking = threading.Event()   # agent audio is playing
         self._out: queue.Queue[bytes] = queue.Queue()
+
+    def _find(self, names: str, channels: str):
+        """First device whose name contains one of `names` and has channels of that kind; else default."""
+        devices = self.sd.query_devices()
+        for want in (n.strip().lower() for n in names.split(",") if n.strip()):
+            for i, d in enumerate(devices):
+                if want in d["name"].lower() and d[channels] > 0:
+                    return i
+        return None
+
+    def devices(self) -> str:
+        q = self.sd.query_devices
+        name = lambda i: "default" if i is None else q(i)["name"][:32]
+        return f"mic={name(self.mic_dev)} speaker={name(self.speaker_dev)}"
 
     def start(self, input_callback) -> None:
         silence = bytes(self.BLOCK * 2)
@@ -249,8 +271,9 @@ class PushToTalkAudio:
             input_callback(bytes(indata) if self.talking.is_set() else silence)
 
         self.in_stream = self.sd.RawInputStream(samplerate=self.RATE, channels=1, dtype="int16",
-                                                blocksize=self.BLOCK, callback=on_audio)
-        self.out_stream = self.sd.RawOutputStream(samplerate=self.RATE, channels=1, dtype="int16", blocksize=1000)
+                                                blocksize=self.BLOCK, callback=on_audio, device=self.mic_dev)
+        self.out_stream = self.sd.RawOutputStream(samplerate=self.RATE, channels=1, dtype="int16",
+                                                  blocksize=1000, device=self.speaker_dev)
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._play, daemon=True)
         self.in_stream.start()

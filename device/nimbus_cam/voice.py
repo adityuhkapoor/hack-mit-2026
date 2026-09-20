@@ -41,6 +41,7 @@ class Voice:
             raise RuntimeError("voice needs an ElevenLabs key and an agent: run `python -m nimbus_cam.agent`")
         self.app = app
         self.audio = PushToTalkAudio()
+        print(f"[voice] audio: {self.audio.devices()}")
         tools = ClientTools()
         for name in CameraApp.TOOLS:
             tools.register(name, _wrap(app, name))

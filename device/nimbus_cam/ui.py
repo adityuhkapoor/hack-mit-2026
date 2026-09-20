@@ -1,7 +1,11 @@
-"""The camera's screen and d-pad, in Tk (runs on a Mac, and on the UNO Q under a desktop session).
+"""The camera's screen and controls, in Tk (a Mac window, or the Pi's touch panel).
 
-    ←/→ mode dial   space shutter   hold T talk   ↑/↓ browse   P send to phone   I post to Instagram
-    Esc viewfinder  F fog on/off    H heat on/off (Mac sensors only)
+Touch and keys do the same things, and both call the same functions the voice agent calls:
+
+    viewfinder   MODE · shutter · HOLD TO TALK · GALLERY
+    review       BACK · ‹ › · PHONE (QR) · POST
+    keys         ←/→ mode · space shutter · hold T talk · ↑/↓ browse · P phone · I post · Esc back
+                 F/H fake fog/heat (simulated sensors only)
 
 Anything slow (a capture, a search) runs off the UI thread, so the viewfinder never freezes.
 """
@@ -45,6 +49,27 @@ def _bar(d: ImageDraw.ImageDraw, y: int, h: int, w: int = W) -> None:
     d.rectangle([0, y, w, y + h], fill=(0, 0, 0))
 
 
+class Button:
+    """A touch target drawn on the screen. `hold` buttons report press and release separately."""
+
+    def __init__(self, key: str, label: str, x0: float, x1: float, action, hold: bool = False,
+                 accent: bool = False):
+        self.key, self.label, self.x0, self.x1 = key, label, x0, x1
+        self.action, self.hold, self.accent = action, hold, accent
+        self.down = False
+
+    def box(self, w: int, h: int) -> tuple[int, int, int, int]:
+        bar = int(h * BAR)
+        return int(self.x0 * w) + 4, h - bar + 4, int(self.x1 * w) - 4, h - 4
+
+    def hit(self, x: int, y: int, w: int, h: int) -> bool:
+        x0, y0, x1, y1 = self.box(w, h)
+        return x0 <= x <= x1 and y0 <= y <= y1
+
+
+BAR = 0.155      # share of the height taken by the touch button bar
+
+
 class Screen:
     def __init__(self, app: CameraApp, voice=None, fullscreen: bool | None = None):
         self.app, self.voice = app, voice
@@ -66,6 +91,10 @@ class Screen:
         self._release_job = None
         self._photo_cache: tuple[str, Image.Image] | None = None
         self._last_toast, self._toast_at = "", 0.0
+        self.buttons = self._make_buttons()
+        self._pressed: Button | None = None
+        self.root.bind("<ButtonPress-1>", self._touch_down)
+        self.root.bind("<ButtonRelease-1>", self._touch_up)
         for key, fn in {"<Left>": lambda e: self._dial(-1), "<Right>": lambda e: self._dial(1),
                         "<space>": lambda e: self._bg(app.take_photo, {}),
                         "<Up>": lambda e: self._bg(app.show_photo, {"which": "previous"}),
@@ -78,6 +107,66 @@ class Screen:
             self.root.bind(key, fn)
         self._refresh_air()
         self._tick()
+
+    # -- touch ---------------------------------------------------------------------------------
+
+    def _make_buttons(self) -> dict[str, list[Button]]:
+        app = self.app
+        shoot = Button("shoot", "", 0.34, 0.60, lambda: self._bg(app.take_photo, {}), accent=True)
+        return {
+            "viewfinder": [Button("mode", "MODE", 0.02, 0.34, lambda: self._dial(1)), shoot,
+                           Button("talk", "HOLD TO TALK", 0.60, 0.86, None, hold=True),
+                           Button("gallery", "PHOTOS", 0.86, 0.98,
+                                  lambda: self._bg(app.show_photo, {"which": "next"}))],
+            "review": [Button("back", "BACK", 0.02, 0.18, lambda: app.show_photo({"which": "viewfinder"})),
+                       Button("prev", "<", 0.18, 0.28, lambda: self._bg(app.show_photo, {"which": "previous"})),
+                       Button("next", ">", 0.28, 0.38, lambda: self._bg(app.show_photo, {"which": "next"})),
+                       Button("phone", "PHONE", 0.38, 0.55, lambda: self._bg(app.send_to_phone, {})),
+                       Button("post", "POST", 0.55, 0.72, lambda: self._bg(app.post_instagram, {}), accent=True),
+                       Button("talk", "TALK", 0.72, 0.98, None, hold=True)],
+            "qr": [Button("back", "BACK", 0.02, 0.3, lambda: app.show_photo({"which": "viewfinder"}))],
+        }
+
+    def _screen_buttons(self) -> list[Button]:
+        st = self.app.state
+        return self.buttons.get("review" if st.screen in ("review", "browse") else st.screen, [])
+
+    def _touch_down(self, e) -> None:
+        for b in self._screen_buttons():
+            if b.hit(e.x, e.y, self.W, self.H):
+                b.down, self._pressed = True, b
+                if b.hold:
+                    self._talk_down(e)
+                return
+
+    def _touch_up(self, e) -> None:
+        b, self._pressed = self._pressed, None
+        if b is None:
+            return
+        b.down = False
+        if b.hold:
+            self._talk_up(e)
+        elif b.hit(e.x, e.y, self.W, self.H) and b.action:
+            b.action()
+
+    def _draw_buttons(self, d: ImageDraw.ImageDraw) -> None:
+        for b in self._screen_buttons():
+            x0, y0, x1, y1 = b.box(self.W, self.H)
+            face = (250, 250, 250) if b.down else ((230, 120, 60) if b.accent else (26, 26, 30))
+            text = (20, 20, 24) if b.down else (255, 255, 255)
+            if b.key == "talk" and self.app.state.talking:
+                face, text = (220, 60, 60), (255, 255, 255)
+            d.rounded_rectangle([x0, y0, x1, y1], radius=int(self.H * 0.02), fill=face,
+                                outline=(90, 90, 96), width=1)
+            if b.key == "shoot":                      # the shutter is a circle, not a word
+                r = int((y1 - y0) * 0.30)
+                cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+                d.ellipse([cx - r, cy - r, cx + r, cy + r], outline=text, width=max(2, r // 6))
+                d.ellipse([cx - r + 6, cy - r + 6, cx + r - 6, cy + r - 6], fill=text)
+                continue
+            label = "LISTENING" if (b.key == "talk" and self.app.state.talking) else b.label
+            font = self.F_MED if len(label) <= 2 else self.F_SMALL
+            d.text(((x0 + x1) // 2, (y0 + y1) // 2), label, font=font, fill=text, anchor="mm")
 
     # -- controls ------------------------------------------------------------------------------
 
@@ -141,26 +230,31 @@ class Screen:
                 cy = int(self.H * 0.046)
                 d.ellipse([x - 7, cy - 7, x + 7, cy + 7], outline="white", width=2,
                           fill="white" if i == st.dial else None)
-            _bar(d, self.H - int(self.H * 0.075), int(self.H * 0.075), self.W)
-            d.text((16, self.H - int(self.H * 0.062)), self.air, font=self.F_SMALL, fill=(220, 220, 220))
+            strip = int(self.H * 0.075)
+            _bar(d, self.H - int(self.H * BAR) - strip, strip, self.W)
+            d.text((16, self.H - int(self.H * BAR) - strip + int(strip * 0.2)), self.air,
+                   font=self.F_SMALL, fill=(220, 220, 220))
         elif st.screen == "qr":
             img = Image.new("RGB", (self.W, self.H), "white")
             q = qrcode.QRCode(border=2, box_size=10)
             q.add_data(st.current.link or "")
-            side = int(min(self.W, self.H) * 0.72)
+            side = int(min(self.W, self.H * (1 - BAR)) * 0.70)
             code = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((side, side), Image.NEAREST)
             img.paste(code, ((self.W - side) // 2, int(self.H * 0.06)))
             d = ImageDraw.Draw(img)
-            d.text((self.W // 2, self.H - int(self.H * 0.07)), "Scan to get this photo on your phone",
+            d.text((self.W // 2, self.H - int(self.H * BAR) - int(self.H * 0.04)),
+                   "Scan to get this photo on your phone",
                    font=self.F_MED, fill="black", anchor="mm")
         else:
             p = st.current
             img = _fit(self._photo(p.local_photo), self.W, self.H) if p.local_photo else Image.new("RGB", (self.W, self.H))
             d = ImageDraw.Draw(img, "RGBA")
-            _bar(d, self.H - int(self.H * 0.135), int(self.H * 0.135), self.W)
-            d.text((16, self.H - int(self.H * 0.12)), (p.caption or p.dial_name)[:90], font=self.F_SMALL, fill="white")
+            block = int(self.H * 0.135)
+            top = self.H - int(self.H * BAR) - block
+            _bar(d, top, block, self.W)
+            d.text((16, top + int(block * 0.12)), (p.caption or p.dial_name)[:90], font=self.F_SMALL, fill="white")
             pos = f"{st.index + 1}/{len(st.results)}  ·  " if st.screen == "browse" and st.results else ""
-            d.text((16, self.H - int(self.H * 0.067)), f"{pos}{p.dial_name}  ·  {p.proof}", font=self.F_SMALL,
+            d.text((16, top + int(block * 0.58)), f"{pos}{p.dial_name}  ·  {p.proof}", font=self.F_SMALL,
                    fill=(143, 227, 168) if p.untouched else (255, 155, 155))
         d = ImageDraw.Draw(img, "RGBA")
         if st.busy:
@@ -170,6 +264,7 @@ class Screen:
             d.ellipse([self.W - 44, int(self.H * 0.12), self.W - 20, int(self.H * 0.12) + 24], fill=(255, 60, 60))
         if st.toast and time.time() - self._toast_at > 4:
             st.toast = ""
+        self._draw_buttons(d)
         if st.toast and st.screen != "qr":            # the QR code must stay clean to scan
             top = int(self.H * 0.09)
             d.rectangle([0, top, self.W, top + int(self.H * 0.058)], fill=(0, 0, 0, 150))
