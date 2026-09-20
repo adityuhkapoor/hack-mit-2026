@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 import random
+from copy import copy
 from functools import lru_cache
 from pathlib import Path
 from types import SimpleNamespace
@@ -134,6 +135,7 @@ def blit_text(dst: Image.Image, text: str, x: float, baseline: float, size: floa
     return sp.width
 
 
+@lru_cache(maxsize=128)
 def cap_height(size: float, weight: str = "Bold") -> float:
     b = font(size, weight).getbbox("H")
     return b[3] - b[1]
@@ -420,6 +422,15 @@ def prepare_controls(groups):
                 rrect(width, 74, 37, color + (255,), SLATE + (255,), 3)
             if button.key not in ("shoot", "prev", "next"):
                 text_sprite(button.label, 17, "ExtraBold", SLATE, .5)
+            for down in (False, True):
+                face = LIME if button.hold else PINK if button.accent or button.key == "shoot" else WHITE
+                lip = PINK if button.hold else SLATE
+                if down:
+                    face, lip = (PINK if button.hold else LIME), None
+                button_body(width, 74, face, lip, down)
+                if button.key != "shoot":
+                    button_sprite(width, 74, face, lip, down, button.label,
+                                  button.key if button.key in ("prev", "next") else "")
     for label in ("LISTENING", "POSTED"):
         text_sprite(label, 17, "ExtraBold", SLATE, .5)
     for label in ("AI Camera", "Visa Buy", "looking it up", "One moment"):
@@ -430,6 +441,9 @@ def prepare_controls(groups):
             text_sprite(label + "." * dots, 24, "ExtraBold", SLATE, -.48)
     chevron(30, True)
     chevron(30, False)
+    for name, col, shadow in (("AI CAMERA", LIME, PINK), ("VISA BUY", PINK, LIME)):
+        width = 18 + 20 + 8 + text_width(name, 22, "ExtraBold", -.44) + 8 + 20 + 18
+        mode_pill_base(width, col, shadow, name, 20)
 
 
 def prepare_review_photo(image, photo):
@@ -448,7 +462,18 @@ def prepare_review_photo(image, photo):
     return image, card, card.rotate(-1.0, Image.BICUBIC, expand=True)
 
 
+# twinkling stars of the idle sky: x, y, size, colour, period, phase (kept clear of the headline)
+IDLE_STARS = [(92, 96, 30, "w", 3.1, 0.0), (188, 168, 18, "l", 2.4, 1.3), (60, 262, 22, "w", 3.7, 2.2),
+              (930, 150, 34, "w", 3.3, 0.6), (858, 236, 20, "l", 2.6, 2.9), (972, 330, 24, "w", 3.9, 1.7),
+              (130, 372, 26, "l", 2.8, 0.9), (886, 402, 18, "w", 2.2, 2.5), (250, 60, 16, "w", 2.9, 3.4),
+              (760, 70, 20, "l", 3.5, 1.1)]
+
+
 class Skin:
+    _wake_frames = None
+    WAKE_STEPS = 24
+    WAKE_CLOSE = 0.55            # the idle sky's clouds close over it on a tap, then part onto the camera
+
     def __init__(self):
         self.sky = self._sky()
         self.waves = [(wave_strip(c, a, p, f, b), per, rev) for c, a, p, f, b, per, rev in WAVES]
@@ -473,8 +498,9 @@ class Skin:
         self.cur, self.cur_t, self.cur_dir, self.min_until, self.was_busy = 0.0, 0.0, 0, 0.0, False
         self.pokes: list[tuple] = []
         self.cl = self._curtain_layout()
-        self._cbg, self._dist = None, None
+        self._cbg, self._closed_clouds, self._dist = None, None, None
         self.busy_label = "One moment"
+        self.wake_t0 = -9.0
         self._prepare_curtain_assets()
 
     def _prepare_curtain_assets(self):
@@ -500,6 +526,8 @@ class Skin:
         for hint in ("shoot · it becomes one of fifty things · auto-posts",
                      "shoot a product · find it · buy it with Visa"):
             text_sprite(hint, 15, "Medium", SLATE)
+        self._closed_curtain_frame()
+        self._prepare_wake_frames()
 
     # ------------------------------------------------------------ assets
 
@@ -621,6 +649,8 @@ class Skin:
         now = ctx.now
         self._track(ctx, now)
         st, g = ctx.st, self.group
+        if getattr(self, "waking", False) and now - self.wake_t0 < self.WAKE_CLOSE:
+            return self._wake_close_frame(now)
         if now - self.t_start < 2.7 and not getattr(ctx, "no_splash", False):
             img = self.sky.copy()
             self._clouds(img, now)
@@ -629,7 +659,8 @@ class Skin:
             self._puffs(img, now)
             return img
         self._curtain_step(st, now, hold=getattr(ctx, "hold_curtain", False))
-        freeze = bool(st.busy) and g == "viewfinder" and self.cur_dir > 0
+        freeze = g == "viewfinder" and ((bool(st.busy) and self.cur_dir > 0)
+                                        or getattr(self, "waking", False))
         if not freeze:
             self._closing_scene = None
         img = self._closing_scene.copy() if freeze and self._closing_scene is not None else self.sky.copy()
@@ -782,10 +813,18 @@ class Skin:
             oc, os_ = (LIME, PINK) if mode_from == 0 else (PINK, LIME)
             col, sh = lerp_color(oc, col, t), lerp_color(os_, sh, t)
         sc = 0.85 + 0.15 * POP(p) if p < 1 else 1.0
+        ang = -(now % 6) / 6 * 360
+        if p >= 1:
+            # Settled: the pill and its name are fixed, only the two asterisks keep turning.
+            pill = mode_pill_base(int(w), col, sh, names[mode % 2], ast).copy()
+            for x in (18, 18 + ast + 8 + tw + 8):
+                sp = asterisk(ast).rotate(ang, Image.BICUBIC)
+                pill.paste(sp, (int(x), 11), sp)
+            blit(img, pill, 14 + (w - pill.width) / 2, 6 + (42 - pill.height) / 2)
+            return
         pill = Image.new("RGBA", (int(w) + 8, 52), (0, 0, 0, 0))
         pill.paste(rrect(int(w), 42, 21, sh + (255,)), (4, 5), rrect(int(w), 42, 21, sh + (255,)))
         pill.paste(rrect(int(w), 42, 21, col + (255,)), (0, 0), rrect(int(w), 42, 21, col + (255,)))
-        ang = -(now % 6) / 6 * 360
         for x in (18, 18 + ast + 8 + tw + 8):
             sp = asterisk(ast).rotate(ang, Image.BICUBIC)
             pill.paste(sp, (int(x), 11), sp)
@@ -872,33 +911,30 @@ class Skin:
         if down:
             face = PINK if b.hold else LIME
             lip = None
-        sp = Image.new("RGBA", (bw + 2, bh + 10), (0, 0, 0, 0))
-        if lip is not None:
-            sp.paste(rrect(bw, bh, 37, lip + (255,)), (0, 5), rrect(bw, bh, 37, lip + (255,)))
         fy = 5 if down else 0
-        body = rrect(bw, bh, 37, face + (255,), SLATE + (255,), 3)
-        sp.paste(body, (0, fy), body)
         cx, cy = bw // 2, fy + bh // 2
-        if b.key == "shoot":
-            self._shutter(sp, cx, cy, now, down)
-        elif b.key in ("prev", "next"):
-            ic = chevron(30, b.key == "next")
-            sp.paste(ic, (cx - 15, cy - 15), ic)
-        elif b.hold and st.talking:
-            tw = text_width(label, 17, "ExtraBold", 0.5)
-            gx = cx - (tw + 10 + 46) // 2
-            blit_text(sp, label, gx, cy + cap_height(17, "ExtraBold") / 2 - 2, 17, "ExtraBold", SLATE, track=0.5)
-            bars = ImageDraw.Draw(sp)
-            for k in range(5):
-                hgt = 6 + 22 * (0.5 + 0.5 * math.sin(now * 9 + k * 0.9))
-                x = gx + tw + 10 + k * 11
-                bars.rounded_rectangle([x, cy - hgt / 2 - 2, x + 6, cy + hgt / 2 - 2], 3, fill=SLATE)
+        if b.key == "shoot" or (b.hold and st.talking):
+            # These two animate every frame (the halo, the listening bars): drawn fresh.
+            sp = button_body(bw, bh, face, lip, down).copy()
+            if b.key == "shoot":
+                self._shutter(sp, cx, cy, now, down)
+            else:
+                tw = text_width(label, 17, "ExtraBold", 0.5)
+                gx = cx - (tw + 10 + 46) // 2
+                blit_text(sp, label, gx, cy + cap_height(17, "ExtraBold") / 2 - 2, 17, "ExtraBold", SLATE, track=0.5)
+                bars = ImageDraw.Draw(sp)
+                for k in range(5):
+                    hgt = 6 + 22 * (0.5 + 0.5 * math.sin(now * 9 + k * 0.9))
+                    x = gx + tw + 10 + k * 11
+                    bars.rounded_rectangle([x, cy - hgt / 2 - 2, x + 6, cy + hgt / 2 - 2], 3, fill=SLATE)
         else:
-            text_mid(sp, label, cx, cy - (0 if down else 0), 17, "ExtraBold", SLATE, track=0.5)
-        for r in [r for r in self.ripples if r["key"] == b.key]:
+            # A labelled or chevron button only changes when it is pressed or relabelled: one sprite per look.
+            sp = button_sprite(bw, bh, face, lip, down, label, b.key if b.key in ("prev", "next") else "")
+        ripples = [r for r in self.ripples if r["key"] == b.key and now - r["t0"] < 0.5]
+        if ripples and b.key != "shoot" and not (b.hold and st.talking):
+            sp = sp.copy()                      # never draw a ripple into the cached sprite
+        for r in ripples:
             rp = (now - r["t0"]) / 0.5
-            if rp >= 1:
-                continue
             rad = 70 * rp
             ov = Image.new("RGBA", sp.size, (0, 0, 0, 0))
             ImageDraw.Draw(ov).ellipse([r["x"] - bx - rad, r["y"] - by - rad, r["x"] - bx + rad, r["y"] - by + rad],
@@ -1020,11 +1056,13 @@ class Skin:
     def begin_wake(self, now):
         """Open a sky full of clouds onto the fresh camera preview."""
         self.waking = True
+        self.wake_t0 = now
+        self._closing_scene = None
         self.cur, self.cur_dir, self.cur_t = 1.0, -1, now
         self.min_until = now + 0.12
         self.was_busy = False
 
-    def _curtain_backdrop(self, now: float) -> Image.Image:
+    def _curtain_backdrop(self, now: float, motion: float = 1.0) -> Image.Image:
         if self._cbg is None:
             top, bot = np.array((0x62, 0xBF, 0xF6), float), np.array((0x86, 0xD1, 0xFB), float)
             t = np.linspace(0, 1, H + 80)[:, None, None]
@@ -1036,15 +1074,64 @@ class Skin:
                     sp = cloud_sh(w, PALE if (gx + gy) % 2 else WHITE)
                     bg.paste(sp, (int(gx * 230 + rnd.uniform(-40, 40)), int(gy * 190 + rnd.uniform(-30, 30))), sp)
             self._cbg = bg
-        ox = int(40 + 26 * math.sin(now * 0.35))
-        oy = int(40 + 12 * math.sin(now * 0.5 + 1))
+        ox = int(40 + motion * 26 * math.sin(now * 0.35))
+        oy = int(40 + motion * 12 * math.sin(now * 0.5 + 1))
         return self._cbg.crop((ox, oy, ox + W, oy + H))
 
+    def _closed_curtain_frame(self) -> Image.Image:
+        """The shared welcome/wake frame, built once so a tap cannot cause a scene swap."""
+        if self._closed_clouds is None:
+            # The fixed centre crop and resting cloud positions are also the exact
+            # cur=1 pose used by _curtain.  Copies are cheap and keep the cached
+            # source immutable across idle and transition frames.
+            img = self._cbg.crop((40, 40, 40 + W, 40 + H))
+            for c in self.cl:
+                sp = cloud_sh(c["w"], c["color"])
+                img.paste(sp, (round(c["x"] - sp.width / 2), round(c["y"] - sp.height / 2)), sp)
+            self._closed_clouds = img
+        return self._closed_clouds
+
+    def _prepare_wake_frames(self):
+        """One bounded, shared animation cache. No masks or cloud layouts during playback."""
+        if Skin._wake_frames is not None:
+            return
+        painter = copy(self)
+        painter.waking, painter.cur_dir, painter.pokes = True, -1, []
+        ctx = SimpleNamespace(st=SimpleNamespace(busy=""))
+        frames = []
+        for index in range(self.WAKE_STEPS + 1):
+            painter.cur = 1 - index / self.WAKE_STEPS
+            now = index * .9 / self.WAKE_STEPS
+            black = Image.new("RGB", (W, H))
+            white = Image.new("RGB", (W, H), "white")
+            painter._draw_curtain(black, ctx, now)
+            painter._draw_curtain(white, ctx, now)
+            # Derive straight-alpha artwork from black/white reference renders.
+            # Drawing existing masked sprites directly onto RGBA would multiply
+            # edge alpha twice and darken the clouds when replayed.
+            b = np.asarray(black).astype(np.float32)
+            transmission = np.asarray(white).astype(np.float32) - b
+            alpha = np.clip(255 - np.mean(transmission, axis=2), 0, 255)
+            rgb = np.clip(np.rint(b * 255 / np.maximum(alpha[..., None], 1)), 0, 255).astype(np.uint8)
+            frames.append((Image.fromarray(rgb), Image.fromarray(np.rint(alpha).astype(np.uint8), "L")))
+        Skin._wake_frames = tuple(frames)
+
     def _curtain(self, img, ctx, now):
+        if getattr(self, "waking", False):
+            index = round((1 - self.cur) * self.WAKE_STEPS)
+            artwork, mask = Skin._wake_frames[max(0, min(self.WAKE_STEPS, index))]
+            img.paste(artwork, (0, 0), mask)
+            return
+        self._draw_curtain(img, ctx, now)
+
+    def _draw_curtain(self, img, ctx, now):
         st = ctx.st
         cur, E = self.cur, (POP if self.cur_dir >= 0 else EASE_IN)
         c = smooth((cur - 0.12) / 0.78)                      # how much of the sky is closed, as an iris on the centre
-        bg = self._curtain_backdrop(now)
+        if c >= 0.999 and getattr(self, "waking", False):
+            img.paste(self._closed_curtain_frame(), (0, 0))
+            return
+        bg = self._curtain_backdrop(now, 1 - cur if getattr(self, "waking", False) else 1.0)
         if c >= 0.999:
             img.paste(bg, (0, 0))
         elif c > 0.001:
@@ -1069,8 +1156,11 @@ class Skin:
         for c in self.cl:
             p = clamp(cur * (1 + CURTAIN_DM) - c["delay"])
             f = 1 - E(p)
-            x = c["x"] + c["ux"] * 720 * f + 10 * math.sin(now * 0.6 + c["ph2"])
-            y = c["y"] + c["uy"] * 720 * f + c["amp"] * math.sin(now * 0.95 + c["ph"])
+            # Motion grows from zero as the clouds leave their cached resting
+            # pose, preventing a one-frame jump at the idle/wake boundary.
+            motion = 1 - cur if getattr(self, "waking", False) else 1.0
+            x = c["x"] + c["ux"] * 720 * f + motion * 10 * math.sin(now * 0.6 + c["ph2"])
+            y = c["y"] + c["uy"] * 720 * f + motion * c["amp"] * math.sin(now * 0.95 + c["ph"])
             pdx, pdy = poke(x, y)
             sp = cloud_sh(c["w"], c["color"])
             px_, py_ = x + pdx - sp.width / 2, y + pdy - sp.height / 2
@@ -1460,14 +1550,43 @@ class Skin:
     # ------------------------------------------------------------ splash
 
     def idle_frame(self, now):
-        """Persistent welcome scene, without the timed splash's fade-out."""
+        """Persistent welcome scene: the splash (waves, logo, headline, spinning asterisks) with twinkling stars."""
         if self.t_start is None:
             self.t_start = now
-        self._curtain_backdrop(now)  # warm cloud artwork before the wake tap
         img = self.sky.copy()
         self._clouds(img, now)
+        self._stars(img, now)
         self._splash(img, now, persistent=True)
-        blit_text(img, "Touch to start", 512, 442, 26, "ExtraBold", SLATE, "m")
+        self._touch_prompt(img, now)
+        return img
+
+    def _stars(self, img, now):
+        t = now - self.t_start
+        for x, y, d, col, per, ph in IDLE_STARS:
+            grow = clamp((t - 0.5 - ph * 0.12) / 0.5)
+            k = (0.55 + 0.45 * math.sin((now / per + ph) * math.tau)) * POP(grow)
+            if k < 0.05:
+                continue
+            size = max(8, int(d * 1.5 * (0.55 + 0.45 * k)) // 2 * 2)
+            blit(img, star(size, WHITE if col == "w" else LIME).rotate(-(now * 18 + ph * 40) % 360, Image.BICUBIC),
+                 x - size / 2, y - size / 2, clamp(0.35 + k * 0.65))
+
+    def _touch_prompt(self, img, now):
+        p = prog(now, self.t_start, 0.6, 1.15)
+        if p <= 0:
+            return
+        bob = math.sin((now - self.t_start) * math.tau / 2.8) * 3
+        blit(img, rrect(244, 58, 29, WHITE + (240,), SLATE + (255,), 3), 390, 417 + bob, clamp(p / 0.4))
+        blit_text(img, "Touch to start", 512, 454 + bob, 24, "ExtraBold", SLATE, "m", alpha=clamp(p / 0.4))
+
+    def _wake_close_frame(self, now):
+        """A tap: the clouds close over the idle sky (the wake frames played backwards), then part onto the camera."""
+        p = clamp((now - self.wake_t0) / self.WAKE_CLOSE)
+        index = round((1 - smooth(p)) * self.WAKE_STEPS)
+        artwork, mask = Skin._wake_frames[max(0, min(self.WAKE_STEPS, index))]
+        img = self.idle_frame(now)
+        img.paste(artwork, (0, 0), mask)
+        self._puffs(img, now)
         return img
 
     def idle_button(self, img):
@@ -1509,8 +1628,47 @@ class Skin:
             img.paste(veil, (0, 0), veil)
 
 
+@lru_cache(maxsize=64)
 def body_alpha(w: int, h: int, fy: int, size: tuple) -> Image.Image:
     """Alpha of a button's face inside its sprite, to clip effects (ripple, halo) to the pill."""
     m = Image.new("L", size, 0)
     m.paste(mask_rrect(w, h, 37), (0, fy))
     return m
+
+
+@lru_cache(maxsize=8)
+def mode_pill_base(w: int, col: tuple, sh: tuple, name: str, ast: int) -> Image.Image:
+    """The settled mode pill without its asterisks: two rounded rectangles and the name. The name is
+    written before the asterisks are pasted, as it was when the whole pill was drawn each frame; nothing
+    overlaps, so the order does not change a pixel."""
+    pill = Image.new("RGBA", (w + 8, 52), (0, 0, 0, 0))
+    pill.paste(rrect(w, 42, 21, sh + (255,)), (4, 5), rrect(w, 42, 21, sh + (255,)))
+    pill.paste(rrect(w, 42, 21, col + (255,)), (0, 0), rrect(w, 42, 21, col + (255,)))
+    blit_text(pill, name, 18 + ast + 8, 21 + cap_height(22, "ExtraBold") / 2, 22, "ExtraBold", SLATE, track=-0.44)
+    return pill
+
+
+@lru_cache(maxsize=64)
+def button_body(bw: int, bh: int, face: tuple, lip: tuple | None, down: bool) -> Image.Image:
+    """A button's pill and its lip, before anything is written on it. Callers that draw on it copy it."""
+    sp = Image.new("RGBA", (bw + 2, bh + 10), (0, 0, 0, 0))
+    if lip is not None:
+        sp.paste(rrect(bw, bh, 37, lip + (255,)), (0, 5), rrect(bw, bh, 37, lip + (255,)))
+    body = rrect(bw, bh, 37, face + (255,), SLATE + (255,), 3)
+    sp.paste(body, (0, 5 if down else 0), body)
+    return sp
+
+
+@lru_cache(maxsize=64)
+def button_sprite(bw: int, bh: int, face: tuple, lip: tuple | None, down: bool, label: str, chevron_key: str) -> Image.Image:
+    """A finished static button: the body with its label or chevron. Built once per look and reused as
+    long as nothing on it moves; the bar used to rasterize every button, every frame."""
+    sp = button_body(bw, bh, face, lip, down).copy()
+    fy = 5 if down else 0
+    cx, cy = bw // 2, fy + bh // 2
+    if chevron_key:
+        ic = chevron(30, chevron_key == "next")
+        sp.paste(ic, (cx - 15, cy - 15), ic)
+    else:
+        text_mid(sp, label, cx, cy, 17, "ExtraBold", SLATE, track=0.5)
+    return sp
