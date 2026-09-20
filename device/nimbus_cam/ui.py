@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 import threading
+from pathlib import Path
 import time
 import tkinter as tk
 
@@ -238,8 +239,27 @@ class Screen:
             self.root.after(4000, self._refresh_air)
 
     def _photo(self, path: str) -> Image.Image:
+        """The photo file, or a fetched copy when the library knows a photo this camera has no file for
+        (another device's, or a wiped folder), or a grey frame. A missing file must never stall the screen."""
         if not self._photo_cache or self._photo_cache[0] != path:
-            self._photo_cache = (path, Image.open(path).convert("RGB"))
+            try:
+                im = Image.open(path).convert("RGB")
+            except OSError:
+                im = None
+                p = self.app.state.current
+                if p and p.photo_url:
+                    try:
+                        import io
+                        r = self.app.http.get(p.photo_url, timeout=10)
+                        r.raise_for_status()
+                        im = Image.open(io.BytesIO(r.content)).convert("RGB")
+                        Path(path).parent.mkdir(parents=True, exist_ok=True)
+                        Path(path).write_bytes(r.content)
+                    except Exception as e:
+                        print(f"[screen] no photo for {path}: {e}")
+                if im is None:
+                    im = Image.new("RGB", (self.W, self.H), (40, 40, 44))
+            self._photo_cache = (path, im)
         return self._photo_cache[1]
 
     def render(self) -> Image.Image:
