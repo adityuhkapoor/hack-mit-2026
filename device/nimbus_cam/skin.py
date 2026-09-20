@@ -23,6 +23,7 @@ W, H = 1024, 600
 BAR_H = 93
 BAR_Y = H - BAR_H            # 507
 SS = 4                       # supersampling for antialiased shapes
+FLASH_DURATION = 0.18         # brief shutter feedback; avoid a prolonged white-screen fade
 
 SKY = (0x70, 0xC8, 0xFB)
 SKY_2 = (0x8F, 0xD5, 0xFC)
@@ -402,6 +403,51 @@ LAYOUT = {
 }
 
 
+@lru_cache(maxsize=243)
+def _flash_lut(alpha: int):
+    # Integer rounding matches Pillow's masked paste of opaque white onto RGB.
+    return [(255 * alpha + value * (255 - alpha) + 127) // 255 for value in range(256)] * 3
+
+
+def prepare_controls(groups):
+    """Rasterize fixed control artwork before the first interactive frame."""
+    for buttons in groups.values():
+        for button in buttons:
+            width = int((button.x1 - button.x0) * W) - 8
+            for color in (SLATE, PINK):
+                rrect(width, 74, 37, color + (255,))
+            for color in (WHITE, PINK, LIME):
+                rrect(width, 74, 37, color + (255,), SLATE + (255,), 3)
+            if button.key not in ("shoot", "prev", "next"):
+                text_sprite(button.label, 17, "ExtraBold", SLATE, .5)
+    for label in ("LISTENING", "POSTED"):
+        text_sprite(label, 17, "ExtraBold", SLATE, .5)
+    for label in ("AI Camera", "Visa Buy", "looking it up", "One moment"):
+        width = text_width(label + "...", 24, "ExtraBold", -.48) + 56
+        rrect(width, 46, 23, SLATE + (255,))
+        rrect(width, 46, 23, WHITE + (255,), SLATE + (255,), 3)
+        for dots in range(4):
+            text_sprite(label + "." * dots, 24, "ExtraBold", SLATE, -.48)
+    chevron(30, True)
+    chevron(30, False)
+
+
+def prepare_review_photo(image, photo):
+    """Pure worker-side preparation; never touches a Skin instance or Tk/SDL."""
+    card = Image.new("RGBA", (452, 412), (0, 0, 0, 0))
+    shadow = rrect(430, 390, 20, (27, 49, 57, 36))
+    body = rrect(430, 390, 20, WHITE + (255,))
+    card.paste(shadow, (11, 19), shadow)
+    card.paste(body, (11, 11), body)
+    card.paste(cover(image, 410, 370), (21, 21), mask_rrect(410, 370, 12))
+    room = 960 - (170 if photo.instagram_id else 0)
+    caption = wrap(photo.caption or photo.dial_name, 17, "ExtraBold", room, 1, -.17)[0]
+    text_sprite(caption, 17, "ExtraBold", SLATE, -.17)
+    proof = wrap(f"{photo.dial_name}  ·  {photo.proof}", 14, "Bold", room - 18 - 22, 1)[0]
+    text_sprite(proof, 14, "Bold", OK if photo.untouched else BAD)
+    return image, card, card.rotate(-1.0, Image.BICUBIC, expand=True)
+
+
 class Skin:
     def __init__(self):
         self.sky = self._sky()
@@ -423,6 +469,7 @@ class Skin:
         self.dots_w = [38.0, 14.0]
         self.last_now = 0.0
         self._sprite_cache: dict = {}
+        self._closing_scene = None
         self.cur, self.cur_t, self.cur_dir, self.min_until, self.was_busy = 0.0, 0.0, 0, 0.0, False
         self.pokes: list[tuple] = []
         self.cl = self._curtain_layout()
@@ -481,6 +528,8 @@ class Skin:
 
     def preview_visible_soon(self, st, now: float) -> bool:
         """Whether the viewfinder is visible, or decoding should prewarm before the curtain opens."""
+        if st.busy and self._closing_scene is not None:
+            return False
         return self.cur < 0.985 or (not st.busy and now >= self.min_until - 0.2)
 
     def touch(self, x: float, y: float, key: str | None, now: float) -> None:
@@ -571,8 +620,11 @@ class Skin:
             self._puffs(img, now)
             return img
         self._curtain_step(st, now, hold=getattr(ctx, "hold_curtain", False))
-        img = self.sky.copy()
-        if self.cur < 0.985:                                # fully behind the clouds, the scene is not drawn at all
+        freeze = bool(st.busy) and g == "viewfinder" and self.cur_dir > 0
+        if not freeze:
+            self._closing_scene = None
+        img = self._closing_scene.copy() if freeze and self._closing_scene is not None else self.sky.copy()
+        if self.cur < 0.985 and not (freeze and self._closing_scene is not None):                                # fully behind the clouds, the scene is not drawn at all
             self._clouds(img, now)
             if g == "viewfinder":
                 self._viewfinder(img, ctx, now)
@@ -589,15 +641,16 @@ class Skin:
             if st.paying_since:
                 self._paying(img, ctx, now)
             self._bar(img, ctx, now)
+            if freeze:
+                self._closing_scene = img.copy()
         if self.cur > 0:
             self._curtain(img, ctx, now)
         if st.talking:
             self._talkdot(img, now)
         self._toast(img, now)
         fl = now - self.anim.get("flash_t0", -9)
-        if 0 <= fl < 0.55 and g == "viewfinder":
-            sp = Image.new("RGBA", img.size, (255, 255, 255, int(242 * (1 - fl / 0.55))))
-            img.paste(sp, (0, 0), sp)
+        if 0 <= fl < FLASH_DURATION and g == "viewfinder":
+            img = img.point(_flash_lut(int(242 * (1 - fl / FLASH_DURATION))))
         self._particles(img, now)
         self._puffs(img, now)
         return img
@@ -641,10 +694,6 @@ class Skin:
     def _feed(self, img, ctx, now):
         a = ctx.st
         fx, fy, fw, fh = 8, 58, 1008, 404
-        sq = 1.0
-        f0 = self.anim.get("flash_t0", -9)
-        if 0 <= now - f0 < 0.42:
-            sq = 1 - 0.035 * math.sin(math.pi * (now - f0) / 0.42)
         card = self._card_base(fw, fh)
         card = card.copy()
         inner_w, inner_h = fw - 10, fh - 10
@@ -668,8 +717,6 @@ class Skin:
         card.paste(inner, (5, 5), mask_rrect(inner_w, inner_h, 21))
         self._brackets(card, now, inner_w, inner_h)
         self._reticle(card, now)
-        if sq != 1.0:
-            card = card.resize((int(card.width * sq), int(card.height * sq)), Image.BILINEAR)
         blit(img, card, fx + (fw - card.width) / 2, fy + (fh - card.height) / 2)
 
     @lru_cache(maxsize=4)
@@ -1088,7 +1135,8 @@ class Skin:
         if pp >= 1 and sc == 1.0 and dx == 0 and dy == 0:
             key = ("rot", p.id, ctx.photo_key)
             if key not in self._sprite_cache:
-                self._sprite_cache[key] = card.rotate(-1.0, Image.BICUBIC, expand=True)
+                assets = getattr(ctx, "review_assets", None)
+                self._sprite_cache[key] = assets[2] if assets else card.rotate(-1.0, Image.BICUBIC, expand=True)
             sp = self._sprite_cache[key]
         else:
             sp = card.rotate(ang, Image.BICUBIC, expand=True)
@@ -1149,6 +1197,10 @@ class Skin:
         key = ("card", p.id, ctx.photo_key)
         if key not in self._sprite_cache:
             self._sprite_cache.clear()
+            assets = getattr(ctx, "review_assets", None)
+            if assets is not None:
+                self._sprite_cache[key] = assets[1]
+                return assets[1]
             card = Image.new("RGBA", (452, 412), (0, 0, 0, 0))
             card.paste(rrect(430, 390, 20, (27, 49, 57, 36)), (11, 19), rrect(430, 390, 20, (27, 49, 57, 36)))
             card.paste(rrect(430, 390, 20, WHITE + (255,)), (11, 11), rrect(430, 390, 20, WHITE + (255,)))

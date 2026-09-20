@@ -257,6 +257,10 @@ def test_screen_builds_what_the_skin_draws_from_the_app_state(tmp_path):
     stub._photo = lambda path: ui.Screen._photo(stub, path)
     stub._product_image = lambda p: ui.Screen._product_image(stub, p)
     c = ui.Screen._ctx(stub, BASE)
+    with stub._photo_loader._condition:
+        assert stub._photo_loader._condition.wait_for(lambda: bool(stub._photo_loader._cache), timeout=3)
+    c = ui.Screen._ctx(stub, BASE)
+    stub._photo_loader.close()
     assert c.photo.size == (400, 300) and c.product_img.size == (200, 300) and c.frame is None
     assert c.link == "https://x/c/abc" and c.offer_url == "https://t" and c.buttons == BUTTONS["shop"]
     assert visibility[-1] is False

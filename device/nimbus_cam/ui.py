@@ -25,7 +25,7 @@ from PIL import Image, ImageTk
 
 from .app import DIALS, CameraApp
 from .frame_pacing import FramePacer, FrameStats, parse_config
-from .skin import H as DESIGN_H, W as DESIGN_W, Skin
+from .skin import H as DESIGN_H, W as DESIGN_W, Skin, prepare_controls
 
 W, H = 800, 480          # the default window; a real panel overrides it (NIMBUS_FULLSCREEN=1)
 BAR = 0.155              # share of the height taken by the touch button bar
@@ -78,6 +78,7 @@ class Screen:
         self._product_cache: tuple[tuple, Image.Image | None] | None = None
         self._last_toast, self._toast_at = "", 0.0
         self.buttons = self._make_buttons()
+        prepare_controls(self.buttons)
         self.gpio = self._wire_gpio()
         self._preview_enabled = True
         self._preview_wait_until = None
@@ -200,6 +201,7 @@ class Screen:
 
     def _screen_buttons(self) -> list[Button]:
         if (getattr(self, "_preview_wait_until", None) is not None
+                or getattr(self, "_photo_pending", False) and self.app.state.screen != "viewfinder"
                 or self.skin.splashing(time.time()) or self.skin.covered()):
             return []
         st = self.app.state
@@ -220,7 +222,8 @@ class Screen:
         b, self._pressed = self._pressed, None
         if b is None:
             return
-        if getattr(self, "_preview_wait_until", None) is not None and not b.hold:
+        if (getattr(self, "_preview_wait_until", None) is not None
+                or getattr(self, "_photo_pending", False) and self.app.state.screen != "viewfinder") and not b.hold:
             b.down = False
             return
         b.down = False
@@ -273,28 +276,44 @@ class Screen:
             self.root.after(4000, self._refresh_air)
 
     def _photo(self, path: str) -> Image.Image:
-        """The photo file, or a fetched copy when the library knows a photo this camera has no file for
-        (another device's, or a wiped folder), or a grey frame. A missing file must never stall the screen."""
-        if not self._photo_cache or self._photo_cache[0] != path:
+        """Prepare decoded pixels, card transforms and caption glyphs off the UI thread."""
+        from .photo_loader import PhotoLoader
+        from .skin import prepare_review_photo
+        if not hasattr(self, "_photo_loader"):
+            self._photo_loader = PhotoLoader()
+            self._photo_placeholder = Image.new("RGB", (self.W, self.H), (0x2A, 0x45, 0x50))
+        photo = copy(self.app.state.current)
+        key = (path, photo.photo_url, photo.caption, photo.dial_name, photo.proof,
+               photo.untouched, bool(photo.instagram_id))
+        def load():
             try:
-                im = Image.open(path).convert("RGB")
+                with Image.open(path) as source:
+                    image = source.convert("RGB")
             except OSError:
-                im = None
-                p = self.app.state.current
-                if p and p.photo_url:
+                if not photo.photo_url:
+                    raise
+                import io
+                response = self.app.http.get(photo.photo_url, timeout=10)
+                response.raise_for_status()
+                with Image.open(io.BytesIO(response.content)) as source:
+                    image = source.convert("RGB")
+                # Downloaded pixels are usable even when the optional disk cache is unwritable.
+                try:
+                    import tempfile
+                    dest = Path(path)
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    with tempfile.NamedTemporaryFile(dir=dest.parent, delete=False) as temp:
+                        temp.write(response.content)
+                        temporary = Path(temp.name)
                     try:
-                        import io
-                        r = self.app.http.get(p.photo_url, timeout=10)
-                        r.raise_for_status()
-                        im = Image.open(io.BytesIO(r.content)).convert("RGB")
-                        Path(path).parent.mkdir(parents=True, exist_ok=True)
-                        Path(path).write_bytes(r.content)
-                    except Exception as e:
-                        print(f"[screen] no photo for {path}: {e}")
-                if im is None:
-                    im = Image.new("RGB", (self.W, self.H), (0x2A, 0x45, 0x50))
-            self._photo_cache = (path, im)
-        return self._photo_cache[1]
+                        temporary.replace(dest)
+                    finally:
+                        temporary.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            return prepare_review_photo(image, photo)
+        self._photo_assets, self._photo_pending = self._photo_loader.request(key, load)
+        return self._photo_assets[0] if self._photo_assets is not None else self._photo_placeholder
 
     def _product_image(self, photo) -> Image.Image | None:
         """The picture of the item the shopper is looking at: the product's own, or a related item's."""
@@ -344,7 +363,9 @@ class Screen:
             self._preview_wait_until = None
         return SimpleNamespace(
             st=st, now=now, frame=frame, air=self.air, buttons=self._screen_buttons(), photo=photo,
-            photo_key=p.local_photo if p else None, product_img=self._product_image(p) if st.screen == "shop" else None,
+            photo_key=(p.local_photo, id(photo)) if p else None,
+            review_assets=getattr(self, "_photo_assets", None) if shown else None,
+            photo_pending=getattr(self, "_photo_pending", False) if shown else False, product_img=self._product_image(p) if st.screen == "shop" else None,
             link=(p.public_link or p.link or "") if p else "",
             offer_url=st.offers[min(st.offer_index, len(st.offers) - 1)].url if st.offers else "",
             expected=self.EXPECTED)
@@ -353,17 +374,17 @@ class Screen:
         ctx = self._ctx(time.time())
         waiting = getattr(self, "_preview_wait_until", None) is not None
         previous = getattr(self, "_last_ctx", None)
-        if waiting and self.skin.cur >= 0.985:
+        if (waiting or ctx.photo_pending) and self.skin.cur >= 0.985:
             # Keep animating closed clouds until a fresh preview is available. The timer below is
             # bounded so a disconnected camera still reaches its normal unavailable presentation.
             ctx.hold_curtain = True
-        elif waiting and previous is not None:
+        elif (waiting or ctx.photo_pending) and previous is not None:
             # Preserve the photo scene, including its animation, rather than flashing an empty feed.
             ctx = copy(previous)
             ctx.now = time.time()
             # Keep the drawn controls; _screen_buttons/_touch_up disable their hit targets.
         img = self.skin.frame(ctx)
-        if not waiting:
+        if not waiting and not ctx.photo_pending:
             self._last_ctx = copy(ctx)
             self._last_ctx.st = copy(ctx.st)  # app state mutates in place on worker/voice threads
         if img.size != (self.W, self.H):
@@ -426,6 +447,8 @@ class Screen:
             self.root.mainloop()
         finally:
             self._closing = True
+            if hasattr(self, "_photo_loader"):
+                self._photo_loader.close()
             if self.voice and self.app.state.talking:
                 self.voice.release()
             if self._native is not None:

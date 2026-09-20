@@ -44,3 +44,33 @@ The temporary interactive run uses two camera buffers, skipping disabled, and au
 posting disabled. The persistent boot launcher was not changed by these experiments.
 Pi backups and test launchers are under `~/camera-latency-qa/`. No experimental changes
 were pushed to main during this work.
+
+## Follow-up: prepared review cache and shutter feedback
+
+A bounded worker now decodes/fetches photos, prepares the card and static rotation,
+and warms caption glyphs before exposing the result to the UI. Four prepared entries
+are retained, navigation has one replaceable pending request, failed reads back off
+for five seconds, and shutdown never waits for network I/O. A pending result keeps
+the cloud curtain or previous scene animating. Cache keys include photo metadata;
+completed work is retrieved by its own key so an old navigation request cannot
+replace the selected photo. Product catalogue image loading remains synchronous.
+
+Fixed button artwork and common loading labels are warmed during startup. The flash
+uses a lookup table verified against masked paste for all 243 intensities. Its visual
+fade is deliberately shortened from 550 to 180 ms, and the full-preview squeeze is
+removed. The scene underneath the closing clouds freezes once at shutter activation;
+clouds and flash continue animating, and camera preview decoding resumes on return.
+This changes shutter presentation, not capture pixels or exposure settings.
+
+Full local suite: 158 passed, 2 skipped. A real AI capture with background photo
+preparation reached review in 20.965 seconds after shutter release; busy feedback
+appeared after 48 ms. That real capture preceded the final short-flash/frozen-scene
+changes. Those final changes were tested with a controlled transition, not another
+server generation.
+
+With short flash but a live underlying scene, the first two shutter seconds had 36
+completed callbacks, median 41.10 ms, p95 79.51 ms, max 86.95 ms. Freezing the underlying
+scene yielded 45 callbacks, median 31.55 ms, p95 47.70 ms, max 54.50 ms. These are
+sequential single runs, not confidence intervals. Review transition maximum remained
+171.68 ms; startup also has a cold hitch. Neither is claimed fixed. No render failures
+were logged in the controlled run. Raw logs: timing-short.log and timing-freeze.log.
