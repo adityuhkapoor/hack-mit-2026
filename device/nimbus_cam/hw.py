@@ -175,7 +175,17 @@ class PiSensors:
         mean = float(np.asarray(f[::8, ::8], np.float32).mean()) / 255
         return round(float(10 ** (1.2 + 2.6 * mean)), 0)
 
+    def attach_audio(self, audio) -> None:
+        """The voice session owns the microphone (ALSA gives a device to one stream at a time), so the
+        sound level comes from its stream instead of opening the mic a second time — which failed both
+        ways: the dB sample could not open it, and worse, if the sample held it when the session started,
+        the agent heard nothing but silence."""
+        self.audio = audio
+
     def _db(self) -> float | None:
+        audio = getattr(self, "audio", None)
+        if audio is not None:
+            return audio.level_db()
         try:
             import sounddevice as sd
             device = None
@@ -429,7 +439,8 @@ class PushToTalkAudio:
     """ElevenLabs AudioInterface: 16 kHz mono PCM16 in and out. While talk is released the mic sends
     silence, so the session stays open (instant replies) but only a held button is ever heard."""
 
-    RATE, BLOCK = 16000, 4000
+    RATE, BLOCK = 16000, 1600          # 100 ms blocks: the button's edges land within a tenth of a second
+    HANGOVER_S = 0.35                  # keep sending real audio this long after release: the last word
 
     def __init__(self, mic: str | None = None, speaker: str | None = None):
         import sounddevice as sd
@@ -442,6 +453,8 @@ class PushToTalkAudio:
         self.talking = threading.Event()
         self.speaking = threading.Event()   # agent audio is playing
         self._out: queue.Queue[bytes] = queue.Queue()
+        self._released_at = 0.0
+        self._rms = 0.0                     # of the latest block, whatever the button is doing
 
     def _find(self, names: str, channels: str):
         """First device whose name contains one of `names` and has channels of that kind; else default."""
@@ -461,7 +474,11 @@ class PushToTalkAudio:
         silence = bytes(self.BLOCK * 2)
 
         def on_audio(indata, frames, t, status):
-            input_callback(bytes(indata) if self.talking.is_set() else silence)
+            buf = bytes(indata)
+            samples = np.frombuffer(buf, np.int16).astype(np.float32) / 32768
+            self._rms = float(np.sqrt(np.mean(np.square(samples)))) if len(samples) else 0.0
+            live = self.talking.is_set() or (time.time() - self._released_at) < self.HANGOVER_S
+            input_callback(buf if live else silence)
 
         self.in_stream = self.sd.RawInputStream(samplerate=self.RATE, channels=1, dtype="int16",
                                                 blocksize=self.BLOCK, callback=on_audio, device=self.mic_dev)
@@ -488,6 +505,14 @@ class PushToTalkAudio:
         for s in (self.in_stream, self.out_stream):
             s.stop()
             s.close()
+
+    def release(self) -> None:
+        self._released_at = time.time()
+        self.talking.clear()
+
+    def level_db(self) -> float:
+        """Rough dBA from the live mic block (the same number the old one-shot sample produced)."""
+        return round(float(94 + 20 * np.log10(max(self._rms, 1e-6))), 1)
 
     def output(self, audio: bytes) -> None:
         self._out.put(audio)

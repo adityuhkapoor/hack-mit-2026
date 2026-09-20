@@ -148,7 +148,7 @@ def conversation_config(tool_ids: list[str], secret_id: str | None, use_muse: bo
         prompt |= {"llm": "gemini-2.5-flash"}
     return {"agent": {"first_message": FIRST_MESSAGE, "language": "en", "prompt": prompt},
             "tts": {"voice_id": VOICE_ID},
-            "turn": {"turn_timeout": 20}}
+            "turn": {"turn_timeout": -1}}   # push-to-talk: never nag after silence, the button decides
 
 
 def setup(use_muse: bool = True) -> str:

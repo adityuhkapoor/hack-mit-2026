@@ -42,6 +42,12 @@ ASUS.
 - **Homebrew's Python has no Tk**, so the device venv must use a uv-managed Python.
 - **On a Mac, OpenCV's first camera open only *asks* for permission and fails**; `hw.Camera` retries for 30 s
   while the prompt is up. A terminal launched from an IDE may never get the prompt — use `run-mac.command`.
+- **ALSA gives a microphone to one stream at a time.** The dB reading used to open the webcam mic with a
+  one-shot `sd.rec` while the ElevenLabs session held it (or vice versa): whichever came second failed, and
+  when the sensor won the race the agent heard only silence (`[you] ...`). The voice stream is now the one
+  owner and feeds the dB meter (`PiSensors.attach_audio`).
+- **An ElevenLabs session cannot be restarted after it closes**: `end_session` shuts the client-tools thread
+  pool. Reconnect by building a new `Conversation`. The agent's `turn_timeout` is -1 for push-to-talk.
 - **The Pi's mic and speaker are not the system defaults** (webcam mic, headphone jack). They are chosen by
   name via `NIMBUS_MIC` / `NIMBUS_SPEAKER`.
 - **X on a bare VT from SSH does not work** on the Pi. The panel runs labwc via lightdm autologin, and Nimbus
