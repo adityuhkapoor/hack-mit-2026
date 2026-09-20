@@ -25,6 +25,9 @@ import numpy as np
 
 from nimbus import sense
 
+from . import diag
+
+log = diag.get("library")
 HOME = Path(os.environ.get("NIMBUS_CAM_HOME", Path.home() / ".nimbus" / "camera"))
 INDEX = os.environ.get("NIMBUS_ES_INDEX", "nimbus-captures")
 ES_URL = os.environ.get("NIMBUS_ES_URL", "http://localhost:9200")
@@ -257,5 +260,5 @@ def open_library(prefer_elastic: bool = True):
             from . import keys
             return ElasticLibrary(api_key=keys.get("elastic"))
         except Exception as e:  # unreachable, auth, not installed
-            print(f"[library] Elasticsearch unavailable ({type(e).__name__}); using the local library")
+            diag.caught(log, "Elasticsearch unavailable; using the local library", e)
     return LocalLibrary()

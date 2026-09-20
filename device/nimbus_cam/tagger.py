@@ -17,7 +17,9 @@ from PIL import Image
 
 from nimbus import sense
 
-from . import keys
+from . import diag, keys
+
+log = diag.get("tagger")
 
 BASE_URL = os.environ.get("NIMBUS_META_URL", "https://api.meta.ai/v1")
 MODEL = os.environ.get("NIMBUS_META_MODEL", "muse-spark-1.3")
@@ -104,7 +106,7 @@ def tag(jpeg: bytes, readings: dict, dial_name: str) -> tuple[dict, str]:
             {"type": "image_url", "image_url": {"url": _data_url(jpeg)}}]}])
         out = parse(r.choices[0].message.content or "")
     except Exception as e:  # network, auth, model, bad JSON: never lose the photo over a tag
-        print(f"[tagger] Muse unavailable ({type(e).__name__}: {str(e)[:120]}); tagging from readings")
+        diag.caught(log, "Muse unavailable; tagging from readings", e)
         return fallback, "readings"
     out["tags"] = list(dict.fromkeys(out["tags"] + fallback["tags"]))   # keep the measured air searchable
     return out, "muse"
@@ -142,7 +144,7 @@ def souvenir(jpeg: bytes) -> dict:
         m = _re.search(r"\{.*\}", r.choices[0].message.content or "", _re.S)
         d = _json.loads(m.group(0))
     except Exception as e:
-        print(f"[souvenir] Muse unavailable ({type(e).__name__}); plain card")
+        diag.caught(log, "Muse unavailable; plain card", e)
         return fallback
     pal = [p for p in (d.get("palette") or []) if isinstance(p, str) and p.startswith("#")][:2]
     return {"kind": str(d.get("kind") or fallback["kind"])[:40],
