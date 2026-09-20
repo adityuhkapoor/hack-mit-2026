@@ -135,7 +135,7 @@ class Screen:
         }
 
     def _screen_buttons(self) -> list[Button]:
-        if self.skin.splashing(time.time()):
+        if self.skin.splashing(time.time()) or self.skin.covered():
             return []
         st = self.app.state
         return self.buttons.get("review" if st.screen in ("review", "browse") else st.screen, [])

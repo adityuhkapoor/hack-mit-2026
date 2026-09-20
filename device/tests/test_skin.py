@@ -110,13 +110,70 @@ def test_mode_change_starts_an_animation_and_the_pill_changes_colour():
     assert (mid != end).any()                                      # it moved in between
 
 
-def test_busy_overlay_blurs_the_feed_and_the_progress_bar_advances():
+def run(sk, ctx, start, seconds, step=0.05):
+    """Frames the way the screen makes them, so time-based animations advance."""
+    t, img = start, None
+    while t < start + seconds:
+        t += step
+        img = sk.frame(ctx(BASE + t))
+    return t, img
+
+
+def test_loading_closes_a_curtain_of_clouds_over_the_whole_screen_and_opens_it_again():
     st = state(busy="Making a school detention slip")
-    sk, early, ctx = scene(st, 0.5)
-    late = sk.frame(ctx(BASE + 12))
-    row = lambda im: np.asarray(im)[351, 265:765]
-    lime = lambda im: int((np.abs(row(im).astype(int) - np.array(skin.LIME)).sum(-1) < 40).sum())
-    assert lime(late) > lime(early) + 40
+    sk, _, ctx = scene(st, 0.1)
+    t, closed = run(sk, ctx, 0.1, 2.6)
+    a = np.asarray(closed)
+    assert sk.cur == 1.0 and sk.covered()
+    bar = a[skin.BAR_Y + 3:].astype(int)
+    assert (bar[..., 2] > bar[..., 0] + 40).mean() > 0.2                        # even the button bar is under sky and clouds
+    assert (np.abs(a.astype(int) - np.array(skin.LIME)).sum(-1) < 40).mean() < 0.05  # no progress bar, no lime bar
+    seen = False
+    for k in range(10):                                                         # the mascot's eyes (it blinks now and then)
+        a = np.asarray(sk.frame(ctx(BASE + t + 0.1 * k)))
+        seen |= bool((np.abs(a[225:285, 440:600].astype(int) - np.array(skin.SLATE)).sum(-1) < 30).any())
+    assert seen
+    st.busy = ""
+    t, opened = run(sk, ctx, t + 1.0, 1.2)
+    a = np.asarray(opened)
+    assert sk.cur == 0.0 and not sk.covered()
+    assert (a[skin.BAR_Y + 3:, 3:12] == 255).all()                              # the bar is back
+
+
+def test_the_iris_opens_from_the_centre_and_the_label_is_kept_while_it_does():
+    st = state(busy="Looking it up")
+    sk, _, ctx = scene(st, 0.1)
+    t, _ = run(sk, ctx, 0.1, 2.8)
+    st.busy = ""
+    t, early = run(sk, ctx, t, 0.35)
+    early = np.asarray(early)
+    assert 0 < sk.cur < 1
+    assert abs(int(early[300, 512, 0]) - 200) < 40                              # the scene shows through at the centre
+    assert sk.busy_label == "Looking it up"
+
+
+def test_a_very_short_load_still_closes_and_reopens_smoothly():
+    st = state(busy="Looking it up")
+    sk, _, ctx = scene(st, 0.1)
+    t, _ = run(sk, ctx, 0.1, 0.2)
+    st.busy = ""                                                                # done almost at once
+    t, _ = run(sk, ctx, t, 0.4)
+    assert sk.cur > 0.3                                                         # it keeps closing, it does not flicker
+    t, _ = run(sk, ctx, t, 3.0)
+    assert sk.cur == 0.0
+
+
+def test_poking_the_curtain_wobbles_the_clouds():
+    st = state(busy="Looking it up")
+    sk, _, ctx = scene(st, 0.1)
+    t, _ = run(sk, ctx, 0.1, 2.6)
+    sk.touch(300, 300, None, BASE + t)
+    assert len(sk.pokes) == 1
+    a = np.asarray(sk.frame(ctx(BASE + t + 0.12)))
+    b = np.asarray(sk.frame(ctx(BASE + t + 0.12)))                              # same instant, with and without the poke
+    sk.pokes = []
+    c = np.asarray(sk.frame(ctx(BASE + t + 0.12)))
+    assert (a != c).any()
 
 
 def test_a_toast_slides_in_and_leaves():

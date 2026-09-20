@@ -299,6 +299,45 @@ def wrap(text: str, size: float, weight: str, maxw: int, lines: int, track: floa
     return out
 
 
+EASE_IN = _bezier(.5, 0, .9, .6)
+PALE = (0xB7, 0xE6, 0xFF)
+CURTAIN_DM = 0.6                          # how far apart in time the curtain's clouds arrive and leave
+
+
+@lru_cache(maxsize=48)
+def cloud_sh(w: int, color: tuple) -> Image.Image:
+    """A flat cloud with the site's offset blue shadow."""
+    c = cloud(w, color)
+    out = Image.new("RGBA", (c.width + 8, c.height + 10), (0, 0, 0, 0))
+    sh = Image.new("RGBA", c.size, (0x4A, 0xA5, 0xE0, 200))
+    sh.putalpha(c.getchannel("A").point(lambda v: int(v * 0.8)))
+    out.paste(sh, (5, 8), sh)
+    out.paste(c, (0, 0), c)
+    return out
+
+
+@lru_cache(maxsize=32)
+def star(d: int, color: tuple = WHITE) -> Image.Image:
+    big = Image.new("RGBA", (d * SS, d * SS), (0, 0, 0, 0))
+    c, r, n = d * SS / 2, d * SS / 2, 0.16
+    pts = [(0, -1), (n, -n), (1, 0), (n, n), (0, 1), (-n, n), (-1, 0), (-n, -n)]
+    ImageDraw.Draw(big).polygon([(c + x * r, c + y * r) for x, y in pts], fill=color + (255,))
+    return big.resize((d, d), Image.BOX)
+
+
+@lru_cache(maxsize=8)
+def smile(w: int) -> Image.Image:
+    big = Image.new("RGBA", (w * SS, w * SS // 2), (0, 0, 0, 0))
+    ImageDraw.Draw(big).arc([SS * 3, -w * SS // 2 + SS * 3, w * SS - SS * 3, w * SS // 2 - SS * 3], 20, 160,
+                            fill=SLATE + (255,), width=SS * 4)
+    return big.resize((w, w // 2), Image.BOX)
+
+
+def smooth(x: float) -> float:
+    x = clamp(x)
+    return x * x * (3 - 2 * x)
+
+
 # ------------------------------------------------------------------ the skin
 
 CLOUDS = [  # colour, width, top, drift seconds, phase seconds, opacity
@@ -339,7 +378,11 @@ class Skin:
         self.dots_w = [38.0, 14.0]
         self.last_now = 0.0
         self._sprite_cache: dict = {}
-        self._blur, self._blur_t, self._blur_for = None, 0.0, ""
+        self.cur, self.cur_t, self.cur_dir, self.min_until, self.was_busy = 0.0, 0.0, 0, 0.0, False
+        self.pokes: list[tuple] = []
+        self.cl = self._curtain_layout()
+        self._cbg, self._dist = None, None
+        self.busy_label = "One moment"
 
     # ------------------------------------------------------------ assets
 
@@ -370,8 +413,14 @@ class Skin:
 
     # ------------------------------------------------------------ input hooks
 
+    def covered(self) -> bool:
+        """True while the cloud curtain hides the screen: the buttons under it are not there to press."""
+        return self.cur > 0.6
+
     def touch(self, x: float, y: float, key: str | None, now: float) -> None:
         self.puffs.append((x, y, now))
+        if self.cur > 0.3:
+            self.pokes = (self.pokes + [(x, y, now)])[-4:]
         if key:
             self.ripples.append({"key": key, "x": x, "y": y, "t0": now})
         elif self.prev.get("screen") == "viewfinder" and 58 <= y <= 462:
@@ -448,42 +497,41 @@ class Skin:
         now = ctx.now
         self._track(ctx, now)
         st, g = ctx.st, self.group
-        img = self.sky.copy()
-        self._clouds(img, now)
-        splash = now - self.t_start < 2.7 and not getattr(ctx, "no_splash", False)
-        if splash:
+        if now - self.t_start < 2.7 and not getattr(ctx, "no_splash", False):
+            img = self.sky.copy()
+            self._clouds(img, now)
             self._splash(img, now)
-            return self._finish(img, now, ctx, splash=True)
-
-        if g == "viewfinder":
-            self._viewfinder(img, ctx, now)
-        else:
-            self._wave_layers(img, now)
-        if g == "review":
-            self._review(img, ctx, now)
-        elif g == "qr":
-            self._qr(img, ctx, now)
-        elif g == "shop":
-            self._shop(img, ctx, now)
-        return self._finish(img, now, ctx)
-
-    def _finish(self, img, now, ctx, splash=False):
-        st = ctx.st
-        if not splash:
-            if self.group == "viewfinder":
+            self._particles(img, now)
+            self._puffs(img, now)
+            return img
+        self._curtain_step(st, now)
+        img = self.sky.copy()
+        if self.cur < 0.985:                                # fully behind the clouds, the scene is not drawn at all
+            self._clouds(img, now)
+            if g == "viewfinder":
+                self._viewfinder(img, ctx, now)
+            else:
+                self._wave_layers(img, now)
+            if g == "review":
+                self._review(img, ctx, now)
+            elif g == "qr":
+                self._qr(img, ctx, now)
+            elif g == "shop":
+                self._shop(img, ctx, now)
+            if g == "viewfinder":
                 self._ticker(img, ctx, now)
-            if st.busy:
-                self._busy(img, ctx, now)
             if st.paying_since:
                 self._paying(img, ctx, now)
             self._bar(img, ctx, now)
-            if st.talking:
-                self._talkdot(img, now)
-            self._toast(img, now)
-            fl = now - self.anim.get("flash_t0", -9)
-            if 0 <= fl < 0.55 and self.group == "viewfinder":
-                sp = Image.new("RGBA", img.size, (255, 255, 255, int(242 * (1 - fl / 0.55))))
-                img.paste(sp, (0, 0), sp)
+        if self.cur > 0:
+            self._curtain(img, ctx, now)
+        if st.talking:
+            self._talkdot(img, now)
+        self._toast(img, now)
+        fl = now - self.anim.get("flash_t0", -9)
+        if 0 <= fl < 0.55 and g == "viewfinder":
+            sp = Image.new("RGBA", img.size, (255, 255, 255, int(242 * (1 - fl / 0.55))))
+            img.paste(sp, (0, 0), sp)
         self._particles(img, now)
         self._puffs(img, now)
         return img
@@ -809,53 +857,145 @@ class Skin:
             blit(img, disc(d, q["color"] + (255,)), q["x"] + q["vx"] * e - d / 2, q["y"] + q["vy"] * e - d / 2, 1 - p)
         self.particles = keep
 
-    # ------------------------------------------------------------ busy overlay
+    # ------------------------------------------------------------ the cloud curtain (loading)
 
-    def _busy(self, img, ctx, now):
+    @staticmethod
+    def _curtain_layout() -> list[dict]:
+        """The clouds that close over the screen: where each rests, which way it comes from, and when."""
+        rnd = random.Random(11)
+        spots = [(130, 30, 340, WHITE), (420, 10, 300, WHITE), (700, 20, 340, WHITE), (960, 40, 320, WHITE),
+                 (100, 580, 340, WHITE), (380, 600, 320, WHITE), (650, 585, 340, WHITE), (930, 590, 320, WHITE),
+                 (-30, 300, 300, WHITE), (1050, 300, 300, WHITE), (250, 190, 300, WHITE), (780, 180, 300, WHITE),
+                 (230, 430, 300, WHITE), (800, 440, 300, WHITE), (150, 300, 200, PINK), (880, 320, 180, LIME),
+                 (512, 120, 240, PALE), (512, 490, 240, PALE)]
+        out = []
+        for x, y, w, color in spots:
+            dx, dy = x - 512, y - 300
+            d = math.hypot(dx, dy) or 1.0
+            out.append(dict(x=x, y=y, w=w, color=color, ux=dx / d, uy=dy / d,
+                            delay=CURTAIN_DM * (1 - clamp(d / 640)) + rnd.uniform(0, 0.06),
+                            ph=rnd.uniform(0, math.tau), ph2=rnd.uniform(0, math.tau), amp=rnd.uniform(6, 12)))
+        return sorted(out, key=lambda c: (c["color"] == WHITE, -c["w"]))
+
+    def _curtain_step(self, st, now: float) -> None:
+        if st.busy and not self.was_busy:
+            self.min_until = now + 2.0                       # closes (1.25 s), lives a moment, then may open
+        self.was_busy = bool(st.busy)
+        if st.busy:
+            self.busy_label = st.busy.replace("…", "").strip()
+        target = 1.0 if (st.busy or now < self.min_until) else 0.0
+        dt = clamp(now - self.cur_t, 0.0, 0.1)
+        self.cur_t = now
+        if target > self.cur:
+            self.cur, self.cur_dir = min(target, self.cur + dt / 1.25), 1
+        elif target < self.cur:
+            self.cur, self.cur_dir = max(target, self.cur - dt / 0.9), -1
+
+    def _curtain_backdrop(self, now: float) -> Image.Image:
+        if self._cbg is None:
+            top, bot = np.array((0x62, 0xBF, 0xF6), float), np.array((0x86, 0xD1, 0xFB), float)
+            t = np.linspace(0, 1, H + 80)[:, None, None]
+            bg = Image.fromarray(np.repeat((top * (1 - t) + bot * t).astype(np.uint8), W + 80, axis=1), "RGB")
+            rnd = random.Random(5)
+            for gx in range(-1, 6):
+                for gy in range(-1, 4):
+                    w = rnd.choice([360, 420, 480])
+                    sp = cloud_sh(w, PALE if (gx + gy) % 2 else WHITE)
+                    bg.paste(sp, (int(gx * 230 + rnd.uniform(-40, 40)), int(gy * 190 + rnd.uniform(-30, 30))), sp)
+            self._cbg = bg
+        ox = int(40 + 26 * math.sin(now * 0.35))
+        oy = int(40 + 12 * math.sin(now * 0.5 + 1))
+        return self._cbg.crop((ox, oy, ox + W, oy + H))
+
+    def _curtain(self, img, ctx, now):
         st = ctx.st
-        t0 = self.anim.get("busy_t0", now)
-        elapsed = now - t0
-        expected = next((v for k, v in ctx.expected.items() if st.busy.startswith(k)), 30.0)
-        frac = min(0.96, 1 - math.exp(-elapsed / (expected * 0.55)))
-        region = img.crop((0, 0, W, BAR_Y))
-        if self._blur is None or now - self._blur_t > 0.25 or not st.busy == self._blur_for:
-            small = cv2.resize(np.asarray(region), (W // 6, BAR_Y // 6), interpolation=cv2.INTER_AREA)
-            small = cv2.GaussianBlur(small, (0, 0), 2.2)
-            blur = Image.fromarray(cv2.resize(small, (W, BAR_Y), interpolation=cv2.INTER_LINEAR))
-            self._blur, self._blur_t, self._blur_for = Image.blend(blur, Image.new("RGB", blur.size, SKY), 0.66), now, st.busy
-        k = clamp(elapsed / 0.35)
-        img.paste(self._blur if k >= 1 else Image.blend(region, self._blur, k), (0, 0))
-        # a ring of cloud dots
-        cx, cy, r = 512, 200, 66
-        for i in range(8):
-            ang = now * math.tau / 2.6 + i * math.pi / 4
-            sz = 10 + 13 * ((i + 1) / 8)
-            col = SKY_3 if i <= 4 else (PINK if i % 2 else WHITE)
-            dsp = disc(int(sz * 2), col + (255,), SLATE + (255,), 3)
-            blit(img, dsp, cx + r * math.cos(ang) - sz, cy + r * math.sin(ang) - sz)
-        label = st.busy if st.busy.startswith("Making") else f"{st.busy}…"
-        label = label.replace("…", "").strip()
-        lw = text_width(label, 30, "ExtraBold", -0.6)
-        x0 = (W - lw - 36) // 2
-        blit_text(img, label, x0, 288 + 26, 30, "ExtraBold", SLATE, track=-0.6)
-        blit_text(img, "." * (int(elapsed * 2.5) % 4), x0 + lw + 2, 288 + 26, 30, "ExtraBold", SLATE, track=-0.6)
-        bx, by, bw, bh = 262, 340, 500, 22
-        img.paste(rrect(bw, bh, 11, (255, 255, 255, 153), SLATE + (255,), 3), (bx, by),
-                  rrect(bw, bh, 11, (255, 255, 255, 153), SLATE + (255,), 3))
-        fw = max(2, int(bw * frac) - 6)
-        fill = Image.new("RGBA", (fw, bh - 6), LIME + (255,))
-        stripes = ImageDraw.Draw(fill)
-        off = int(now * 28) % 20
-        for sx in range(-40, fw + 40, 20):
-            stripes.polygon([(sx + off, bh - 6), (sx + off + 10, bh - 6), (sx + off + 10 + 12, 0), (sx + off + 12, 0)],
-                            fill=(27, 49, 57, 36))
-        fill.putalpha(ImageChops.multiply(fill.getchannel("A"), mask_rrect(fw, bh - 6, 8)))
-        img.paste(fill, (bx + 3, by + 3), fill)
-        head = cloud(46, WHITE)
-        sh = cloud(46, (27, 49, 57))
-        blit(img, sh, bx + fw - 18, by - 16 + 3, 0.35)
-        blit(img, head, bx + fw - 18, by - 19)
-        text_mid(img, f"{int(frac * 100)}%  ·  about {max(1, int(expected - elapsed))} s to go", 512, 384, 16, "Bold", SLATE)
+        cur, E = self.cur, (POP if self.cur_dir >= 0 else EASE_IN)
+        c = smooth((cur - 0.12) / 0.78)                      # how much of the sky is closed, as an iris on the centre
+        bg = self._curtain_backdrop(now)
+        if c >= 0.999:
+            img.paste(bg, (0, 0))
+        elif c > 0.001:
+            if self._dist is None:                          # the iris is worked out at half size, then scaled up
+                yy, xx = np.mgrid[0:H // 2, 0:W // 2].astype(np.float32)
+                self._dist = np.hypot(xx * 2 - 512, yy * 2 - 300)
+            m = np.clip((self._dist - (1 - c) * 700) * (1 / 70) + 0.5, 0, 1)
+            img.paste(bg, (0, 0), Image.fromarray((m * 255).astype(np.uint8), "L").resize((W, H), Image.BILINEAR))
+        pokes = [q for q in self.pokes if now - q[2] < 1.2]
+        self.pokes = pokes
+
+        def poke(x, y):
+            dx = dy = 0.0
+            for px, py, t0 in pokes:
+                d = math.hypot(x - px, y - py)
+                if d < 340:
+                    age = now - t0
+                    amp = 24 * (1 - d / 340) * math.exp(-age * 3.2) * math.sin(age * 15)
+                    dx += (x - px) / (d or 1) * amp
+                    dy += (y - py) / (d or 1) * amp
+            return dx, dy
+        for c in self.cl:
+            p = clamp(cur * (1 + CURTAIN_DM) - c["delay"])
+            f = 1 - E(p)
+            x = c["x"] + c["ux"] * 720 * f + 10 * math.sin(now * 0.6 + c["ph2"])
+            y = c["y"] + c["uy"] * 720 * f + c["amp"] * math.sin(now * 0.95 + c["ph"])
+            pdx, pdy = poke(x, y)
+            sp = cloud_sh(c["w"], c["color"])
+            px_, py_ = x + pdx - sp.width / 2, y + pdy - sp.height / 2
+            if px_ > W or py_ > H or px_ + sp.width < 0 or py_ + sp.height < 0:
+                continue
+            blit(img, sp, px_, py_)
+        hs = E(clamp((cur - 0.5) / 0.45))                    # the cloud mascot: last in, first out
+        if hs > 0.02:
+            self._hero(img, st, now, hs, poke)
+
+    def _hero(self, img, st, now, hs, poke):
+        base = cloud_sh(380, WHITE)
+        bob = math.sin(now * 1.6)
+        sx, sy = hs * (1 + 0.035 * bob), hs * (1 - 0.035 * bob)
+        hero = base.resize((max(2, int(base.width * sx)), max(2, int(base.height * sy))), Image.BILINEAR)
+        cx, cy = 512, 225 + 9 * bob
+        pdx, pdy = poke(cx, cy)
+        cx, cy = cx + pdx, cy + pdy
+        hx, hy = cx - hero.width / 2, cy - hero.height / 2
+        blit(img, hero, hx, hy)
+        k = hs * 380 / 200                                   # symbol units to px
+        # the face: two eyes that look around and blink, a smile, rosy cheeks
+        look = (math.sin(now * 0.55) * 4 * hs, math.sin(now * 0.37 + 1) * 2.5 * hs)
+        blink = (now + 1.3) % 3.4 < 0.16
+        ey = cy + 0.13 * hero.height + look[1]
+        for ex in (-40 * k / 1.0 * 0.95, 40 * k / 1.0 * 0.95):
+            x = cx + ex + look[0]
+            if blink:
+                eye = rrect(max(4, int(20 * hs)), max(2, int(4 * hs)), 2, SLATE + (255,))
+                blit(img, eye, x - eye.width / 2, ey - eye.height / 2 + 4 * hs)
+            else:
+                eye = rrect(max(4, int(17 * hs)), max(4, int(26 * hs)), max(2, int(8 * hs)), SLATE + (255,))
+                blit(img, eye, x - eye.width / 2, ey - eye.height / 2)
+                gl = disc(max(2, int(6 * hs)), WHITE + (255,))
+                blit(img, gl, x - eye.width / 2 + 8 * hs + look[0] * 0.3, ey - eye.height / 2 + 3 * hs)
+        for ex in (-58 * hs * 1.6, 58 * hs * 1.6):
+            blit(img, disc(max(4, int(22 * hs)), (255, 158, 198, 150)), cx + ex - 11 * hs, ey + 12 * hs)
+        sm = smile(max(6, int(34 * hs)))
+        blit(img, sm, cx - sm.width / 2, ey + 8 * hs + (1 - 1) * 0)
+        # sparkles and small clouds drifting through
+        for i, (fx, fy, d, col) in enumerate(((120, 90, 20, WHITE), (900, 110, 26, LIME), (250, 520, 18, WHITE),
+                                              (820, 500, 22, WHITE), (60, 300, 14, LIME), (960, 330, 16, WHITE),
+                                              (640, 60, 14, WHITE), (400, 555, 16, LIME))):
+            tw = 0.5 + 0.5 * abs(math.sin(now * 2.1 + i * 1.7))
+            dd = max(4, int(d * (0.5 + tw)))
+            blit(img, star(dd, col).rotate(now * 25 + i * 30, Image.BICUBIC), fx - dd / 2 + 6 * math.sin(now + i),
+                 fy - dd / 2 + 6 * math.cos(now * 0.8 + i), hs * (0.4 + 0.6 * tw))
+        for i, (spd, y0, w, col) in enumerate(((60, 150, 110, PINK), (85, 400, 84, LIME), (45, 300, 96, WHITE))):
+            x = 1150 - ((now * spd + i * 380) % 1400)
+            blit(img, cloud_sh(w, col), x, y0 + 12 * math.sin(now * 1.3 + i), hs)
+        label = self.busy_label
+        dots = "." * (int(now * 2.5) % 4)
+        lw = text_width(label + "...", 24, "ExtraBold", -0.48) + 56
+        pill = Image.new("RGBA", (lw + 8, 62), (0, 0, 0, 0))
+        pill.paste(rrect(lw, 46, 23, SLATE + (255,)), (4, 6), rrect(lw, 46, 23, SLATE + (255,)))
+        pill.paste(rrect(lw, 46, 23, WHITE + (255,), SLATE + (255,), 3), (0, 0), rrect(lw, 46, 23, WHITE + (255,), SLATE + (255,), 3))
+        blit_text(pill, label + dots, 28, 23 + cap_height(24, "ExtraBold") / 2, 24, "ExtraBold", SLATE, track=-0.48)
+        blit(img, pill, 512 - lw / 2, 405 + (1 - POP(hs)) * 60, hs)
 
     # ------------------------------------------------------------ review
 
