@@ -1,0 +1,13 @@
+[Unit]
+Description=Nimbus camera API and library tunnel to ASUS
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+User=raspi4
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/raspi4/.ssh/nimbus_asus_known_hosts -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=15 -i /home/raspi4/.ssh/nimbus_asus_tunnel -L 127.0.0.1:18000:127.0.0.1:8000 -L 127.0.0.1:19200:127.0.0.1:9200 asus@100.90.82.31
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
