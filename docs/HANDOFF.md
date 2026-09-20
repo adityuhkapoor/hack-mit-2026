@@ -1,4 +1,4 @@
-# Nimbus — handoff, 19 Sep 2026, 22:30 ET
+# Nimbus — handoff, 20 Sep 2026, 01:10 ET
 
 Written for whoever picks this up next: a teammate, or a fresh agent session. It says what exists, what is
 running where, what is still open, and how to get in. Design and rationale live in [DESIGN.md](DESIGN.md);
@@ -75,10 +75,21 @@ the rig by voice.
 - **Instagram**: posting as **@arunningaround**, token verified.
 - **Souvenir**: Muse saw daisies, chose a seed packet, and produced "WILD DAISY MIX — sunshine you can plant".
 
+## What's next (agreed 20 Sep, 01:00)
+
+1. **More AI Camera testing** on the rig — different subjects and formats on klein 9B; watch for extra
+   people and text; the camera is in portrait (`NIMBUS_ROTATE=270`).
+2. **UI/UX polish** — the loading ring/progress bar is in; review screen, gallery flow and the shop screen
+   need a pass with the touch panel in hand.
+3. **Visa shopping experience** — the flow works (identify → offers → real sandbox approval); make it feel
+   like shopping: product image, offer choice, a receipt screen worth photographing, voice confirmation.
+
 ## Not done
 
 1. **Three button pins unnamed** (see above) — a one-line env change once Arun presses them.
-2. **Voice untested by voice** on the rig: the session connects and the devices are right, but nobody has held
+2. **Sharing goes through the public server**: POST and the QR mirror the photo to `nimbus.akvaithi.page`
+   (the Windows box) because Instagram cannot fetch from the hotspot; if that box is down, posting fails.
+3. **Voice untested by voice** on the rig: the session connects and the devices are right, but nobody has held
    the button and spoken yet. A speaker must be in the Pi's 3.5 mm jack.
 3. **The ASUS has no sudo for this user**, so ComfyUI, the API and Elasticsearch restart from a user `@reboot`
    crontab rather than systemd. Good enough for the event; check `~/start_all.sh` if something is missing after
