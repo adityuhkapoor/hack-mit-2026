@@ -169,3 +169,74 @@ def test_shop_labels_and_simulated_checkout():
     r = shop.SimulatedVisa().charge(shop.Offer("Target", "t", "https://target.com", 2.79), 2.79)
     assert r.approved and r.network == "simulated Visa" and "no money" in r.message
     assert shop._json('noise {"offers": []} more') == {"offers": []}
+
+
+def _print_rig(tmp_path, monkeypatch, handler):
+    import httpx
+
+    from nimbus_cam import app as appmod
+    monkeypatch.setattr(appmod, "HOME", tmp_path)
+    monkeypatch.setattr(appmod, "PRINT_TOKEN", "")
+    monkeypatch.setattr(appmod, "PRINT_MEDIA", None)
+    lib = LocalLibrary(tmp_path / "lib.sqlite")
+    shot = photo("abc123", "2026-09-19T15:00:00-04:00", 20, 50)
+    shot.photo_url = "http://box:8000/captures/abc123/photo.jpg"
+    lib.add(shot)
+    lib.add(photo("cam1", "2026-09-19T15:05:00-04:00", 20, 50))   # taken offline: no photo_url
+    a = appmod.CameraApp(FakeSensors(), None, lib, api="http://box:8000")
+    a.http = httpx.Client(transport=httpx.MockTransport(handler))
+    return appmod, a
+
+
+def test_print_photo(tmp_path, monkeypatch):
+    import httpx
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(200, json={"job": "Epson_XP4200-7"})
+    appmod, a = _print_rig(tmp_path, monkeypatch, handler)
+    assert a.print_photo({"photo": "abc123"}) == {"printing": True, "what": "photo", "job": "Epson_XP4200-7"}
+    (req,) = seen
+    assert req.method == "POST" and req.url.path == "/captures/abc123/print"
+    assert dict(req.url.params) == {"which": "photo", "size": "4x6"} and "x-print-token" not in req.headers
+    monkeypatch.setattr(appmod, "PRINT_TOKEN", "s3cret")
+    monkeypatch.setattr(appmod, "PRINT_MEDIA", "PhotographicGlossy")
+    assert a.print_photo({"photo": "abc123", "what": "card"})["what"] == "card"
+    assert seen[-1].headers["x-print-token"] == "s3cret"
+    assert dict(seen[-1].url.params) == {"which": "card", "size": "4x6", "media_type": "PhotographicGlossy"}
+    assert "print_photo" in appmod.CameraApp.TOOLS
+
+
+def test_print_photo_says_why_not(tmp_path, monkeypatch):
+    import httpx
+
+    def refuse(req):
+        return httpx.Response(503, json={"detail": "printing is not enabled on this server"})
+    _, a = _print_rig(tmp_path, monkeypatch, refuse)
+    assert "not enabled" in a.print_photo({"photo": "abc123"})["error"]
+    assert "only exists on the camera" in a.print_photo({"photo": "cam1"})["error"]   # never asks the server
+
+    def down(req):
+        raise httpx.ConnectError("no route")
+    _, a = _print_rig(tmp_path, monkeypatch, down)
+    assert "could not reach" in a.print_photo({"photo": "abc123"})["error"]
+
+
+def test_review_screen_has_a_print_button_and_the_row_does_not_overlap():
+    from types import SimpleNamespace
+
+    from nimbus_cam import ui
+    printed = []
+    app = SimpleNamespace(print_photo=lambda p=None: printed.append(p), show_photo=lambda p=None: None,
+                          send_to_phone=lambda p=None: None, post_instagram=lambda p=None: None,
+                          identify_product=lambda p=None: None, take_photo=lambda p=None: None,
+                          buy_it=lambda p=None: None)
+    stub = SimpleNamespace(app=app, _bg=lambda fn, arg: fn(arg), _dial=lambda n: None)
+    row = ui.Screen._make_buttons(stub)["review"]
+    assert [b.key for b in row] == ["back", "prev", "next", "phone", "print", "post", "shop", "talk"]
+    for a, b in zip(row, row[1:]):
+        assert a.x1 <= b.x0 and a.x0 < a.x1                       # side by side, none over another
+    assert row[-1].x1 <= 1.0
+    next(b for b in row if b.key == "print").action()
+    assert printed == [{}]

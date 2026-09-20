@@ -23,7 +23,7 @@ app.yaml            Arduino App Lab app manifest
 | 0.96 in. OLED (SSD1306) | I2C | dial position, live readings, the proof after a shot |
 | Raspberry Pi HQ Camera (via a MIPI-CSI carrier) or a USB webcam | | the picture |
 
-Wind and cloud cover come from the web (Open-Meteo), not a sensor. There is no printer: the card is posted and
+Wind and cloud cover come from the web (Open-Meteo), not a sensor. Prints go to the GPU box's Epson (`POST /captures/{id}/print`, see docs/API.md); the card is also posted and
 shown in the gallery.
 
 The sketch still targets Modulinos. Once the parts are confirmed, only the drivers change. The Bridge contract
@@ -103,7 +103,7 @@ uv run python -m nimbus_cam --mac                # screen + voice + webcam + sim
 | Tools only, no screen: a test script | `--script "fog; take_photo; wait; search_photos query=fog"` |
 | Skip Elasticsearch | `--local-library` |
 
-Keys: ←/→ mode · space shutter · **hold T to talk** · ↑/↓ browse · P send to phone (QR code) · I post to Instagram ·
+Keys: ←/→ mode · space shutter · **hold T to talk** · ↑/↓ browse · P send to phone (QR code) · I post to Instagram · R print (or the PRINT button on the photo screen) ·
 Esc viewfinder · F/H simulated fog/heat.
 
 Keys are read from the macOS Keychain, never from files. On the UNO Q, use environment variables instead.

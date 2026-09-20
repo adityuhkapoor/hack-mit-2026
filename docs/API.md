@@ -295,3 +295,29 @@ Both return the capture's metadata: `id`, `dial_used`, `untouched`, `proof`, `re
 | `/captures/{id}/mask.jpg` | what the AI was allowed to touch, tinted |
 | `/captures` | newest-first list for the gallery |
 | `/c/{id}` | short link on the card's QR code → the gallery page for that capture |
+
+## Printing
+
+Off unless the server is started with `NIMBUS_PRINTER=<CUPS queue>` (the GPU box uses `Epson_XP4200`, an XP-4200 on
+USB via `ipp-usb`). Optional: `NIMBUS_PRINT_TOKEN` (callers must send it as `X-Print-Token`) and
+`NIMBUS_PRINTS_PER_MIN` (default 6 per client address).
+
+`POST /captures/{id}/print` — query parameters, all optional: `which` (`photo` default, or `card`), `size`
+(`3.5x5 4x6 5x7 8x10 A4 A6 Letter Legal`, default `4x6`), `borderless` (default `true`; not for A6 or Legal),
+`media_type` (`Photographic`, `PhotographicGlossy`, `PhotographicHighGloss`, `PhotographicSemiGloss`,
+`PhotographicMatte`, `Stationery`, `StationeryCoated`; omit for the printer's own setting), `scaling` (`fit` keeps
+the whole picture, `fill` crops to cover the paper), `copies` (1–3). Returns once CUPS has the job:
+`{"capture", "which", "queue", "job", "size", "borderless", "media_type", "scaling", "copies"}`. Errors: 400 bad
+option, 401 wrong token, 404 no such capture, 429 too many prints, 502 CUPS refused the job, 503 printing is not
+enabled here or CUPS is unavailable.
+
+`GET /printer` — `{"enabled": false, …}`, or the queue's `state` (`idle` / `printing`) and `ready`. Never prints.
+
+The camera's `NIMBUS_API` must point at the server that owns the printer. `NIMBUS_PRINT_SIZE`,
+`NIMBUS_PRINT_MEDIA` and `NIMBUS_PRINT_TOKEN` set what the camera sends.
+
+`layout` (default `polaroid4`, 4x6 only): four identical upright polaroids on one sheet, inside a 0.2 in white margin,
+each with the HackMIT logo centred on its thick end. The frame is a fixed template
+(`nimbus/data/polaroid_frame.png`, built once by `scripts/build_polaroid_template.py` from
+`nimbus/data/hackmit_caption.png`); nothing is generated per print. `layout=single` prints the picture as it is.
+`NIMBUS_PRINT_MEDIA` (e.g. `PhotographicSemiGloss`) sets the paper type when a request does not.

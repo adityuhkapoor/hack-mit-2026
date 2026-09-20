@@ -29,6 +29,10 @@ AI_CAMERA, VISA_BUY = 0, 1
 DIALS = {AI_CAMERA: "AI Camera", VISA_BUY: "Visa Buy"}
 # A copy of each shared photo goes here so Instagram and phones off our network can fetch it.
 PUBLIC_API = os.environ.get("NIMBUS_PUBLIC_API", "https://nimbus.akvaithi.page").rstrip("/")
+# Printing happens on the GPU box (its Epson XP-4200); NIMBUS_API must point at that box's API for it to work.
+PRINT_TOKEN = os.environ.get("NIMBUS_PRINT_TOKEN", "")
+PRINT_SIZE = os.environ.get("NIMBUS_PRINT_SIZE", "4x6")
+PRINT_MEDIA = os.environ.get("NIMBUS_PRINT_MEDIA") or None   # e.g. PhotographicGlossy; unset = the printer's setting
 
 
 def _now_iso() -> str:
@@ -292,8 +296,33 @@ class CameraApp:
                 "merchant": offer.merchant, "card": f"Visa ending {receipt.last4}", "network": receipt.network,
                 "auth_code": receipt.auth_code, "note": receipt.message, "link_on_screen": offer.url}
 
+    def print_photo(self, p: dict | None = None) -> dict:
+        """Ask the GPU box to print the photo (or, with what="card", its QR card) on its Epson."""
+        photo = self._resolve((p or {}).get("photo"))
+        if photo is None:
+            return {"error": "no photo to print"}
+        if not photo.photo_url:
+            return {"error": "this photo only exists on the camera (the server was offline), so it cannot be printed"}
+        what = "card" if str((p or {}).get("what", "")).lower() == "card" else "photo"
+        params = {"which": what, "size": PRINT_SIZE}
+        if PRINT_MEDIA:
+            params["media_type"] = PRINT_MEDIA
+        headers = {"X-Print-Token": PRINT_TOKEN} if PRINT_TOKEN else {}
+        try:
+            r = self.http.post(f"{self.api}/captures/{photo.id}/print", params=params, headers=headers, timeout=20)
+        except httpx.HTTPError as e:
+            return {"error": f"could not reach the print server ({type(e).__name__})"}
+        if r.status_code != 200:
+            try:
+                detail = r.json().get("detail", r.text)
+            except ValueError:
+                detail = r.text
+            return {"error": f"the printer refused it: {str(detail)[:160]}"}
+        self.say("Printing")
+        return {"printing": True, "what": what, "job": r.json().get("job")}
+
     TOOLS = ("take_photo", "set_mode", "read_air", "search_photos", "photo_details", "show_photo",
-             "send_to_phone", "post_instagram", "identify_product", "buy_it")
+             "send_to_phone", "post_instagram", "identify_product", "buy_it", "print_photo")
 
     # -----------------------------------------------------------------------------------------
     # capture, storage, tagging

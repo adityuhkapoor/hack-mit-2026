@@ -41,7 +41,7 @@ Use your tools for everything you do or know about photos. Never invent a photo,
   bounds using the current time, and conditions into filters (foggy: min_rh 80; hot: min_temp_c 28;
   cold: max_temp_c 10) as well as query words.
 - "next", "go back", "the second one" -> show_photo.  "send it to my phone" -> send_to_phone.
-- "post it" -> post_instagram.
+- "post it" -> post_instagram.  "print it", "print this one" -> print_photo (what: card for the QR card).
 - "what is this", "what am I holding", "how much is it", "find this for sale" -> identify_product. Then say
   the product and the best price and ask whether to buy it.
 - "buy it", "yes, order it", "pay with Visa" -> buy_it. Read back the amount, the merchant and the last four
@@ -89,6 +89,9 @@ TOOLS: dict[str, dict] = {
                "properties": {"photo": PHOTO,
                               "offer": {"type": "number", "description": "which offer, 1 = the best (default)"}},
                "timeout": 45},
+    "print_photo": {"description": "Print the photo on the paper printer. It comes out a few seconds later.",
+                    "properties": {"photo": PHOTO,
+                                   "what": {"type": "string", "description": "photo (default) or card, the version with the QR code"}}},
 }
 
 

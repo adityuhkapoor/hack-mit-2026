@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hmac
 import json
 import threading
 import time
@@ -19,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
-from . import analyze, brush, capture, effects, grade, imageio, look, realtime, restyle, sense, styles
+from . import analyze, brush, capture, effects, grade, imageio, look, printing, realtime, restyle, sense, styles
 from .backends import Backends
 from .comfy import ComfyError
 
@@ -49,6 +50,7 @@ MAX_LIVE_SESSIONS = int(os.environ.get("NIMBUS_MAX_SESSIONS", "3"))
 GPU_CALLS_PER_MINUTE = int(os.environ.get("NIMBUS_GPU_CALLS_PER_MIN", "20"))
 LOOKS_PER_MINUTE = int(os.environ.get("NIMBUS_LOOKS_PER_MIN", "12"))
 MAX_STORED_LOOKS = int(os.environ.get("NIMBUS_MAX_LOOKS", "300"))
+PRINTS_PER_MINUTE = int(os.environ.get("NIMBUS_PRINTS_PER_MIN", "6"))
 _live_sessions = 0
 _calls: dict[str, list[float]] = {}
 
@@ -622,3 +624,52 @@ def get_capture(capture_id: str):
 def get_capture_image(capture_id: str, which: Literal["card", "photo", "as_shot", "mask"]):
     get_capture(capture_id)
     return FileResponse(captures.dir(capture_id) / f"{which}.jpg", media_type="image/jpeg")
+
+
+# ---------------------------------------------------------------------------------------------
+# Printing: the finished capture on the paper printer. Off unless NIMBUS_PRINTER names a CUPS queue.
+
+
+@app.get("/printer")
+def printer_status():
+    """Whether printing is enabled here, and if so what the queue is doing. Never prints."""
+    return printing.status()
+
+
+@app.post("/captures/{capture_id}/print")
+def print_capture(capture_id: str, request: Request, which: Literal["photo", "card"] = "photo",
+                  size: str | None = None, borderless: bool | None = None, media_type: str | None = None,
+                  scaling: Literal["fit", "fill"] = "fit", copies: int = 1,
+                  quality: Literal["draft", "normal", "high"] | None = None,
+                  layout: Literal["polaroid4", "polaroid1", "polaroid1full", "single"] = "polaroid4"):
+    """Send a stored capture's `photo` (the picture) or `card` (with its QR code) to the printer.
+
+    Returns as soon as CUPS has the job ({"job": "Epson_XP4200-7", …}); the paper comes out after that.
+    size: 3.5x5 4x6 5x7 8x10 A4 A6 Letter Legal (borderless except A6 and Legal). media_type is the paper
+    in the tray (Photographic…, Stationery); leave it out for the printer's setting. scaling `fit` keeps
+    the whole picture, `fill` crops to cover the paper. layout `polaroid4` (the default, 4x6 only) prints four
+    identical upright polaroids with the HackMIT logo on the thick border; `polaroid1` prints one of them, scaled
+    up, centred on a 3x4 in page (half a 4x6 sheet; size 3x4, not borderless, printed at its own size);
+    `polaroid1full` fills that page edge to edge (borderless); `single` prints the picture as it is. `size` and
+    `borderless` default to what the layout needs. quality `draft` prints fastest, `high` slowest; leave it out for
+    the printer's own setting. copies is 1 to 10.
+    503 when printing is not enabled on this server.
+    """
+    token = printing.required_token()
+    if token is not None and not hmac.compare_digest(request.headers.get("x-print-token", ""), token):
+        raise HTTPException(401, "X-Print-Token missing or wrong")
+    try:
+        enabled = printing.queue() is not None
+    except printing.PrintError as e:
+        raise HTTPException(e.status, str(e)) from e
+    if not enabled:
+        raise HTTPException(503, "printing is not enabled on this server (NIMBUS_PRINTER is not set)")
+    _rate_limit(request, cost="print", per_minute=PRINTS_PER_MINUTE)
+    meta = get_capture(capture_id)
+    try:
+        job = printing.submit(captures.dir(capture_id) / f"{which}.jpg", title=f"Nimbus {meta.id} {which}",
+                              size=size, borderless=borderless, media_type=media_type, scaling=scaling,
+                              copies=copies, layout=layout, quality=quality)
+    except printing.PrintError as e:
+        raise HTTPException(e.status, str(e)) from e
+    return {"capture": capture_id, "which": which, **job}
