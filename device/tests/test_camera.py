@@ -199,12 +199,14 @@ def test_print_photo(tmp_path, monkeypatch):
     assert a.print_photo({"photo": "abc123"}) == {"printing": True, "what": "photo", "job": "Epson_XP4200-7"}
     (req,) = seen
     assert req.method == "POST" and req.url.path == "/captures/abc123/print"
-    assert dict(req.url.params) == {"which": "photo", "size": "4x6"} and "x-print-token" not in req.headers
+    assert dict(req.url.params) == {"which": "photo", "layout": "polaroid1full", "size": "3x4", "quality": "draft"}
+    assert "x-print-token" not in req.headers                 # one polaroid filling a 3x4 page, not four on a 4x6 sheet
     monkeypatch.setattr(appmod, "PRINT_TOKEN", "s3cret")
     monkeypatch.setattr(appmod, "PRINT_MEDIA", "PhotographicGlossy")
     assert a.print_photo({"photo": "abc123", "what": "card"})["what"] == "card"
     assert seen[-1].headers["x-print-token"] == "s3cret"
-    assert dict(seen[-1].url.params) == {"which": "card", "size": "4x6", "media_type": "PhotographicGlossy"}
+    assert dict(seen[-1].url.params) == {"which": "card", "layout": "single", "size": "4x6", "quality": "draft",
+                                         "media_type": "PhotographicGlossy"}
     assert "print_photo" in appmod.CameraApp.TOOLS
 
 

@@ -54,7 +54,9 @@ def square(jpeg: bytes) -> bytes:
     return out.getvalue()
 # Printing happens on the GPU box (its Epson XP-4200); NIMBUS_API must point at that box's API for it to work.
 PRINT_TOKEN = os.environ.get("NIMBUS_PRINT_TOKEN", "")
-PRINT_SIZE = os.environ.get("NIMBUS_PRINT_SIZE", "4x6")
+PRINT_SIZE = os.environ.get("NIMBUS_PRINT_SIZE", "3x4")            # the page loaded in the printer
+PRINT_LAYOUT = os.environ.get("NIMBUS_PRINT_LAYOUT", "polaroid1full")   # one polaroid filling that page
+PRINT_QUALITY = os.environ.get("NIMBUS_PRINT_QUALITY", "draft") or None  # draft is the quickest the printer does
 PRINT_MEDIA = os.environ.get("NIMBUS_PRINT_MEDIA") or None   # e.g. PhotographicGlossy; unset = the printer's setting
 
 
@@ -337,7 +339,12 @@ class CameraApp:
         if not photo.photo_url:
             return {"error": "this photo only exists on the camera (the server was offline), so it cannot be printed"}
         what = "card" if str((p or {}).get("what", "")).lower() == "card" else "photo"
-        params = {"which": what, "size": PRINT_SIZE}
+        if what == "card":   # the QR card is printed as it is, on a 4x6 sheet
+            params = {"which": "card", "layout": "single", "size": "4x6"}
+        else:
+            params = {"which": "photo", "layout": PRINT_LAYOUT, "size": PRINT_SIZE}
+        if PRINT_QUALITY:
+            params["quality"] = PRINT_QUALITY
         if PRINT_MEDIA:
             params["media_type"] = PRINT_MEDIA
         headers = {"X-Print-Token": PRINT_TOKEN} if PRINT_TOKEN else {}
