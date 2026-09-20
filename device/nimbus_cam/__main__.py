@@ -57,42 +57,41 @@ def main() -> None:
     args = ap.parse_args()
 
     camera = Camera(args.camera, args.image)
-    if args.pi:
-        from .hw import PiSensors
-        sensors = PiSensors(camera)
-    elif args.mac:
-        sensors = MacSensors()
-    else:
-        from .hw import BridgeSensors
-        sensors = BridgeSensors()
-    app = CameraApp(sensors, camera, open_library(not args.local_library),
-                    render_locally=not args.server_real)
-    print(f"[camera] library: {app.library.kind} · keys: {keys.status()}")
-
-    if args.script:
-        try:
-            run_script(app, args.script)
-        finally:
-            camera.close()
-        return
-
-    from .ui import Screen
-    voice = None
-    if not (args.no_voice or args.text):
-        try:
-            from .voice import Voice
-            voice = Voice(app)
-        except Exception as e:
-            print(f"[voice] off: {e}")
-    screen = Screen(app, voice)
-    if args.text:
-        from .voice import text_session
-        threading.Thread(target=text_session, args=(app,), daemon=True).start()
     try:
-        screen.run()
+        if args.pi:
+            from .hw import PiSensors
+            sensors = PiSensors(camera)
+        elif args.mac:
+            sensors = MacSensors()
+        else:
+            from .hw import BridgeSensors
+            sensors = BridgeSensors()
+        app = CameraApp(sensors, camera, open_library(not args.local_library),
+                        render_locally=not args.server_real)
+        print(f"[camera] library: {app.library.kind} · keys: {keys.status()}")
+
+        if args.script:
+            run_script(app, args.script)
+            return
+
+        from .ui import Screen
+        voice = None
+        if not (args.no_voice or args.text):
+            try:
+                from .voice import Voice
+                voice = Voice(app)
+            except Exception as e:
+                print(f"[voice] off: {e}")
+        screen = Screen(app, voice)
+        if args.text:
+            from .voice import text_session
+            threading.Thread(target=text_session, args=(app,), daemon=True).start()
+        try:
+            screen.run()
+        finally:
+            if voice:
+                voice.close()
     finally:
-        if voice:
-            voice.close()
         camera.close()
 
 

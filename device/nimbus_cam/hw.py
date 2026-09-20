@@ -240,15 +240,18 @@ class Camera:
     sensor exposed them, so freshness still comes from draining and settling reads, not timestamps."""
 
     CAPTURE_TIMEOUT_S = 20.0      # bounded wait for jpeg(): covers the exposure settle + reads + encode
+    STALE_AFTER_S = 1.5          # application receipt age, not sensor exposure age
     REOPEN_EVERY_S = 2.0          # retry _open this often while the device stays failed
 
     def __init__(self, index: int = 0, still: str | None = None):
         self.index = index
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None
         self.cap = None if still else self._open(index)
-        self._latest: np.ndarray | None = None   # written only by the reader thread; an atomic swap
+        self._latest: tuple[float, np.ndarray] | None = None  # immutable receipt-time/frame snapshot
         self._stop = threading.Event()
-        self._requests: queue.Queue[_Shot] = queue.Queue()
+        self._requests: queue.Queue[_Shot] = queue.Queue(maxsize=1)
+        self._lifecycle = threading.Lock()
+        self._active: _Shot | None = None
         self._reader = None if still else threading.Thread(target=self._reader_loop, daemon=True,
                                                            name="camera-reader")
         if self._reader:
@@ -256,59 +259,81 @@ class Camera:
 
     def _reader_loop(self) -> None:
         failures, last_reopen = 0, 0.0
-        while not self._stop.is_set():
-            self._serve_next()
-            try:
-                ok, f = self.cap.read()
-            except Exception:
-                ok, f = False, None
-            if not ok:
-                failures += 1
-                self._latest = None            # disconnected or failing: don't serve stale frames
-                if failures >= 3 and time.time() - last_reopen > self.REOPEN_EVERY_S:
-                    last_reopen = time.time()
-                    self._reopen()
-                time.sleep(min(0.5, 0.05 * failures))    # backoff: no busy loop on a dead device
-                continue
-            failures = 0
-            self._publish(f)
+        try:
+            while not self._stop.is_set():
+                self._serve_next()
+                if self._stop.is_set():
+                    break
+                try:
+                    self._read()
+                except Exception:
+                    failures += 1
+                    self._latest = None
+                    if (not self._stop.is_set() and failures >= 3
+                            and time.monotonic() - last_reopen > self.REOPEN_EVERY_S):
+                        last_reopen = time.monotonic()
+                        self._reopen()
+                    self._stop.wait(min(0.5, 0.05 * failures))
+                else:
+                    failures = 0
+        finally:
+            self._latest = None
+            # Never release a VideoCapture from another thread while read() uses it.
+            self.cap.release()
 
     def _reopen(self) -> None:
         try:
             self.cap.release()
-            self.cap = self._open(self.index, wait_s=5)
+            if not self._stop.is_set():
+                self.cap = self._open(self.index, wait_s=5)
         except Exception as e:
             print(f"[camera] reopen failed: {e}")
 
-    def _serve_next(self) -> None:
-        try:
-            req = self._requests.get_nowait()
-        except queue.Empty:
-            return
-        if req.cancelled or time.monotonic() > req.deadline:
-            req.error = RuntimeError("capture request expired")
-            req.done.set()
-            return
-        try:
-            req.result = self._capture()
-        except BaseException as e:
-            req.error = e
-        req.done.set()
+    def _check_shot(self, req: _Shot) -> None:
+        if self._stop.is_set():
+            raise RuntimeError("camera is closed")
+        if req.cancelled or time.monotonic() >= req.deadline:
+            raise TimeoutError("capture request expired")
 
-    def _capture(self) -> bytes:
+    def _serve_next(self) -> None:
+        with self._lifecycle:
+            if self._stop.is_set():
+                return
+            try:
+                req = self._requests.get_nowait()
+            except queue.Empty:
+                return
+            self._active = req
+        try:
+            self._check_shot(req)
+            req.result = self._capture(req)
+        except Exception as e:
+            req.error = e
+            self._latest = None
+        finally:
+            with self._lifecycle:
+                self._active = None
+                req.done.set()
+
+    def _capture(self, req: _Shot) -> bytes:
         """Runs on the reader thread: the shot's exposure work and its settle/fresh-frame reads are
         serialized with preview reads, and auto-exposure is restored even when the shot fails."""
+        self._check_shot(req)
         exp = self._exposure()
+        self._check_shot(req)
         capped = exp is not None and exp > self.MAX_EXPOSURE
         try:
             if capped:
                 self._v4l2(self.index, "auto_exposure=1",
                            f"exposure_time_absolute={self.MAX_EXPOSURE}", "gain=255")
                 for _ in range(8):      # let the new exposure take effect
+                    self._check_shot(req)
                     self._read()
             f = None
             for _ in range(3):          # drop buffered frames so the picture is the moment of the press
+                self._check_shot(req)
                 f = self._read()
+            self._check_shot(req)
             if f is None:
                 raise RuntimeError("camera returned no frame")
             return cv2.imencode(".jpg", cv2.cvtColor(f, cv2.COLOR_RGB2BGR),
@@ -320,8 +345,9 @@ class Camera:
     def _read(self) -> np.ndarray | None:
         """One raw read, published to the slot: preview frames keep flowing during a capture."""
         ok, f = self.cap.read()
-        if not ok:
-            return None
+        if not ok or f is None:
+            self._latest = None
+            raise RuntimeError("camera returned no frame")
         return self._publish(f)
 
     def _publish(self, f: np.ndarray) -> np.ndarray:
@@ -329,7 +355,8 @@ class Camera:
         if rot is not None:
             f = cv2.rotate(f, rot)
         f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
-        self._latest = f
+        if not self._stop.is_set():
+            self._latest = (time.monotonic(), f)
         return f
 
     @staticmethod
@@ -375,7 +402,7 @@ class Camera:
         if not shutil.which("v4l2-ctl"):
             return ""
         args = ["v4l2-ctl", "-d", f"/dev/video{index}"] + [a for s in settings for a in ("-c", s)]
-        return subprocess.run(args, capture_output=True, text=True).stdout
+        return subprocess.run(args, capture_output=True, text=True, timeout=2).stdout
 
     def _exposure(self) -> int | None:
         import shutil
@@ -383,7 +410,7 @@ class Camera:
         if not shutil.which("v4l2-ctl"):
             return None
         out = subprocess.run(["v4l2-ctl", "-d", f"/dev/video{self.index}", "-C", "exposure_time_absolute"],
-                             capture_output=True, text=True).stdout
+                             capture_output=True, text=True, timeout=2).stdout
         digits = "".join(ch for ch in out if ch.isdigit())
         return int(digits) if digits else None
 
@@ -395,20 +422,35 @@ class Camera:
     def frame(self) -> np.ndarray | None:
         """RGB uint8, full resolution, upright. The newest finished frame, or None until the first one
         arrives (or while the device is failing). Do not mutate it — it is the live slot, not a copy."""
+        if self._stop.is_set():
+            return None
         if self.still is not None:
             return self.still.copy()
-        return self._latest
+        latest = self._latest
+        if latest is None or time.monotonic() - latest[0] > self.STALE_AFTER_S:
+            return None
+        return latest[1]
 
     def jpeg(self, timeout: float = CAPTURE_TIMEOUT_S) -> bytes:
         """The photo at the press: the reader thread caps exposure, settles, drops buffered frames and
         encodes the fresh one. Bounded wait; an expired request never runs (it is cancelled in the queue)."""
+        if self._stop.is_set():
+            raise RuntimeError("camera is closed")
+        if timeout <= 0:
+            raise ValueError("capture timeout must be positive")
         if self.cap is None:
             if self.still is None:
                 raise RuntimeError("camera returned no frame")
             return cv2.imencode(".jpg", cv2.cvtColor(self.still, cv2.COLOR_RGB2BGR),
                                 [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
         req = _Shot(time.monotonic() + timeout)
-        self._requests.put(req)
+        with self._lifecycle:
+            if self._stop.is_set():
+                raise RuntimeError("camera is closed")
+            try:
+                self._requests.put_nowait(req)
+            except queue.Full:
+                raise RuntimeError("camera capture queue is full") from None
         if not req.done.wait(timeout):
             req.cancelled = True          # if the reader hasn't started it yet, it never will
             raise TimeoutError(f"no frame within {timeout:.0f}s")
@@ -417,11 +459,23 @@ class Camera:
         return req.result
 
     def close(self) -> None:
-        self._stop.set()
+        """Wake waiting callers and request reader shutdown. A wedged native read cannot be safely
+        interrupted here; its daemon owns final release when it returns. Never race release with read."""
+        with self._lifecycle:
+            self._stop.set()
+            self._latest = None
+            pending = [self._active] if self._active is not None else []
+            while True:
+                try:
+                    pending.append(self._requests.get_nowait())
+                except queue.Empty:
+                    break
+            for req in pending:
+                req.cancelled = True
+                req.error = RuntimeError("camera is closed")
+                req.done.set()
         if self._reader is not None:
             self._reader.join(timeout=2)
-        if self.cap is not None:
-            self.cap.release()
 
 
 class PiButtons:

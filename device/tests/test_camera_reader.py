@@ -208,3 +208,79 @@ def test_concurrent_preview_shutter_and_sensor_reads(camera, monkeypatch):
         t.join(5)
         assert not t.is_alive()
     assert errors == []
+
+
+def test_stalled_read_expires_latest_frame(camera, monkeypatch):
+    cam, cap = camera
+    wait_for(lambda: cam.frame() is not None)
+    cap.gate.clear()
+    entered = cap.enter_count
+    try:
+        wait_for(lambda: cap.enter_count > entered)
+        monkeypatch.setattr(cam, 'STALE_AFTER_S', 0)
+        assert cam.frame() is None
+    finally:
+        cap.gate.set()
+
+
+def test_close_does_not_release_while_native_read_is_blocked(camera):
+    cam, cap = camera
+    wait_for(lambda: cam.frame() is not None)
+    cap.gate.clear()
+    entered = cap.enter_count
+    try:
+        wait_for(lambda: cap.enter_count > entered)
+        cam.close()
+        assert cam.frame() is None
+        assert cam._reader.is_alive()
+        assert not cap.released
+        with pytest.raises(RuntimeError, match='closed'):
+            cam.jpeg()
+    finally:
+        cap.gate.set()
+        cam._reader.join(5)
+    assert cap.released and not cam._reader.is_alive()
+
+
+def test_close_wakes_queued_capture(camera, monkeypatch):
+    cam, cap = camera
+    wait_for(lambda: cam.frame() is not None)
+    cap.gate.clear()
+    entered = cap.enter_count
+    errors, calls = [], []
+    monkeypatch.setattr(cam, '_exposure', lambda: calls.append('exposure'))
+    def capture():
+        try:
+            cam.jpeg()
+        except Exception as exc:
+            errors.append(exc)
+    t = threading.Thread(target=capture)
+    try:
+        wait_for(lambda: cap.enter_count > entered)
+        t.start()
+        wait_for(lambda: not cam._requests.empty())
+        cam.close()
+        t.join(1)
+        assert not t.is_alive()
+        assert len(errors) == 1 and 'closed' in str(errors[0])
+        assert calls == []
+    finally:
+        cap.gate.set()
+        cam._reader.join(5)
+        t.join(5)
+
+
+def test_failed_settle_read_aborts_and_restores_auto(camera, monkeypatch):
+    cam, cap = camera
+    calls = []
+    monkeypatch.setattr(cam, '_exposure', lambda: 900)
+    def exposure(*args):
+        calls.append(args)
+        if 'auto_exposure=1' in args:
+            cap.fail = True
+    monkeypatch.setattr(cam, '_v4l2', exposure)
+    with pytest.raises(RuntimeError, match='no frame'):
+        cam.jpeg()
+    assert calls[-1] == (0, 'auto_exposure=3', 'exposure_dynamic_framerate=1')
+    assert cam.frame() is None
+    cap.fail = False
