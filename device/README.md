@@ -1,41 +1,10 @@
-# Nimbus — the camera (Arduino UNO Q)
+# Nimbus camera app
 
-The UNO Q is the whole brain. Its microcontroller reads the sensors and controls, and its Linux side takes
-the picture. It renders Real itself; for the AI positions it sends the frame to the GPU box. It then posts the card.
-
-```
-sketch/sketch.ino   MCU: sensors, shutter, dial, status LEDs → Bridge functions readings() controls() status()
-python/main.py      Linux: shutter loop → Real on the board, or POST /capture → Instagram
-app.yaml            Arduino App Lab app manifest
-```
-
-## Parts (pending confirmation from the hardware desk)
-
-| Part | Connects to | Reading |
-|---|---|---|
-| BME280 | I2C | temperature, humidity, pressure |
-| Sensirion SEN54 | I2C | PM2.5 (haze) |
-| APDS-9930 | I2C | light (lux) |
-| Sound sensor module | A0 | sound level (dB) |
-| Arcade pushbutton | digital pin | shutter |
-| Potentiometer or button | analog/digital pin | the dial: Nimbus / Souvenir |
-| WS2812B ring | digital pin | status: chase = working, green = done, red = error |
-| 0.96 in. OLED (SSD1306) | I2C | dial position, live readings, the proof after a shot |
-| Raspberry Pi HQ Camera (via a MIPI-CSI carrier) or a USB webcam | | the picture |
-
-Wind and cloud cover come from the web (Open-Meteo), not a sensor. Prints go to the GPU box's Epson (`POST /captures/{id}/print`, see docs/API.md); the card is also posted and
-shown in the gallery.
-
-The sketch still targets Modulinos. Once the parts are confirmed, only the drivers change. The Bridge contract
-stays: `readings()` returns `key=value;…` with any subset of `temp_c rh lux db pm25 pressure_hpa`.
-
-## Check at the venue
-
-- [ ] UNO Q checked out (Arduino booth); App Lab runs Blink.
-- [ ] Bridge API names match the App Lab examples (`Bridge.provide` / `Bridge.call`).
-- [ ] Camera enumerates on the UNO Q (CSI carrier, or `/dev/video*` for USB).
-- [ ] `curl https://nimbus.akvaithi.page/health` from the board over venue Wi-Fi.
-- [ ] On the board: `pip install -e pipeline` and `NIMBUS_SEG=human`, then time one Real shot (Real renders on the board).
+The current rig uses a Raspberry Pi 4 for the Python app, touchscreen and USB webcam,
+an Arduino UNO Q for thermal readings and buttons, and an ASUS GPU computer for AI
+capture processing. Mac development uses simulated sensors. The older standalone
+UNO Q App Lab files (`sketch/`, `python/`, `app.yaml`) are a legacy path, not the
+current Pi deployment instructions.
 
 ## The rig (Raspberry Pi 4 + Arduino UNO Q + C270 + 1024x600 touch panel)
 
@@ -62,7 +31,7 @@ pull-ups) and reach the Pi over the same I2C link as the thermal array (command 
 
 Only D4 is named so far. **A press on an unnamed pin is logged** (`[buttons] unnamed pin D9 pressed`) — press
 each button once while watching `~/nimbus-run.log`, put the numbers in `NIMBUS_BUTTONS` in
-`~/start_nimbus.sh` and `~/.config/labwc/autostart`, and restart. (Buttons straight on the Pi's GPIO still
+`~/start_nimbus.sh`, and restart. The configured labwc autostart calls that launcher. (Buttons straight on the Pi's GPIO still
 work too: `NIMBUS_GPIO=1`, `NIMBUS_PINS="shutter=17,mode=27,talk=22"`.)
 
 ### Reflashing the UNO Q
@@ -90,7 +59,7 @@ makes the driver read through Zephyr's `i2c_write_read()`.
 ## Run the camera on a Mac (no hardware needed)
 
 ```bash
-cd infra/elastic && docker compose up -d          # photo search (optional: falls back to a local index)
+(cd infra/elastic && docker compose up -d)          # photo search (optional: falls back to a local index)
 cd device && uv sync
 uv run python -m nimbus_cam.agent                # once: creates the ElevenLabs agent (needs both keys)
 uv run python -m nimbus_cam --mac                # screen + voice + webcam + simulated sensors
@@ -106,11 +75,11 @@ uv run python -m nimbus_cam --mac                # screen + voice + webcam + sim
 Keys: ←/→ mode · space shutter · **hold T to talk** · ↑/↓ browse · P send to phone (QR code) · I post to Instagram · R print (or the PRINT button on the photo screen) ·
 Esc viewfinder · F/H simulated fog/heat.
 
-Keys are read from the macOS Keychain, never from files. On the UNO Q, use environment variables instead.
+On macOS, secrets can come from Keychain or environment variables. On the Pi, the configured launcher sources the existing `/etc/nimbus.env`; keep it and the local voice-agent configuration out of Git.
 
 | Keychain service | Environment variable | Status |
 |---|---|---|
-| `meta-model-api-key` | `MODEL_API_KEY` | ✅ stored |
+| `meta-model-api-key` | `MODEL_API_KEY` | required for model calls |
 | `elevenlabs-api-key` | `ELEVENLABS_API_KEY` | needed for voice |
 | `ig-token` | `IG_TOKEN` | needed to post (the account id is looked up from it) |
 
@@ -126,7 +95,7 @@ Instagram needs a professional (business or creator) Instagram account and one t
 ## On the Pi rig (Raspberry Pi 4 + Arduino UNO Q + C270)
 
 ```bash
-rsync -a --exclude .venv --exclude .git ~/Developer/hackMIT/ raspi4:~/nimbus/     # from the Mac
+rsync -a --exclude .venv --exclude .git ./ raspi4:~/nimbus/     # from the repository root; requires your SSH alias
 ssh raspi4 'cd ~/nimbus && python3 -m venv .venv && .venv/bin/pip install -e pipeline -e device'
 ssh raspi4 'sudo apt-get install -y libportaudio2'      # the webcam microphone
 ssh raspi4 'cd ~/nimbus/device && NIMBUS_SEG=human ../.venv/bin/python -m nimbus_cam --pi'
@@ -136,3 +105,28 @@ ssh raspi4 'cd ~/nimbus/device && NIMBUS_SEG=human ../.venv/bin/python -m nimbus
 change between frames), the light level from the camera frame, and sound from the webcam microphone.
 Humidity, wind and cloud come from the local weather and are labelled "(web)" on the card.
 `NIMBUS_SEG=human` picks the light segmentation model, which the Pi can actually run.
+
+## Tested touchscreen configuration
+
+The existing Pi deployment uses `~/start_nimbus.sh`, called by labwc autostart.
+It selects `NIMBUS_UI_BACKEND=sdl`, `NIMBUS_UI_FPS=24`,
+`SDL_VIDEODRIVER=wayland` and `NIMBUS_UI_FRAME_STATS=1`. The SDL presenter must
+be [built separately](native_presenter/README.md); installing Python packages
+alone does not build it. Tk is still needed for the event loop. SDL initialization
+failure falls back to Tk. Without configuration the source defaults to Tk at 15 FPS.
+
+Measured steady home-screen callback throughput was roughly 23.9–24.0 FPS.
+Transitions can still hitch; these measurements do not establish physical display
+FPS or webcam latency. See [full results](FRAME_PACING_RESULTS.md).
+
+The configured Pi uses `NIMBUS_API=http://127.0.0.1:18000` and
+`NIMBUS_ES_URL=http://127.0.0.1:19200` through its persistent SSH tunnel to ASUS.
+These endpoints require the tunnel and its separately provisioned keys; they do
+not work on a fresh machine just by setting environment variables. See
+[network recovery and verification](NETWORK_RECOVERY.md). The Pi and ASUS can
+use different networks if both can reach their tailnet.
+
+Automatic Instagram posting defaults to enabled. For capture QA, set
+`NIMBUS_AUTO_POST=0` in the process environment after loading configuration.
+An intermittent `Server disconnected without sending a response` capture failure
+remains unresolved. Camera-buffer experiments are not included in main.

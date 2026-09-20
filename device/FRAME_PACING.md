@@ -1,6 +1,7 @@
 # Touchscreen frame pacing
 
-The screen keeps its default 15 FPS schedule.  A later physical test can opt
+The source defaults to a 15 FPS schedule; the tested Pi launcher selects SDL at
+24 FPS. See [hardware results](FRAME_PACING_RESULTS.md). Other deployments can opt
 into 24 or 30 FPS by setting `NIMBUS_UI_FPS=24` or `NIMBUS_UI_FPS=30` before
 starting the camera process.  The only accepted values are 15, 24, and 30;
 missing or invalid values use 15 FPS, and an invalid value emits one startup
@@ -39,21 +40,16 @@ Record the aggregate reports and compare callback/render/upload/configure
 tails, missed deadlines, and render failures.  For each setting, also record
 sustained CPU use, temperature, and throttling; check touch and shutter
 responsiveness; and inspect physical screen smoothness.  Repeat enough of each
-run to expose warm-up and sustained-load behavior.  This patch contains no
-hardware benchmark and its unit tests make no throughput, smoothness, or
-thermal claim.
+run to expose warm-up and sustained-load behavior.  Unit tests make no throughput, smoothness, or thermal claim; the separate
+results document records hardware measurements.
 
-## Integration order
+## Integration status
 
-1. Review and integrate the pacing helper and narrow UI hook.
-2. Integrate the camera decoding, cloud/fade cache, and background image
-   loading patches in their reviewed order.
-3. Run the existing device tests, then perform the baseline/24/30 physical
-   protocol above.
-
-If a physical test is inconclusive or regresses touch, shutter, thermals, or
-visual quality, roll back to `NIMBUS_UI_FPS=15` while investigating.  No
-deployment, restart, Pi access, or remote operation is part of this change.
+Pacing, cloud/fade caching, persistent Tk images, the optional SDL presenter and
+capture-art prewarming are integrated. Background photo loading and experimental
+camera-buffer changes are not included. The Pi was tested at 24 FPS; 30 FPS is
+an available target, not an established sustained full-app result. Consult the
+results document before interpreting a configured target as achieved throughput.
 
 ## Persistent Tk image
 
