@@ -199,6 +199,18 @@ def cloud(w: int, color: tuple) -> Image.Image:
 
 
 @lru_cache(maxsize=32)
+def cloud_faded(w: int, color: tuple, opacity: float) -> Image.Image:
+    """Return an immutable-by-convention cloud sprite with its fixed opacity applied.
+
+    The background clouds are drawn repeatedly while they drift, so applying the same
+    alpha mask on every frame needlessly copies each sprite.  Keeping the faded result
+    separate from ``cloud`` also means callers can pass it to ``blit`` at full opacity
+    and never apply the opacity a second time.
+    """
+    return fade(cloud(w, color), opacity)
+
+
+@lru_cache(maxsize=32)
 def asterisk(d: int, color: tuple = SLATE) -> Image.Image:
     big = Image.new("RGBA", (d * SS, d * SS), (0, 0, 0, 0))
     g = ImageDraw.Draw(big)
@@ -546,7 +558,7 @@ class Skin:
         for color, w, top, dur, phase, op in CLOUDS:
             x = -300 + ((now - phase) / dur % 1) * 1640
             bob = math.sin((now - phase) / (6 + w / 200 * 3) * math.pi) * 5
-            blit(img, cloud(w, color), x, top + bob, op)
+            blit(img, cloud_faded(w, color, op), x, top + bob)
 
     def _wave_layers(self, img, now):
         target = WAVES_Y.get(self.group, 398)
