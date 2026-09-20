@@ -13,3 +13,4 @@ pipeline/captures/
 **/.pytest_cache/
 web/.vercel/
 *.part
+visa/
