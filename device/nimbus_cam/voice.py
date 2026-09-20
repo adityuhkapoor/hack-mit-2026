@@ -10,12 +10,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 
-from . import agent, keys
+from . import agent, diag, keys
 from .tagger import REASONING
 from .app import CameraApp
+
+log = diag.get("voice")
 
 
 def _wrap(app: CameraApp, name: str):
@@ -23,9 +26,10 @@ def _wrap(app: CameraApp, name: str):
 
     def handler(params: dict):
         params = {k: v for k, v in (params or {}).items() if k != "tool_call_id"}
-        print(f"[tool] {name}({json.dumps(params)})")
-        out = fn(params)
-        print(f"[tool] → {json.dumps(out)[:300]}")
+        # Tool name + duration + outcome only: parameters and results stay out of the log
+        # (queries, captions and receipts are user data).
+        with diag.action("tool", diag.get("tool"), detail=name):
+            out = fn(params)
         return json.dumps(out)
     return handler
 
@@ -43,7 +47,7 @@ class Voice:
         self.app = app
         self.key, self.aid = key, aid
         self.audio = PushToTalkAudio()
-        print(f"[voice] audio: {self.audio.devices()}")
+        log.info("audio: %s", self.audio.devices())
         self.conv = None
         self.started = False
         self.blocked = 0.0          # when the server refused us for credits
@@ -64,8 +68,8 @@ class Voice:
             tools.register(name, _wrap(self.app, name))
         return Conversation(
             ElevenLabs(api_key=self.key), self.aid, requires_auth=True, audio_interface=self.audio, client_tools=tools,
-            callback_user_transcript=lambda t: print(f"[you {time.strftime('%H:%M:%S')}] {t}"),
-            callback_agent_response=lambda t: (print(f"[Nimbus {time.strftime('%H:%M:%S')}] {t}"), self.app.say(t)),
+            callback_user_transcript=lambda t: diag.event(log, "voice_turn"),   # not the words
+            callback_agent_response=lambda t: self.app.say(t),
             callback_end_session=self._ended)
 
     def _ensure_session(self) -> None:
@@ -79,11 +83,11 @@ class Voice:
                 self.conv = self._make_conversation()
                 self.conv.start_session()
                 self.started = True
-                print("[voice] session open")
+                diag.event(log, "session_open")
                 threading.Thread(target=self._watch, args=(self.conv,), daemon=True).start()
             except Exception as e:
                 self.started = False
-                print(f"[voice] could not open the session: {type(e).__name__}: {e}")
+                diag.caught(log, "could not open the session", e)
 
     def press(self) -> None:
         self._ensure_session()          # reconnects if the server closed an idle session
@@ -102,7 +106,7 @@ class Voice:
         conv._thread.join()
         if self.conv is conv and self.started:
             self.started = False
-            print("[voice] session thread died")
+            diag.event(log, "session_died", level=logging.WARNING)
             if self._out_of_credits():
                 self.blocked = time.time()
                 self.app.say("Voice is off: the ElevenLabs account is out of credits")
@@ -112,11 +116,12 @@ class Voice:
             import httpx
             r = httpx.get("https://api.elevenlabs.io/v1/user/subscription", headers={"xi-api-key": self.key}, timeout=10).json()
             return int(r.get("character_count", 0)) >= int(r.get("character_limit", 1))
-        except Exception:
+        except Exception as e:
+            diag.caught(log, "could not check the ElevenLabs quota", e, level=logging.DEBUG)
             return False
 
     def _ended(self) -> None:
-        print("[voice] session ended (the next press reconnects)")
+        diag.event(log, "session_end")           # the next press reconnects
         self.started = False
         # The SDK prints the close reason as a traceback; a quota close is the one worth telling the user.
         import sys

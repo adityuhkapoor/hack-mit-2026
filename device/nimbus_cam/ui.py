@@ -14,6 +14,7 @@ window, the touch targets and the state they act on.
 
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from pathlib import Path
@@ -22,11 +23,13 @@ import tkinter as tk
 
 from PIL import Image, ImageTk
 
+from . import diag
 from .app import DIALS, CameraApp
 from .skin import H as DESIGN_H, W as DESIGN_W, Skin
 
 W, H = 800, 480          # the default window; a real panel overrides it (NIMBUS_FULLSCREEN=1)
 BAR = 0.155              # share of the height taken by the touch button bar
+log = diag.get("screen")
 
 
 class Button:
@@ -86,6 +89,7 @@ class Screen:
                         "f": lambda e: self._toggle("fog"), "h": lambda e: self._toggle("heat"),
                         "<KeyPress-t>": self._talk_down, "<KeyRelease-t>": self._talk_up}.items():
             self.root.bind(key, fn)
+        diag.install_tk(self.root)
         self._refresh_air()
         self._tick()
 
@@ -107,7 +111,7 @@ class Screen:
                 from .hw import PiButtons
                 return PiButtons(handlers)
         except Exception as e:      # not wired, no gpiozero, or no permission: touch and keys still work
-            print(f"[buttons] off: {type(e).__name__}: {e}")
+            diag.caught(diag.get("buttons"), "off", e)
         return None
 
     # -- touch ---------------------------------------------------------------------------------
@@ -200,8 +204,9 @@ class Screen:
         def work():
             try:
                 self.air = self.app.read_air()["readings"]
-            except Exception:
-                pass
+            except Exception as e:
+                if diag.throttled("air-refresh", 60):
+                    diag.caught(log, "air refresh failed", e, level=logging.DEBUG)
         threading.Thread(target=work, daemon=True).start()
         if not once:
             self.root.after(4000, self._refresh_air)
@@ -224,7 +229,7 @@ class Screen:
                         Path(path).parent.mkdir(parents=True, exist_ok=True)
                         Path(path).write_bytes(r.content)
                     except Exception as e:
-                        print(f"[screen] no photo for {path}: {e}")
+                        diag.caught(log, f"no photo for {Path(path).name}", e)   # path basenames only
                 if im is None:
                     im = Image.new("RGB", (self.W, self.H), (0x2A, 0x45, 0x50))
             self._photo_cache = (path, im)
@@ -288,8 +293,10 @@ class Screen:
         try:
             self._tk = ImageTk.PhotoImage(self.render())
             self.label.configure(image=self._tk)
+            diag.rendered((time.time() - t0) * 1000)
         except Exception as e:
-            print(f"[screen] {e}")
+            if diag.throttled("render", 30):        # a broken renderer must not spam every 66 ms
+                diag.caught(log, "frame render failed", e)
         self.root.after(max(8, 66 - int((time.time() - t0) * 1000)), self._tick)
 
     def run(self) -> None:

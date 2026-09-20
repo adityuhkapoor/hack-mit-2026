@@ -19,7 +19,7 @@ import httpx
 
 from nimbus import capture as lc, imageio, sense
 
-from . import instagram, shop, tagger
+from . import diag, instagram, shop, tagger
 from .library import HOME, Photo, Query
 
 API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
@@ -84,6 +84,9 @@ class State:
     receipt: shop.Receipt | None = None
     offer_index: int = 0                # the offer the shopper is looking at (browse with show_offer)
     paying_since: float = 0.0           # > 0 while the Visa terminal animation plays
+
+
+log = diag.get("camera")
 
 
 class CameraApp:
@@ -158,7 +161,8 @@ class CameraApp:
             self.state.busy = f"{DIALS[dial]}…"
             self.sensors.status(1)
             try:
-                photo = self._capture(dial)
+                with diag.op(f"cap-{int(time.time())}"), diag.action("capture", log, mode=DIALS[dial]):
+                    photo = self._capture(dial)
             except Exception as e:
                 self.state.busy = ""
                 self.sensors.status(3)
@@ -257,7 +261,7 @@ class CameraApp:
         try:
             photo = self._public(photo)        # a link any phone can open, not only ones on our network
         except Exception as e:
-            print(f"[camera] public copy failed ({type(e).__name__}); using the local link")
+            diag.caught(log, "public copy failed; using the local link", e)
         self.state.current, self.state.screen = photo, "qr"
         self.say("Scan to get it on your phone")
         return {"shown": "a QR code on the camera's screen", "link": photo.public_link or photo.link}
@@ -396,7 +400,8 @@ class CameraApp:
             params["media_type"] = PRINT_MEDIA
         headers = {"X-Print-Token": PRINT_TOKEN} if PRINT_TOKEN else {}
         try:
-            r = self.http.post(f"{self.api}/captures/{photo.id}/print", params=params, headers=headers, timeout=20)
+            with diag.action("print", log, photo_id=photo.id):
+                r = self.http.post(f"{self.api}/captures/{photo.id}/print", params=params, headers=headers, timeout=20)
         except httpx.HTTPError as e:
             return {"error": f"could not reach the print server ({type(e).__name__})"}
         if r.status_code != 200:
@@ -438,14 +443,18 @@ class CameraApp:
         self.say(f"Making a {sv['kind']}…")
         self.state.busy = f"Making a {sv['kind']}"
         up.join(30)
+        if "error" in prepared:
+            diag.caught(log, "capture upload failed; taking the one-shot route", prepared["error"])
         seed = str(int(time.time()) % 100000)
         if prepared.get("id"):
-            r = self.http.post(f"{self.api}/capture/finish", data={"prepared": prepared["id"], "dial": str(sense.SOUVENIR),
-                                                                   "seed": seed, "souvenir": json.dumps(sv)})
+            with diag.action("render", log):
+                r = self.http.post(f"{self.api}/capture/finish", data={"prepared": prepared["id"], "dial": str(sense.SOUVENIR),
+                                                                        "seed": seed, "souvenir": json.dumps(sv)})
         else:   # an older server, or the upload failed: the one-shot route
-            r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
-                               data={"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": seed,
-                                     "souvenir": json.dumps(sv)})
+            with diag.action("render", log):
+                r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
+                                   data={"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": seed,
+                                         "souvenir": json.dumps(sv)})
         r.raise_for_status()
         return self._store_server(r.json())
 
@@ -477,7 +486,7 @@ class CameraApp:
             res.raise_for_status()
             return self._store_server(res.json(), files)
         except httpx.HTTPError as e:   # offline: the photo still exists, on the camera only
-            print(f"[camera] publish failed ({type(e).__name__}); keeping the photo on the camera")
+            diag.caught(log, "publish failed; keeping the photo on the camera", e)
             pid = "cam" + datetime.now().strftime("%Y%m%d%H%M%S")
             d = HOME / "photos" / pid
             d.mkdir(parents=True, exist_ok=True)
@@ -491,6 +500,10 @@ class CameraApp:
             return photo
 
     def _store_server(self, meta: dict, files: dict[str, bytes] | None = None) -> Photo:
+        with diag.action("save_photo", log, photo_id=meta["id"]):
+            return self._store(meta, files)
+
+    def _store(self, meta: dict, files: dict[str, bytes] | None = None) -> Photo:
         pid = meta["id"]
         d = HOME / "photos" / pid
         d.mkdir(parents=True, exist_ok=True)
@@ -513,14 +526,15 @@ class CameraApp:
 
     def _tag(self, photo: Photo) -> None:
         jpeg = Path(photo.local_photo).read_bytes() if photo.local_photo else b""
-        tags, source = tagger.tag(jpeg, photo.readings, photo.dial_name)
+        with diag.action("tag", diag.get("tagger"), photo_id=photo.id):
+            tags, source = tagger.tag(jpeg, photo.readings, photo.dial_name)
         if source != "muse":
             return
         photo.caption, photo.tags, photo.scene, photo.mood, photo.people = (
             tags["caption"], tags["tags"], tags["scene"], tags["mood"], tags["people"])
         (Path(photo.local_photo).parent / "tags.json").write_text(json.dumps(tags, indent=2))
         self.library.add(photo)
-        print(f"[tagger] {photo.id}: {photo.caption}")
+        diag.event(diag.get("tagger"), "tag_done", photo_id=photo.id)   # the caption lives on the photo, not the log
 
     def _auto_post(self, photo: Photo, tagger_thread: threading.Thread) -> None:
         """Every AI Camera photo goes to the account (NIMBUS_AUTO_POST=0 to stop). Waits for the tags so the

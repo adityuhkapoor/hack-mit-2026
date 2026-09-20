@@ -25,7 +25,9 @@ from pathlib import Path
 import httpx
 from jwcrypto.common import json_encode
 
-from . import keys, tagger
+from . import diag, keys, tagger
+
+log = diag.get("shop")
 
 IDENTIFY_PROMPT = """Name the thing in this photograph as precisely as a shop listing would, and suggest what a
 shopper who wants it might also buy.
@@ -143,7 +145,7 @@ def open_food_facts(query: str) -> dict | None:
                     p["brands"] = ", ".join(p["brands"])
                 return p
     except Exception as e:
-        print(f"[shop] Open Food Facts unavailable ({type(e).__name__})")
+        diag.caught(log, "Open Food Facts unavailable", e)
     return None
 
 
@@ -153,7 +155,7 @@ def web_search(query: str, n: int = 8) -> list[dict]:
         from ddgs import DDGS
         return list(DDGS().text(f"{query} buy price", max_results=n))
     except Exception as e:
-        print(f"[shop] web search unavailable ({type(e).__name__}: {e})")
+        diag.caught(log, "web search unavailable", e)
         return []
 
 
@@ -165,7 +167,7 @@ def product_image(query: str) -> str | None:
             if r.get("image", "").startswith("http"):
                 return r["image"]
     except Exception as e:
-        print(f"[shop] image search unavailable ({type(e).__name__})")
+        diag.caught(log, "image search unavailable", e)
     return None
 
 

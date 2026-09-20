@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 import math
 import os
 import queue
@@ -19,6 +20,9 @@ import time
 import cv2
 import numpy as np
 
+from . import diag
+
+log = diag.get("hw")
 KNOWN = {"temp_c", "rh", "lux", "db", "pm25", "pressure_hpa", "cct"}
 
 
@@ -147,7 +151,8 @@ class PiSensors:
                         time.sleep(0.1)
             except OSError as e:          # the Arduino was unplugged or is busy; keep trying
                 self._bus = None
-                print(f"[thermal] {e}; retrying")
+                if diag.throttled("thermal-bus", 60):   # a down board must not fill the log
+                    diag.caught(log, "thermal bus error; retrying", e)
                 time.sleep(2)
 
     def _update(self, frame: list[float]) -> None:
@@ -199,7 +204,9 @@ class PiSensors:
             rms = float(np.sqrt(np.mean(np.square(rec))))
             # float(): numpy scalars do not survive json.dumps, and these readings are posted as JSON
             return round(float(94 + 20 * np.log10(max(rms, 1e-6))), 1)   # dBFS → rough dBA
-        except Exception:
+        except Exception as e:
+            if diag.throttled("mic-sample", 60):
+                diag.caught(log, "could not sample the mic", e, level=logging.DEBUG)
             return None
 
     def readings(self) -> dict:
@@ -241,7 +248,7 @@ class Camera:
                 if m:
                     found = int(m.group(1))
                     if found != index:
-                        print(f"[camera] {want} is /dev/video{found}")
+                        log.info("%s is /dev/video%s", want, found)
                     return found
         return index
 
@@ -265,7 +272,7 @@ class Camera:
             if time.time() > deadline:
                 raise RuntimeError(f"camera {index} did not open (on a Mac: System Settings → Privacy & "
                                    "Security → Camera → allow the terminal app, then relaunch)")
-            print("[camera] waiting for camera permission…", flush=True)
+            log.info("waiting for camera permission…")
             time.sleep(1.5)
 
     # -- exposure (Linux / v4l2; a no-op elsewhere) -----------------------------------------------
@@ -371,7 +378,7 @@ class PiButtons:
             if release:
                 b.when_released = lambda r=release: r()
             self.buttons[name] = b
-        print(f"[buttons] {', '.join(f'{n}=GPIO{p}' for n, p in self.pins().items())}")
+        log.info("buttons: %s", ', '.join(f'{n}=GPIO{p}' for n, p in self.pins().items()))
 
     @classmethod
     def pins(cls) -> dict[str, int]:
@@ -408,7 +415,7 @@ class I2CButtons:
         self._held = 0
         self._stop = threading.Event()
         threading.Thread(target=self._loop, daemon=True).start()
-        print(f"[buttons] i2c {', '.join(f'{n}=D{p}' for n, p in self.pins.items())}")
+        log.info("buttons i2c: %s", ', '.join(f'{n}=D{p}' for n, p in self.pins.items()))
 
     @classmethod
     def pin_map(cls) -> dict[str, int]:
@@ -423,7 +430,9 @@ class I2CButtons:
         while not self._stop.is_set():
             try:
                 held, latched = self.sensors.buttons()
-            except OSError:
+            except OSError as e:
+                if diag.throttled("i2c-buttons", 60):
+                    diag.caught(log, "button poll failed", e)
                 time.sleep(1)
                 continue
             self.step(held, latched)
@@ -438,7 +447,7 @@ class I2CButtons:
             if pressed & bit:
                 name = self.names.get(pin)
                 if name is None:
-                    print(f"[buttons] unnamed pin D{pin} pressed (name it in NIMBUS_BUTTONS)")
+                    log.info("unnamed pin D%s pressed (name it in NIMBUS_BUTTONS)", pin)
                 else:
                     press = self.handlers.get(name, (None, None))[0]
                     if press:
@@ -549,7 +558,7 @@ class PushToTalkAudio:
                 for i in range(0, len(audio), 1400):      # under one UDP datagram each
                     sock.sendto(audio[i:i + 1400], addr)
             except OSError:
-                pass
+                pass            # the UDP tap is best-effort
 
     def interrupt(self) -> None:
         try:

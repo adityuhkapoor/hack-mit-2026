@@ -16,7 +16,7 @@ import os
 import shlex
 import threading
 
-from . import keys
+from . import diag, keys
 from .app import CameraApp
 from .hw import Camera, MacSensors
 from .library import open_library
@@ -56,6 +56,7 @@ def main() -> None:
     ap.add_argument("--no-voice", action="store_true")
     args = ap.parse_args()
 
+    diag.setup()
     camera = Camera(args.camera, args.image)
     if args.pi:
         from .hw import PiSensors
@@ -67,10 +68,11 @@ def main() -> None:
         sensors = BridgeSensors()
     app = CameraApp(sensors, camera, open_library(not args.local_library),
                     render_locally=not args.server_real)
-    print(f"[camera] library: {app.library.kind} · keys: {keys.status()}")
+    diag.get("camera").info(f"library: {app.library.kind} · keys: {keys.status()}")
 
     if args.script:
         run_script(app, args.script)
+        diag.shutdown()
         return
 
     from .ui import Screen
@@ -80,7 +82,7 @@ def main() -> None:
             from .voice import Voice
             voice = Voice(app)
         except Exception as e:
-            print(f"[voice] off: {e}")
+            diag.caught(diag.get("voice"), "off", e)
     screen = Screen(app, voice)
     if args.text:
         from .voice import text_session
@@ -90,6 +92,7 @@ def main() -> None:
     finally:
         if voice:
             voice.close()
+        diag.shutdown()
 
 
 if __name__ == "__main__":

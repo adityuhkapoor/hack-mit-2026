@@ -136,3 +136,26 @@ ssh raspi4 'cd ~/nimbus/device && NIMBUS_SEG=human ../.venv/bin/python -m nimbus
 change between frames), the light level from the camera frame, and sound from the webcam microphone.
 Humidity, wind and cloud come from the local weather and are labelled "(web)" on the card.
 `NIMBUS_SEG=human` picks the light segmentation model, which the Pi can actually run.
+
+## Logs and crash diagnostics
+
+The app writes a structured log next to the console output (`~/nimbus-run.log` still gets the same
+`[name] message` lines as before — now through `nimbus_cam.diag`):
+
+| File | What |
+|---|---|
+| `~/nimbus-logs/nimbus.jsonl` | JSON lines: `ts`, `level`, `component`, `thread`, `session`, `msg`, plus event fields (`event`, `op`, `outcome`, `duration_ms`, `photo_id`) and a redacted stack for errors |
+| `~/nimbus-logs/nimbus-fault.log` | `faulthandler` stacks on a fatal signal (segfault/abort) — the file a normal exception hook cannot write |
+
+Config (env): `NIMBUS_LOG_DIR`, `NIMBUS_LOG_LEVEL` (INFO), `NIMBUS_LOG_MAX_BYTES` (1 MB),
+`NIMBUS_LOG_BACKUPS` (4 → ≤ ~5 MB on disk), `NIMBUS_PERF_S` (aggregate render/CPU/RSS summary
+interval; `0` disables). Rotation is bounded; a full or missing disk degrades to console output
+with a throttled `[diag]` note — the camera never crashes over a log.
+
+After a crash: `cat ~/nimbus-logs/nimbus-fault.log`, then `tail -200 ~/nimbus-logs/nimbus.jsonl`
+(or `jq 'select(.component=="camera")'`). Unhandled exceptions in the main thread, worker threads
+and Tk callbacks land as `event:"crash"` records; caught errors carry `exc` with a redacted stack.
+
+Not captured: SIGKILL/OOM, power loss, and crashes in native code after faulthandler runs. Also not
+logged, on purpose: tool parameters/results, transcripts, photos, audio, credentials — event fields
+are allowlisted and exception text is redacted before it is written.
