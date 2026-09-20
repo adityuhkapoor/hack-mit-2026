@@ -353,7 +353,7 @@ LAYOUT = {
     "viewfinder": ["mode", "shoot", "talk", "gallery"],
     "review": ["back", "prev", "next", "phone", "print", "post", "shop", "talk"],
     "qr": ["back"],
-    "shop": ["back", "buy", "talk"],
+    "shop": ["back", "prev", "next", "buy", "talk"],
 }
 
 
@@ -1181,8 +1181,10 @@ class Skin:
             blit_text(img, chip, x + 14, 98 + 15 + cap_height(14) / 2, 14, "Bold", SLATE)
             if st.offers:
                 self._qr_small(img, ctx.offer_url or "", 896, 20)
-            for i, o in enumerate(st.offers[:3]):
-                self._offer(img, x, 138 + i * 63, o, i, now, a)
+            sel = getattr(st, "offer_index", 0)
+            start = max(0, min(sel - 1, len(st.offers) - 3))       # a window of three around the selection
+            for row, i in enumerate(range(start, min(start + 3, len(st.offers)))):
+                self._offer(img, x, 138 + row * 63, st.offers[i], i, now, a, selected=(i == sel), count=len(st.offers))
             if not st.offers:
                 blit_text(img, "nothing for sale found", x, 176, 20, "Bold", BAD)
         r = st.receipt
@@ -1198,23 +1200,31 @@ class Skin:
         hl.putalpha(ImageChops.multiply(hl.getchannel("A"), mask_rrect(w, 52, 26)))
         img.paste(hl, (x, y), hl)
 
-    def _offer(self, img, x, y, o, i, now, a):
-        p = prog(now, a["offers_t0"], 0.55, 0.15 + i * 0.1)
+    def _offer(self, img, x, y, o, i, now, a, selected=None, count=1):
+        """One offer row. The selected one (the shopper browses with < > or by voice) is lime with a tag
+        that says what it is: the product itself, an alternative, something that goes with it."""
+        p = prog(now, a["offers_t0"], 0.55, 0.15 + min(i, 2) * 0.1)
         dx = (1 - POP(p)) * 120 if p < 1 else 0
         al = clamp(p / 0.3) if p < 1 else 1.0
-        best = i == 0
+        best = selected if selected is not None else i == 0
         sp = Image.new("RGBA", (508, 60), (0, 0, 0, 0))
         if best:
             sp.paste(rrect(500, 52, 26, PINK + (255,)), (4, 5), rrect(500, 52, 26, PINK + (255,)))
         body = rrect(500, 52, 26, (LIME if best else WHITE) + (255,), SLATE + (255,), 3)
         sp.paste(body, (0, 0), body)
         blit_text(sp, o.price_text(), 18, 26 + cap_height(22, "ExtraBold") / 2, 22, "ExtraBold", SLATE, track=-0.44)
-        blit_text(sp, o.merchant[:22], 18 + 92 + 14, 26 + cap_height(18) / 2, 18, "Bold", SLATE)
-        if best:
-            tw = text_width("BEST", 12.5, "ExtraBold", 1.0)
+        why = getattr(o, "why", "this")
+        label = o.merchant[:22] if why == "this" else f"{getattr(o, 'item', '')[:16]} · {o.merchant[:12]}"
+        blit_text(sp, label, 18 + 92 + 14, 26 + cap_height(18) / 2, 18, "Bold", SLATE)
+        tag = {"this": "BEST" if i == 0 else "", "alternative": "ALT", "goes with": "PAIRS", "ingredient": "MAKE IT",
+               "make it at home": "MAKE IT"}.get(why, "MORE")
+        if count > 1 and best:
+            tag = f"{i + 1}/{count}" + (f" · {tag}" if tag else "")
+        if tag:
+            tw = text_width(tag, 12.5, "ExtraBold", 1.0)
             tg = rrect(tw + 20, 24, 12, SLATE + (255,))
             sp.paste(tg, (500 - 18 - tw - 20, 14), tg)
-            blit_text(sp, "BEST", 500 - 18 - tw - 10, 26 + cap_height(12.5, "ExtraBold") / 2, 12.5, "ExtraBold", WHITE, track=1.0)
+            blit_text(sp, tag, 500 - 18 - tw - 10, 26 + cap_height(12.5, "ExtraBold") / 2, 12.5, "ExtraBold", WHITE, track=1.0)
         blit(img, sp, x + dx, y, al)
 
     def _qr_small(self, img, url, x, y):

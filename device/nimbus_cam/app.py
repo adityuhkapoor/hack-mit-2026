@@ -82,6 +82,7 @@ class State:
     product: shop.Product | None = None # Shop: what the current photo is, what it costs, the receipt
     offers: list = field(default_factory=list)
     receipt: shop.Receipt | None = None
+    offer_index: int = 0                # the offer the shopper is looking at (browse with show_offer)
     paying_since: float = 0.0           # > 0 while the Visa terminal animation plays
 
 
@@ -304,15 +305,53 @@ class CameraApp:
             finally:
                 self.state.busy = ""
             shop.save(pdir, product, offers)
-        if product.image_url and not (pdir / "product.jpg").exists():
-            shop.fetch_image(product.image_url, pdir / "product.jpg")
+        threading.Thread(target=self._item_images, args=(pdir, product, offers), daemon=True).start()
         self.state.current, self.state.screen = photo, "shop"
-        self.state.product, self.state.offers, self.state.receipt = product, offers, None
+        self.state.product, self.state.offers, self.state.receipt, self.state.offer_index = product, offers, None, 0
         best = offers[0] if offers else None
         self.say(f"{product.label()} — {best.price_text()} at {best.merchant}" if best else f"{product.label()} — nothing for sale found")
         return {"product": product.label(), "category": product.category, "confidence": product.confidence,
-                "offers": [{"merchant": o.merchant, "price": o.price, "currency": o.currency, "url": o.url} for o in offers],
-                "buyable": bool(best), "next": "call buy_it to pay with Visa" if best else "nothing to buy"}
+                "offers": [{"n": i + 1, "item": o.item, "why": o.why, "merchant": o.merchant, "price": o.price,
+                            "currency": o.currency, "url": o.url} for i, o in enumerate(offers)],
+                "selected": 1 if best else None,
+                "buyable": bool(best), "next": "show_offer to browse, buy_it to pay with Visa" if best else "nothing to buy"}
+
+    def _item_images(self, pdir: Path, product: shop.Product, offers: list) -> None:
+        """A catalogue picture per distinct item, fetched after the screen is already up."""
+        if product.image_url and not (pdir / "product.jpg").exists():
+            shop.fetch_image(product.image_url, pdir / "product.jpg")
+        seen = {product.label()}
+        for o in offers:
+            if o.item in seen:
+                continue
+            seen.add(o.item)
+            dest = pdir / f"item_{shop.slug(o.item)}.jpg"
+            if not dest.exists() and (url := shop.product_image(o.item)):
+                shop.fetch_image(url, dest)
+
+    def show_offer(self, p: dict | None = None) -> dict:
+        """Move through the offers on the shop screen: next, previous, or a number."""
+        st = self.state
+        if not st.offers:
+            return {"error": "nothing to browse: identify a product first"}
+        which = str((p or {}).get("which", "next")).strip().lower()
+        n = len(st.offers)
+        if which in ("next", "forward", ""):
+            st.offer_index = (st.offer_index + 1) % n
+        elif which in ("previous", "prev", "back"):
+            st.offer_index = (st.offer_index - 1) % n
+        elif which.isdigit():
+            st.offer_index = max(0, min(int(which) - 1, n - 1))
+        else:   # by name
+            hits = [i for i, o in enumerate(st.offers) if which in (o.item + " " + o.merchant).lower()]
+            if not hits:
+                return {"error": f"no offer matching '{which}'", "count": n}
+            st.offer_index = hits[0]
+        st.screen = "shop"
+        o = st.offers[st.offer_index]
+        self.say(f"{st.offer_index + 1}/{n} · {o.item} — {o.price_text()} at {o.merchant}")
+        return {"selected": st.offer_index + 1, "of": n, "item": o.item, "why": o.why, "merchant": o.merchant,
+                "price": o.price, "currency": o.currency, "estimated": o.estimated}
 
     def buy_it(self, p: dict | None = None) -> dict:
         st = self.state
@@ -320,8 +359,9 @@ class CameraApp:
             r = self.identify_product(p)
             if "error" in r or not r.get("buyable"):
                 return r if "error" in r else {"error": "nothing for sale was found for this photo"}
-        which = int((p or {}).get("offer", 1) or 1) - 1
+        which = int((p or {}).get("offer") or (st.offer_index + 1)) - 1
         offer = st.offers[max(0, min(which, len(st.offers) - 1))]
+        st.offer_index = max(0, min(which, len(st.offers) - 1))
         st.paying_since = time.time()               # the terminal animation runs while Visa answers
         try:
             receipt = shop.checkout(offer)
@@ -335,7 +375,7 @@ class CameraApp:
             shop.save(Path(st.current.local_photo).parent, st.product, st.offers, receipt)
         self.say(f"{'Paid' if receipt.approved else 'Declined'} · {receipt.network} ····{receipt.last4}")
         return {"approved": receipt.approved, "amount": receipt.amount, "currency": receipt.currency,
-                "merchant": offer.merchant, "card": f"Visa ending {receipt.last4}", "network": receipt.network,
+                "item": offer.item, "merchant": offer.merchant, "card": f"Visa ending {receipt.last4}", "network": receipt.network,
                 "auth_code": receipt.auth_code, "note": receipt.message, "link_on_screen": offer.url}
 
     def print_photo(self, p: dict | None = None) -> dict:
@@ -369,7 +409,7 @@ class CameraApp:
         return {"printing": True, "what": what, "job": r.json().get("job")}
 
     TOOLS = ("take_photo", "set_mode", "read_air", "search_photos", "photo_details", "show_photo",
-             "send_to_phone", "post_instagram", "identify_product", "buy_it", "print_photo")
+             "send_to_phone", "post_instagram", "identify_product", "show_offer", "buy_it", "print_photo")
 
     # -----------------------------------------------------------------------------------------
     # capture, storage, tagging

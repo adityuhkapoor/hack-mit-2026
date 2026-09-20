@@ -35,7 +35,7 @@ def photo(posted=False):
 
 def state(screen="viewfinder", dial=0, **kw):
     d = dict(screen=screen, dial=dial, current=None, results=[], index=0, busy="", toast="", talking=False, product=None,
-             offers=[], receipt=None, paying_since=0.0)
+             offers=[], receipt=None, paying_since=0.0, offer_index=0)
     d.update(kw)
     return NS(**d)
 

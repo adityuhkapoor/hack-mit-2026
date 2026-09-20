@@ -129,9 +129,11 @@ class Screen:
                        Button("shop", "SHOP", 0.71, 0.83, lambda: self._bg(app.identify_product, {})),
                        Button("talk", "TALK", 0.83, 0.98, None, hold=True)],
             "qr": [Button("back", "BACK", 0.02, 0.3, lambda: app.show_photo({"which": "viewfinder"}))],
-            "shop": [Button("back", "BACK", 0.02, 0.2, lambda: app.show_photo({"which": "viewfinder"})),
-                     Button("buy", "BUY WITH VISA", 0.2, 0.7, lambda: self._bg(app.buy_it, {}), accent=True),
-                     Button("talk", "TALK", 0.7, 0.98, None, hold=True)],
+            "shop": [Button("back", "BACK", 0.02, 0.16, lambda: app.show_photo({"which": "viewfinder"})),
+                     Button("prev", "<", 0.16, 0.25, lambda: app.show_offer({"which": "previous"})),
+                     Button("next", ">", 0.25, 0.34, lambda: app.show_offer({"which": "next"})),
+                     Button("buy", "BUY WITH VISA", 0.34, 0.76, lambda: self._bg(app.buy_it, {}), accent=True),
+                     Button("talk", "TALK", 0.76, 0.98, None, hold=True)],
         }
 
     def _screen_buttons(self) -> list[Button]:
@@ -229,10 +231,16 @@ class Screen:
         return self._photo_cache[1]
 
     def _product_image(self, photo) -> Image.Image | None:
-        """The product's own picture (from Open Food Facts), when the shop found one for this photo."""
+        """The picture of the item the shopper is looking at: the product's own, or a related item's."""
         if not photo or not photo.local_photo:
             return None
+        st = self.app.state
         path = Path(photo.local_photo).parent / "product.jpg"
+        if st.offers and 0 <= st.offer_index < len(st.offers):
+            o = st.offers[st.offer_index]
+            if o.why != "this":
+                from .shop import slug
+                path = Path(photo.local_photo).parent / f"item_{slug(o.item)}.jpg"
         try:
             key = (str(path), path.stat().st_mtime_ns)
         except OSError:
@@ -257,7 +265,8 @@ class Screen:
         return SimpleNamespace(
             st=st, now=now, frame=frame, air=self.air, buttons=self._screen_buttons(), photo=photo,
             photo_key=p.local_photo if p else None, product_img=self._product_image(p) if st.screen == "shop" else None,
-            link=(p.public_link or p.link or "") if p else "", offer_url=st.offers[0].url if st.offers else "",
+            link=(p.public_link or p.link or "") if p else "",
+            offer_url=st.offers[min(st.offer_index, len(st.offers) - 1)].url if st.offers else "",
             expected=self.EXPECTED)
 
     def render(self) -> Image.Image:

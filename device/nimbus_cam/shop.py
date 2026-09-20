@@ -27,24 +27,31 @@ from jwcrypto.common import json_encode
 
 from . import keys, tagger
 
-IDENTIFY_PROMPT = """Name the product in this photograph as precisely as a shop listing would.
+IDENTIFY_PROMPT = """Name the thing in this photograph as precisely as a shop listing would, and suggest what a
+shopper who wants it might also buy.
 Reply with JSON only:
-{"name": "<product name as sold, e.g. 'Red Bull Energy Drink'>",
+{"name": "<product name as sold, e.g. 'Red Bull Energy Drink'; for a prepared dish its name, e.g. 'chicken pad thai'>",
  "brand": "<brand or null>",
  "variant": "<flavour, colour, model or size, e.g. '8.4 fl oz can', or null>",
- "category": "<one of: food, drink, electronics, clothing, book, toy, sports, beauty, home, other>",
+ "category": "<one of: dish, food, drink, electronics, clothing, book, toy, sports, beauty, home, other>",
  "confidence": <0 to 1>,
- "search_query": "<the exact words to search a shop for it>"}
-If there is no buyable product, use confidence 0 and describe what is there in name."""
+ "search_query": "<the exact words to search a shop for it>",
+ "related": [{"name": "<a related product>", "search_query": "<words to search for it>",
+              "why": "<'alternative' | 'goes with' | 'ingredient' | 'make it at home'>"}]}
+category "dish" is cooked food on a plate or in a bowl (order it for delivery); "food" is a packaged
+grocery item. Give 2 or 3 related products: for a dish, a way to order it and its key ingredient or a kit
+to make it; for a drink, its other flavour and a snack; for a gadget, its accessory.
+If there is no buyable product, use confidence 0, describe what is there in name, and related = []."""
 
-OFFERS_PROMPT = """A shopper photographed: {product}.
-Below are live search results. Pick the results that sell exactly this product (same brand and variant) and
-turn them into offers. Reply with JSON only:
-{{"offers": [{{"merchant": "<store name>", "title": "<listing title>", "price": <number>,
+OFFERS_PROMPT = """A shopper photographed: {product}. They may also want the related items listed below.
+For each item there are live search results. Pick the results that sell exactly that item and turn them
+into offers. Reply with JSON only:
+{{"offers": [{{"item": <item number>, "merchant": "<store name>", "title": "<listing title>", "price": <number>,
               "estimated": <true if the price is not in the result text>, "currency": "USD", "url": "<the result url>"}}]}}
-At most 3 offers, best first (a listed price beats an estimate, a known US retailer beats a marketplace).
-When the result gives no price, put your best estimate of the usual US price for that exact item and size
-and set estimated to true. If nothing matches, return an empty list.
+Up to 3 offers for item 0 and 1 or 2 for each other item, best first within an item (a single unit beats a
+case or multipack, a listed price beats an estimate, a known US retailer or delivery service beats a
+marketplace). If a listing is a multipack, say so in the title ("24-pack") and give the pack price. When the result gives no price, put
+your best estimate of the usual US price for that item and set estimated to true. Skip an item with no match.
 
 {results}"""
 
@@ -58,6 +65,7 @@ class Product:
     confidence: float = 0.0
     search_query: str = ""
     image_url: str | None = None      # from Open Food Facts when it knows the product
+    related: list = field(default_factory=list)    # [{"name", "search_query", "why"}]
 
     def label(self) -> str:
         name = self.name if not self.brand or self.brand.lower() in self.name.lower() else f"{self.brand} {self.name}"
@@ -72,6 +80,9 @@ class Offer:
     price: float | None = None
     currency: str = "USD"
     estimated: bool = False           # the price was not on the listing; Muse's guess at the usual one
+    item: str = ""                    # what this offer is for: the product itself or a related item
+    why: str = "this"                 # "this" | "alternative" | "goes with" | "ingredient" | "make it at home"
+    image_url: str | None = None      # a catalogue picture of the item
 
     def price_text(self) -> str:
         if self.price is None:
@@ -106,9 +117,13 @@ def identify(jpeg: bytes) -> Product:
                                            {"type": "text", "text": IDENTIFY_PROMPT},
                                            {"type": "image_url", "image_url": {"url": tagger._data_url(jpeg)}}]}])
     d = _json(r.choices[0].message.content or "")
+    related = [{"name": str(x.get("name", ""))[:60], "search_query": str(x.get("search_query") or x.get("name", ""))[:120],
+                "why": str(x.get("why") or "goes with")[:20]}
+               for x in (d.get("related") or []) if isinstance(x, dict) and x.get("name")][:3]
     return Product(name=str(d.get("name") or "something")[:80], brand=_opt(d.get("brand")),
                    variant=_opt(d.get("variant")), category=str(d.get("category") or "other").lower(),
-                   confidence=float(d.get("confidence") or 0), search_query=str(d.get("search_query") or "")[:120])
+                   confidence=float(d.get("confidence") or 0), search_query=str(d.get("search_query") or "")[:120],
+                   related=related)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -164,7 +179,13 @@ def fetch_image(url: str, dest: Path) -> Path | None:
         return None
 
 
+DELIVERY_NEAR = os.environ.get("NIMBUS_DELIVERY_NEAR", "Cambridge MA")
+
+
 def find(product: Product) -> list[Offer]:
+    """Offers for the product and for its related items, the product's first. One web search per item
+    (in parallel) and one Muse call to turn all the results into offers."""
+    from concurrent.futures import ThreadPoolExecutor
     query = product.search_query or product.label()
     if product.category in ("food", "drink"):
         off = open_food_facts(query)
@@ -172,28 +193,40 @@ def find(product: Product) -> list[Offer]:
             product.image_url = off.get("image_front_url")
             if off.get("quantity") and not product.variant:
                 product.variant = off["quantity"]
-    if not product.image_url:
-        product.image_url = product_image(query)
-    results = web_search(query)
-    if not results:
+    items = [{"name": product.label(), "why": "this",
+              "search_query": f"order {query} delivery near {DELIVERY_NEAR}" if product.category == "dish" else query}]
+    items += [{"name": x["name"], "why": x["why"], "search_query": x["search_query"]} for x in product.related]
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        searches = list(pool.map(lambda it: web_search(it["search_query"], 8 if it["why"] == "this" else 4), items))
+        if not product.image_url:
+            product.image_url = product_image(query)
+    if not any(searches):
         return []
     client = tagger._client()
     if client is None:
-        return [Offer(merchant=_host(r["href"]), title=r["title"], url=r["href"]) for r in results[:3]]
-    text = "\n".join(f"- {r['title']} | {r['href']} | {r.get('body', '')[:200]}" for r in results)
-    r = client.chat.completions.create(model=tagger.MODEL, max_tokens=2500, reasoning_effort=tagger.REASONING,   # it reasons over the results first; 600 starved the answer
+        return [Offer(merchant=_host(r["href"]), title=r["title"], url=r["href"], item=items[0]["name"]) for r in searches[0][:3]]
+    text = "\n\n".join(f"item {k}: {it['name']} ({it['why']})\n" +
+                       "\n".join(f"- {r['title']} | {r['href']} | {r.get('body', '')[:160]}" for r in res)
+                       for k, (it, res) in enumerate(zip(items, searches)) if res)
+    r = client.chat.completions.create(model=tagger.MODEL, max_tokens=3500, reasoning_effort=tagger.REASONING,   # it reasons over the results first; 600 starved the answer
                                        messages=[{"role": "user", "content": OFFERS_PROMPT.format(
                                            product=product.label(), results=text)}])
     offers = []
-    for o in _json(r.choices[0].message.content or "").get("offers", [])[:3]:
+    for o in _json(r.choices[0].message.content or "").get("offers", [])[:9]:
         try:
             price = float(o["price"]) if o.get("price") not in (None, "") else None
         except (TypeError, ValueError):
             price = None
+        try:
+            k = int(o.get("item", 0))
+        except (TypeError, ValueError):
+            k = 0
+        it = items[k] if 0 <= k < len(items) else items[0]
         if o.get("url"):
             offers.append(Offer(merchant=str(o.get("merchant") or _host(o["url"]))[:40], title=str(o.get("title", ""))[:100],
                                 url=str(o["url"]), price=price, currency=str(o.get("currency") or "USD")[:3],
-                                estimated=bool(o.get("estimated", False))))
+                                estimated=bool(o.get("estimated", False)), item=it["name"], why=it["why"]))
+    offers.sort(key=lambda o: 0 if o.why == "this" else 1)       # stable: the product first, then related
     return offers
 
 
@@ -319,6 +352,12 @@ def save(photo_dir: Path, product: Product, offers: list[Offer], receipt: Receip
     (photo_dir / "shop.json").write_text(json.dumps(
         {"product": asdict(product), "offers": [asdict(o) for o in offers],
          "receipt": asdict(receipt) if receipt else None}, indent=2))
+
+
+def slug(text: str, n: int = 40) -> str:
+    import re
+    t = re.sub(r"[^\w\s-]", "", (text or "").lower()).strip()
+    return re.sub(r"[\s_-]+", "-", t)[:n].strip("-") or "item"
 
 
 def _json(text: str) -> dict:

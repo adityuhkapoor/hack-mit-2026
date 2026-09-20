@@ -44,7 +44,9 @@ Use your tools for everything you do or know about photos. Never invent a photo,
 - "post it" -> post_instagram.  "print it", "print this one" -> print_photo (what: card for the QR card).
 - "what is this", "what am I holding", "how much is it", "find this for sale" -> identify_product. Then say
   the product and the best price and ask whether to buy it.
-- "buy it", "yes, order it", "pay with Visa" -> buy_it. Read back the amount, the merchant and the last four
+- "what else is there", "next one", "show me the ramen", "the second one" -> show_offer. Offers include
+  related items: an alternative, something that goes with it, an ingredient, a way to order a dish.
+- "buy it", "buy that one", "yes, order it", "pay with Visa" -> buy_it (the selected offer). Read back the amount, the merchant and the last four
   digits of the card; say "simulated" if the receipt says so.
 If a tool returns an error, say so plainly in one sentence. An AI Camera photo takes about thirty seconds
 while the GPU paints: say you're on it before calling take_photo. In Visa Buy mode take_photo already
@@ -85,9 +87,12 @@ TOOLS: dict[str, dict] = {
     "identify_product": {"description": "Name the product in the photo exactly and find it for sale: merchant, price, link. "
                                         "Shows the offers on screen.",
                          "properties": {"photo": PHOTO}, "timeout": 60},
-    "buy_it": {"description": "Buy the product found for the photo, paying with the camera's Visa card. Returns the receipt.",
+    "show_offer": {"description": "Browse the offers found for the photo on screen: the product itself first, then related items "
+                                  "(alternatives, things that go with it, ingredients). Selects one.",
+                   "properties": {"which": {"type": "string", "description": "next, previous, a number, or words from the item or store"}}},
+    "buy_it": {"description": "Buy the selected offer (or a numbered one), paying with the camera's Visa card. Returns the receipt.",
                "properties": {"photo": PHOTO,
-                              "offer": {"type": "number", "description": "which offer, 1 = the best (default)"}},
+                              "offer": {"type": "number", "description": "which offer; default: the one selected on screen"}},
                "timeout": 45},
     "print_photo": {"description": "Print the photo on the paper printer. It comes out a few seconds later.",
                     "properties": {"photo": PHOTO,
