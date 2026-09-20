@@ -1,7 +1,7 @@
 # Nimbus — read this before touching anything
 
 HackMIT 2026. A camera that photographs the air: the subject stays exactly as shot, the surroundings are
-rendered from what the sensors measured. Two modes, **Nimbus** and **Souvenir**.
+rendered from what the sensors measured. Two modes on the camera: **AI Camera** (the scene becomes one of fifty formats — cave painting to Netflix thumbnail — painted around the untouched subject) and **Visa Buy** (photo → exact product → real Visa sandbox checkout). The pipeline's dial 0 ("Nimbus", the measured air) still exists for the API and voice, but is off the camera's dial.
 
 - **What is running where, right now:** [docs/HANDOFF.md](docs/HANDOFF.md) — start there.
 - **Why it is built this way:** [docs/DESIGN.md](docs/DESIGN.md).

@@ -44,7 +44,11 @@ is patched, `device/unoq/patches/`), and the array delivers one chess subpage pe
 are live at any moment — plenty for temperature and motion. The thermal array is on **Wire2 (A4/A5)** and the
 Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 
-## Shop (Visa) — new
+## The two modes (changed 23:50 ET)
+
+**AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning, 25 s. **Visa Buy** = the shutter takes a plain photo and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
+
+## Shop (Visa)
 
 "What am I holding?" → `identify_product` (Muse vision → live search → offers) → "buy it" → `buy_it`. A
 **SHOP** button is on the review screen. Checkout is a **real Visa Developer sandbox call** (Visa Direct pull-funds, MLE-encrypted, test card) —

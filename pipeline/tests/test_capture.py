@@ -90,8 +90,9 @@ def test_effect_map_directions():
 def test_prompts_mention_conditions():
     p = sense.scene_prompt(sense.Readings(temp_c=2, rh=90))
     assert "frost" in p and "fog" in p and "same places" in p
-    sv = sense.souvenir_prompt("trading card", "a can of Red Bull", sense.Readings())
-    assert "trading card" in sv and "Red Bull" in sv and "no people" in sv.lower()
+    sv = sense.souvenir_prompt("energy drink can", "a can of Red Bull", sense.Readings())
+    assert "energy drink can" in sv and "Red Bull" in sv and "no other people" in sv.lower()
+    assert len(sense.KINDS) == 50 and all(k in sense.SOUVENIRS for k in sense.KINDS)
 
 
 def test_verify_catches_a_touched_subject():

@@ -83,7 +83,7 @@ class Query:
             return None if v in (None, "") else float(v)
         dial = p.get("dial")
         if isinstance(dial, str):
-            names = {n.lower(): i for i, n in sense.DIAL_NAMES.items()}
+            names = {n.lower(): i for i, n in sense.DIAL_NAMES.items()} | {"visa buy": 0, "souvenir": sense.SOUVENIR, "photo": 0}
             dial = names.get(dial.strip().lower())
         return cls(text=str(p.get("query") or ""), after=p.get("after") or None, before=p.get("before") or None,
                    dial=None if dial in (None, "") else int(dial), min_temp_c=f("min_temp_c"),

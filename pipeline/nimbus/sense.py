@@ -35,7 +35,7 @@ from .color import luminance
 
 # Two positions, because one of them already does everything the sensors ask for.
 NIMBUS, SOUVENIR = 0, 1
-DIAL_NAMES = {NIMBUS: "Nimbus", SOUVENIR: "Souvenir"}
+DIAL_NAMES = {NIMBUS: "Nimbus", SOUVENIR: "AI Camera"}
 
 # Ranges a hackathon floor and the street outside will actually produce; readings are clipped to them.
 RANGES = {
@@ -302,24 +302,74 @@ def describe(r: Readings) -> str:
 
 # The keepsakes the camera knows how to make. Muse names one from the scene (see nimbus_cam.tagger);
 # anything it invents is passed through as-is, with these as the examples that keep it plausible.
+# AI Camera: the fifty things a scene can become. kind → what the surroundings are repainted as.
 SOUVENIRS = {
+    "cave painting": "a prehistoric cave wall: ochre and charcoal pigments on rough rock, hand stencils, painted animals",
+    "alien abduction report": "a redacted government file: typewritten dossier, grainy UFO photos, stamped classified, tractor beam light",
+    "medieval wanted poster": "a parchment wanted poster: aged paper, woodcut border, wax seal, torn edges",
+    "sticker on a banana": "a produce sticker on a bright yellow banana peel: glossy oval label, supermarket produce aisle",
+    "dollar bill": "an engraved banknote: green intaglio linework, ornate border, guilloche patterns, a portrait oval",
+    "aquarium species information board": "a public aquarium information panel: deep blue water, coral, a museum-style species plaque",
+    "zoo enclosure sign": "a zoo enclosure sign: green painted wood, a habitat map, leaves and bars at the edges",
+    "dinosaur fossil museum": "a natural history museum hall: fossil bones, a display plinth, dramatic spotlights, stone walls",
+    "hieroglyphic tablet": "a carved Egyptian stone tablet: sandstone relief, hieroglyph columns, gold leaf traces",
+    "renaissance royal portrait": "an oil painting royal portrait: dark varnished background, velvet drapery, a gilded frame",
+    "nasa astronaut id": "a NASA astronaut ID badge: mission patches, a blue starfield, a lanyard, official crest",
+    "forbes 30 under 30": "a business magazine feature: clean white studio backdrop, bold typographic blocks, a laurel emblem",
+    "fortnite loading screen": "a video game loading screen: stylised cel-shaded battle island, glowing storm, dramatic sky",
+    "instant noodle packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
+    "pokemon card": "a collectible monster trading card: holographic foil, energy symbols, a yellow border, an arena backdrop",
+    "sports trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
+    "newspaper front page": "a broadsheet newspaper front page: newsprint texture, halftone photos, column rules, a masthead",
+    "police evidence board": "a detective's evidence board: corkboard, pinned photos, red string, sticky notes",
+    "cereal box": "a breakfast cereal box front: candy colours, a cartoon mascot, milk splash, a bowl of cereal",
+    "hot sauce bottle": "a hot sauce bottle label: flames, chilli peppers, a vintage badge layout, red and black",
+    "milk carton": "a milk carton side panel: white waxed cardboard, blue and black print, a missing-person panel layout",
+    "museum exhibit": "a museum exhibit case: glass vitrine, a spotlit plinth, an engraved brass placard, dark walls",
+    "wwe entrance": "a wrestling arena entrance: pyrotechnics, a titantron screen, smoke, a roaring stadium of lights",
+    "minecraft inventory": "a blocky voxel game inventory: pixelated grid slots, cubes of grass and stone, a crafting table",
+    "celebrity gossip tabloid": "a gossip tabloid cover: hot pink and yellow starbursts, paparazzi flash, shouting headlines",
+    "lottery scratch ticket": "a scratch-off lottery ticket: silver latex panels, lucky sevens, gold coins, bright gradients",
+    "music album cover": "a record album cover: bold graphic art, limited palette, print texture, a parental advisory corner",
+    "energy drink can": "an energy drink can graphic: metallic surface, lightning, neon streaks, extreme sports energy",
+    "youtube thumbnail": "a video thumbnail: saturated colours, a big red arrow, an explosion of emojis, a shocked frame",
+    "netflix thumbnail": "a streaming series key art: moody cinematic lighting, a dark gradient, a red accent glow",
+    "school detention slip": "a school detention slip: pink carbon-copy paper, ruled lines, a rubber stamp, a wooden desk",
+    "employee id at spongebob krusty krab": "a fast-food employee badge at an undersea burger joint: cartoon ocean, a bubbly kitchen, anchor decor",
+    "comic book cover": "a comic book cover: halftone dots, ink outlines, action bursts, a price corner box",
+    "coffee cup sleeve": "a coffee cup sleeve: kraft cardboard, a stamped logo, coffee-ring stains, a cafe counter",
+    "highschool yearbook": "a high school yearbook page: laser-lit studio portrait backdrop, a grid of ovals, cheesy gradients",
+    "wikipedia page": "an online encyclopedia article: white page, an infobox, blue links, a plain sans-serif layout",
+    "sports illustrated": "a sports magazine cover: stadium floodlights, bold red masthead, action photography look",
+    "concert t shirt": "a concert tour t-shirt print: black cotton, distressed white ink, a tour date list, flames",
+    "guinness world records page": "a world records book page: a bold blue and gold layout, a big holographic seal, record photos",
+    "national geographic wildlife documentary": "a wildlife documentary frame: golden savanna light, long grass, a yellow border frame",
+    "grocery store flyer": "a supermarket sale flyer: red price starbursts, product cutouts, a weekly deals grid",
+    "vending machine selection": "a vending machine window: glass front, spiral coils, backlit rows of snacks, a code button pad",
+    "laboratory specimen jar": "a specimen jar in a laboratory: glass and formaldehyde tint, a handwritten label, shelves of jars",
+    "viking saga page": "an illuminated Norse saga manuscript: vellum, runes, knotwork borders, a longship",
+    "shakespeare playbill": "an Elizabethan playbill: cream paper, ornate woodcut flourishes, the Globe theatre",
+    "gravestone": "a weathered gravestone in a churchyard: carved granite, moss, ivy, a misty cemetery",
+    "police lineup": "a police lineup room: height-marked wall, harsh fluorescent light, a numbered card",
+    "barbie doll packaging": "a fashion doll box: hot pink blister packaging, a dreamhouse backdrop, sparkle accents",
+    # kept for older photos and voice requests
     "trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
     "ramen packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
     "ticket stub": "a printed ticket stub: perforated edge, guilloche pattern, ink-stamped date",
     "postcard": "a vintage travel postcard: painted scenery, saturated skies, a soft printed grain",
     "magazine cover": "a glossy magazine cover: studio backdrop, clean colour blocking",
     "seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
-    "vinyl sleeve": "a record sleeve: graphic shapes, limited palette, print texture",
     "stamp": "a postage stamp: engraved lines, perforated border, a flat single-colour field",
 }
+KINDS = list(SOUVENIRS)[:50]        # the fifty on the menu
 
 
 def souvenir_prompt(kind: str, subject: str, r: Readings) -> str:
     """Dial 3: the surroundings become the artwork of a keepsake about whatever is in the picture."""
     look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
-    return (f"Replace the masked surroundings with {look}, celebrating {subject}. Graphic, printed artwork "
-            "filling the whole background, bold and uncluttered behind the subject, leaving the centre clear. "
-            "No text, no lettering, no logos, no people.")
+    return (f"Replace the masked surroundings with {look}, featuring {subject}. Fill the whole background in "
+            "that style, bold and uncluttered right behind the subject so it stays the focus. Match the "
+            "camera height and light direction of image 1. No text, no lettering, no logos, no other people.")
 
 
 def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:

@@ -23,7 +23,10 @@ from . import instagram, shop, tagger
 from .library import HOME, Photo, Query
 
 API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
-DIALS = sense.DIAL_NAMES
+# The camera's two modes. AI Camera renders on the GPU as the pipeline's Souvenir dial; Visa Buy takes a
+# plain photo and goes straight to the shop.
+AI_CAMERA, VISA_BUY = 0, 1
+DIALS = {AI_CAMERA: "AI Camera", VISA_BUY: "Visa Buy"}
 
 
 def _now_iso() -> str:
@@ -94,8 +97,8 @@ class CameraApp:
     def set_mode(self, p: dict) -> dict:
         mode = str(p.get("mode", "")).strip().lower()
         names = ({n.lower(): i for i, n in DIALS.items()} |
-                 {"nimbus": sense.NIMBUS, "normal": sense.NIMBUS, "photo": sense.NIMBUS, "air": sense.NIMBUS,
-                  "souvenir": sense.SOUVENIR, "card": sense.SOUVENIR, "keepsake": sense.SOUVENIR})
+                 {"ai": AI_CAMERA, "camera": AI_CAMERA, "souvenir": AI_CAMERA, "card": AI_CAMERA, "photo": AI_CAMERA,
+                  "visa": VISA_BUY, "buy": VISA_BUY, "shop": VISA_BUY, "shopping": VISA_BUY})
         if mode.isdigit() and int(mode) in DIALS:
             dial = int(mode)
         elif mode in names:
@@ -131,10 +134,12 @@ class CameraApp:
             self.state.busy = ""
             self.sensors.status(2)
         self.state.current, self.state.screen = photo, "review"
-        self.say(f"{photo.dial_name} · {photo.proof}")
         t = threading.Thread(target=self._tag, args=(photo,), daemon=True)
         t.start()
         self._taggers.append(t)
+        if dial == VISA_BUY:                      # the photo is the shopping query
+            return self.identify_product({"photo": photo.id})
+        self.say(f"{photo.dial_name} · {photo.proof}")
         out = self._summary(photo)
         if photo.processed_on == "camera":
             out["note"] = "the GPU server was unavailable, so the surroundings carry only the sensor effects"
@@ -261,28 +266,22 @@ class CameraApp:
     # capture, storage, tagging
 
     def _capture(self, dial: int) -> Photo:
-        """The GPU paints the surroundings. If it cannot be reached, Nimbus mode is rendered here on the
-        camera (the sensor effects alone) rather than failing; Souvenir has no such fallback."""
+        """AI Camera: Muse names what the scene becomes (~3 s) and the GPU paints it around the untouched
+        subject. Visa Buy: a plain photo, kept as shot (the pipeline's Nimbus dial with the GPU skipped)."""
         jpeg = self.camera.jpeg()
         readings = self.sensors.readings()
-        data = {"readings": json.dumps(readings), "dial": str(dial), "seed": str(int(time.time()) % 100000)}
-        if dial == sense.SOUVENIR:
-            # Muse looks at the scene and names the keepsake it should become (~3 s).
-            sv = tagger.souvenir(jpeg)
-            self.say(f"Making a {sv['kind']}…")
-            data["souvenir"] = json.dumps(sv)
-        try:
-            r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
-            r.raise_for_status()
-        except httpx.HTTPError as e:
-            if dial != sense.NIMBUS or not self.render_locally:
-                raise
-            print(f"[camera] GPU server unreachable ({type(e).__name__}); rendering on the camera")
+        if dial == VISA_BUY:
             return self._capture_here(jpeg, readings)
+        sv = tagger.souvenir(jpeg)
+        self.say(f"Making a {sv['kind']}…")
+        data = {"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": str(int(time.time()) % 100000),
+                "souvenir": json.dumps(sv)}
+        r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
+        r.raise_for_status()
         return self._store_server(r.json())
 
     def _capture_here(self, jpeg: bytes, readings: dict) -> Photo:
-        """Real, rendered on this machine (on the UNO Q: on the camera's own board)."""
+        """The photo as shot, processed on this machine (sensor effects only, no GPU)."""
         img = imageio.load_for_render(jpeg, 2400)
         rr, web = lc.with_web_weather(sense.Readings.from_dict(readings))
         cap = lc.take(img, rr, 0, None, web=web)
@@ -300,7 +299,7 @@ class CameraApp:
             d.mkdir(parents=True, exist_ok=True)
             for k, v in files.items():
                 (d / f"{k}.jpg").write_bytes(v)
-            photo = Photo(id=pid, created_at=_now_iso(), dial=0, dial_name=DIALS[0], readings=rr.to_dict(),
+            photo = Photo(id=pid, created_at=_now_iso(), dial=0, dial_name="Photo", readings=rr.to_dict(),
                           web=sorted(web), untouched=cap.proof.untouched, proof=cap.proof.label(),
                           local_photo=str(d / "photo.jpg"), processed_on="camera")
             photo.caption, photo.tags = tagger.from_readings(photo.readings, photo.dial_name)["caption"], []
