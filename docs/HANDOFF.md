@@ -76,11 +76,11 @@ the rig by voice.
   camera frame, sound from the webcam mic, humidity/wind/cloud from Open-Meteo, labelled "(web)".
 - **Screen**: 1024×600 panel, fullscreen, with touch buttons (mode · shutter · hold-to-talk · photos, and
   back/‹ ›/phone/post on a photo).
-- **Audio**: mic = C270 webcam, speaker = the Pi's 3.5 mm jack, both chosen by name. Tone out and 1 s in tested.
+- **Audio**: mic = C270 webcam, speaker = **Whammo 2.0 Bluetooth speaker** (57:DB:A6:6E:87:96, paired and trusted; PipeWire default sink via `pipewire-alsa`), or the 3.5 mm jack. Tone out and 1 s in tested.
   **A speaker must be plugged into the jack to hear the camera.**
 - **Voice**: ElevenLabs agent `agent_3501m2xfqx3yemcb5ph6tr8ekjen`, brain = Muse Spark via custom LLM, ten tools.
-  Tested in text mode: it read the air and answered "when did I take my last photo" from the record. **Nobody
-  has spoken to it on the rig yet.**
+  Spoken to on the rig 20 Sep: "take a picture" → shot, described back through the speaker. Agent is now
+  `agent_2901m2zkxyaped8sevtb87bx13b0` on a fresh ElevenLabs free account (10k characters — spend them on the demo).
 - **Search**: Elasticsearch 8.15 on the ASUS (tarball, no docker), the camera indexes and searches it live.
 - **Instagram**: posting as **@nimbus_hackmit2026**, token verified. **Every AI Camera photo auto-posts** (`NIMBUS_AUTO_POST=0` to stop): the picture alone, 1080² on a blurred pad, no card/QR, Muse's caption.
 - **Souvenir**: Muse saw daisies, chose a seed packet, and produced "WILD DAISY MIX — sunshine you can plant".

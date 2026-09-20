@@ -48,6 +48,10 @@ ASUS.
   owner and feeds the dB meter (`PiSensors.attach_audio`).
 - **An ElevenLabs session cannot be restarted after it closes**: `end_session` shuts the client-tools thread
   pool. Reconnect by building a new `Conversation`. The agent's `turn_timeout` is -1 for push-to-talk.
+- **A Bluetooth speaker only exists inside PipeWire, and PortAudio cannot see PipeWire without
+  `pipewire-alsa`.** Without it the app's "default" output is HDMI and the speaker is silent while the mic
+  works. Pair a speaker that bluez's scan cannot see with `sudo btmgmt pair -c 3 -t 0 <MAC>`, then
+  `bluetoothctl trust/connect`; `NIMBUS_SPEAKER=pipewire,default`.
 - **The Pi's mic and speaker are not the system defaults** (webcam mic, headphone jack). They are chosen by
   name via `NIMBUS_MIC` / `NIMBUS_SPEAKER`.
 - **X on a bare VT from SSH does not work** on the Pi. The panel runs labwc via lightdm autologin, and Nimbus
