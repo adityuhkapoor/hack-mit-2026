@@ -80,6 +80,7 @@ class Voice:
                 self.conv.start_session()
                 self.started = True
                 print("[voice] session open")
+                threading.Thread(target=self._watch, args=(self.conv,), daemon=True).start()
             except Exception as e:
                 self.started = False
                 print(f"[voice] could not open the session: {type(e).__name__}: {e}")
@@ -93,6 +94,26 @@ class Voice:
     def release(self) -> None:
         self.audio.release()
         self.app.state.talking = False
+
+    def _watch(self, conv) -> None:
+        """The SDK's session thread dies uncaught when the server closes the socket before the first
+        message (which is how a credit refusal arrives), so no end-session callback fires. Notice, and say
+        why if it was the quota."""
+        conv._thread.join()
+        if self.conv is conv and self.started:
+            self.started = False
+            print("[voice] session thread died")
+            if self._out_of_credits():
+                self.blocked = time.time()
+                self.app.say("Voice is off: the ElevenLabs account is out of credits")
+
+    def _out_of_credits(self) -> bool:
+        try:
+            import httpx
+            r = httpx.get("https://api.elevenlabs.io/v1/user/subscription", headers={"xi-api-key": self.key}, timeout=10).json()
+            return int(r.get("character_count", 0)) >= int(r.get("character_limit", 1))
+        except Exception:
+            return False
 
     def _ended(self) -> None:
         print("[voice] session ended (the next press reconnects)")
