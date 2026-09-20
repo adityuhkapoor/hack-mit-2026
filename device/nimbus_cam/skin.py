@@ -492,6 +492,14 @@ class Skin:
         mask_rrect(410, 370, 12)
         rrect(996, 70, 24, SLATE + (255,))
         rrect(996, 70, 24, WHITE + (255,), SLATE + (255,), 3)
+        # The first live preview otherwise constructs these supersampled borders
+        # after the splash, producing a several-hundred-millisecond frame on Pi.
+        self._card_base(1008, 404)
+        mask_rrect(998, 394, 21)
+        rrect(34, 34, 9, None, WHITE + (255,), 4)
+        for hint in ("shoot · it becomes one of fifty things · auto-posts",
+                     "shoot a product · find it · buy it with Visa"):
+            text_sprite(hint, 15, "Medium", SLATE)
 
     # ------------------------------------------------------------ assets
 
