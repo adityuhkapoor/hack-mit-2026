@@ -24,6 +24,7 @@ import tkinter as tk
 from PIL import Image, ImageTk
 
 from .app import DIALS, CameraApp
+from .frame_pacing import FramePacer, FrameStats, parse_config
 from .skin import H as DESIGN_H, W as DESIGN_W, Skin
 
 W, H = 800, 480          # the default window; a real panel overrides it (NIMBUS_FULLSCREEN=1)
@@ -53,6 +54,11 @@ class Screen:
         self.app, self.voice = app, voice
         self.root = tk.Tk()
         self.root.title("Nimbus")
+        pacing = parse_config()
+        self._ui_fps = pacing.fps
+        self._frame_pacer = FramePacer(pacing.fps)
+        self._frame_stats = (FrameStats(enabled=True, fps=pacing.fps)
+                             if pacing.stats_enabled else None)
         full = os.environ.get("NIMBUS_FULLSCREEN", "0") == "1" if fullscreen is None else fullscreen
         if full:
             self.W, self.H = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
@@ -320,14 +326,36 @@ class Screen:
             st.toast = ""
 
     def _tick(self) -> None:
-        t0 = time.time()
-        self._watch_toast()
+        callback_started = time.monotonic()
+        stats = self._frame_stats
+        if stats is not None:
+            stats.begin_callback(callback_started)
+        success = False
         try:
-            self._tk = ImageTk.PhotoImage(self.render())
+            self._watch_toast()
+            if stats is not None:
+                t0 = time.monotonic()
+            image = self.render()
+            if stats is not None:
+                stats.record_render(time.monotonic() - t0)
+                t0 = time.monotonic()
+            self._tk = ImageTk.PhotoImage(image)
+            if stats is not None:
+                stats.record_image_upload(time.monotonic() - t0)
+                t0 = time.monotonic()
             self.label.configure(image=self._tk)
+            if stats is not None:
+                stats.record_configure(time.monotonic() - t0)
+            success = True
         except Exception as e:
             print(f"[screen] {e}")
-        self.root.after(max(8, 66 - int((time.time() - t0) * 1000)), self._tick)
+        finally:
+            now = time.monotonic()
+            delay = self._frame_pacer.next_delay_ms(now)
+            if stats is not None:
+                stats.set_missed_deadlines(self._frame_pacer.missed_deadlines)
+                stats.finish_callback(now=now, success=success)
+            self.root.after(delay, self._tick)
 
     def run(self) -> None:
         self.root.mainloop()
