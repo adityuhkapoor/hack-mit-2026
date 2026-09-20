@@ -222,10 +222,28 @@ class PiSensors:
 
 class Camera:
     def __init__(self, index: int = 0, still: str | None = None):
-        self.index = index
+        self.index = self._resolve(index)
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None
-        self.cap = None if still else self._open(index)
+        self.cap = None if still else self._open(self.index)
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _resolve(index: int) -> int:
+        """On Linux the webcam is found by name, not number: after a USB hub reset the C270 came back as
+        /dev/video1 and "camera 0" was gone. /dev/v4l/by-id is stable; NIMBUS_CAMERA names the device."""
+        import glob
+        import re
+        want = os.environ.get("NIMBUS_CAMERA", "C270")
+        for link in sorted(glob.glob("/dev/v4l/by-id/*-video-index0")):
+            if want.lower() in link.lower():
+                target = os.path.realpath(link)
+                m = re.search(r"video(\d+)$", target)
+                if m:
+                    found = int(m.group(1))
+                    if found != index:
+                        print(f"[camera] {want} is /dev/video{found}")
+                    return found
+        return index
 
     @staticmethod
     def _open(index: int, wait_s: float = 30) -> cv2.VideoCapture:
