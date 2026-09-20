@@ -8,6 +8,7 @@ Anything slow (a capture, a search) runs off the UI thread, so the viewfinder ne
 
 from __future__ import annotations
 
+import os
 import threading
 import time
 import tkinter as tk
@@ -19,7 +20,7 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 from .app import DIALS, CameraApp
 
-W, H = 800, 480
+W, H = 800, 480          # the default window; a real panel overrides it (NIMBUS_FULLSCREEN=1)
 
 
 def _font(size: int):
@@ -40,17 +41,25 @@ def _fit(img: Image.Image, w: int, h: int) -> Image.Image:
     return canvas
 
 
-def _bar(d: ImageDraw.ImageDraw, y: int, h: int) -> None:
-    d.rectangle([0, y, W, y + h], fill=(0, 0, 0))
+def _bar(d: ImageDraw.ImageDraw, y: int, h: int, w: int = W) -> None:
+    d.rectangle([0, y, w, y + h], fill=(0, 0, 0))
 
 
 class Screen:
-    def __init__(self, app: CameraApp, voice=None):
+    def __init__(self, app: CameraApp, voice=None, fullscreen: bool | None = None):
         self.app, self.voice = app, voice
         self.root = tk.Tk()
         self.root.title("Nimbus")
-        self.root.geometry(f"{W}x{H}")
-        self.root.resizable(False, False)
+        full = os.environ.get("NIMBUS_FULLSCREEN", "0") == "1" if fullscreen is None else fullscreen
+        if full:
+            self.W, self.H = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            self.root.attributes("-fullscreen", True)
+            self.root.config(cursor="none")
+        else:
+            self.W, self.H = W, H
+            self.root.geometry(f"{W}x{H}")
+            self.root.resizable(False, False)
+        self.F_BIG, self.F_MED, self.F_SMALL = (_font(max(12, int(self.H * s))) for s in (0.058, 0.042, 0.033))
         self.label = tk.Label(self.root, bd=0)
         self.label.pack()
         self.air = ""
@@ -122,44 +131,49 @@ class Screen:
         st = self.app.state
         if st.screen == "viewfinder" or st.current is None:
             f = self.app.camera.frame()
-            img = _fit(Image.fromarray(cv2.resize(f, (W, round(f.shape[0] * W / f.shape[1])))) if f is not None
-                       else Image.new("RGB", (W, H)), W, H)
+            img = _fit(Image.fromarray(cv2.resize(f, (self.W, round(f.shape[0] * self.W / f.shape[1])))) if f is not None
+                       else Image.new("RGB", (self.W, self.H)), self.W, self.H)
             d = ImageDraw.Draw(img, "RGBA")
-            _bar(d, 0, 44)
-            d.text((16, 8), DIALS[st.dial].upper(), font=F_BIG, fill="white")
+            _bar(d, 0, int(self.H * 0.09), self.W)
+            d.text((16, int(self.H * 0.015)), DIALS[st.dial].upper(), font=self.F_BIG, fill="white")
             for i in DIALS:                                  # the dial position, as dots
-                x = W - 30 - 26 * (len(DIALS) - 1 - i)
-                d.ellipse([x - 7, 15, x + 7, 29], outline="white", width=2, fill="white" if i == st.dial else None)
-            _bar(d, H - 36, 36)
-            d.text((16, H - 30), self.air, font=F_SMALL, fill=(220, 220, 220))
+                x = self.W - 30 - 26 * (len(DIALS) - 1 - i)
+                cy = int(self.H * 0.046)
+                d.ellipse([x - 7, cy - 7, x + 7, cy + 7], outline="white", width=2,
+                          fill="white" if i == st.dial else None)
+            _bar(d, self.H - int(self.H * 0.075), int(self.H * 0.075), self.W)
+            d.text((16, self.H - int(self.H * 0.062)), self.air, font=self.F_SMALL, fill=(220, 220, 220))
         elif st.screen == "qr":
-            img = Image.new("RGB", (W, H), "white")
+            img = Image.new("RGB", (self.W, self.H), "white")
             q = qrcode.QRCode(border=2, box_size=10)
             q.add_data(st.current.link or "")
-            code = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((360, 360), Image.NEAREST)
-            img.paste(code, ((W - 360) // 2, 40))
+            side = int(min(self.W, self.H) * 0.72)
+            code = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((side, side), Image.NEAREST)
+            img.paste(code, ((self.W - side) // 2, int(self.H * 0.06)))
             d = ImageDraw.Draw(img)
-            d.text((W // 2, 430), "Scan to get this photo on your phone", font=F_MED, fill="black", anchor="mm")
+            d.text((self.W // 2, self.H - int(self.H * 0.07)), "Scan to get this photo on your phone",
+                   font=self.F_MED, fill="black", anchor="mm")
         else:
             p = st.current
-            img = _fit(self._photo(p.local_photo), W, H) if p.local_photo else Image.new("RGB", (W, H))
+            img = _fit(self._photo(p.local_photo), self.W, self.H) if p.local_photo else Image.new("RGB", (self.W, self.H))
             d = ImageDraw.Draw(img, "RGBA")
-            _bar(d, H - 64, 64)
-            d.text((16, H - 58), (p.caption or p.dial_name)[:90], font=F_SMALL, fill="white")
+            _bar(d, self.H - int(self.H * 0.135), int(self.H * 0.135), self.W)
+            d.text((16, self.H - int(self.H * 0.12)), (p.caption or p.dial_name)[:90], font=self.F_SMALL, fill="white")
             pos = f"{st.index + 1}/{len(st.results)}  ·  " if st.screen == "browse" and st.results else ""
-            d.text((16, H - 32), f"{pos}{p.dial_name}  ·  {p.proof}", font=F_SMALL,
+            d.text((16, self.H - int(self.H * 0.067)), f"{pos}{p.dial_name}  ·  {p.proof}", font=self.F_SMALL,
                    fill=(143, 227, 168) if p.untouched else (255, 155, 155))
         d = ImageDraw.Draw(img, "RGBA")
         if st.busy:
-            d.rectangle([0, 0, W, H], fill=(0, 0, 0, 120))
-            d.text((W // 2, H // 2), f"rendering {st.busy}", font=F_BIG, fill="white", anchor="mm")
+            d.rectangle([0, 0, self.W, self.H], fill=(0, 0, 0, 120))
+            d.text((self.W // 2, self.H // 2), f"rendering {st.busy}", font=self.F_BIG, fill="white", anchor="mm")
         if st.talking:
-            d.ellipse([W - 44, 56, W - 20, 80], fill=(255, 60, 60))
+            d.ellipse([self.W - 44, int(self.H * 0.12), self.W - 20, int(self.H * 0.12) + 24], fill=(255, 60, 60))
         if st.toast and time.time() - self._toast_at > 4:
             st.toast = ""
         if st.toast and st.screen != "qr":            # the QR code must stay clean to scan
-            d.rectangle([0, 44, W, 72], fill=(0, 0, 0, 150))
-            d.text((16, 48), st.toast[:95], font=F_SMALL, fill="white")
+            top = int(self.H * 0.09)
+            d.rectangle([0, top, self.W, top + int(self.H * 0.058)], fill=(0, 0, 0, 150))
+            d.text((16, top + 4), st.toast[:95], font=self.F_SMALL, fill="white")
         return img
 
     def _watch_toast(self) -> None:
