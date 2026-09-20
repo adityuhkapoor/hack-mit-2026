@@ -1,20 +1,35 @@
-# Nimbus — the camera that photographs the air
+# Nimbus
 
-HackMIT 2026. The person in the picture stays exactly as shot, checked pixel by pixel. The surroundings are
-rendered from what the camera's sensors felt. You talk to it; it answers, searches your photos, posts to
-Instagram, and sends a photo to your phone with a QR code.
+Nimbus is a camera with a touchscreen, physical controls and voice commands, built
+for HackMIT 2026. Take a photo to make an AI-designed image or look up a product.
 
-Two modes: **Nimbus**, where the surroundings become the air the camera measured, and **Souvenir**, where the
-scene becomes the keepsake it deserves — a can of Red Bull makes a trading card, noodles a ramen packet.
+The app has two modes:
+
+- **AI Camera:** takes a photo, chooses a design based on what's in it, and sends it
+  to a GPU server to generate the result. The pipeline uses a subject mask to keep
+  the selected subject from the original photo while changing the area around it.
+- **Visa Buy:** takes an unedited photo, identifies the item or dish, and searches
+  for shopping options. The app includes a Visa checkout flow; purchase completion
+  is not covered by our current hardware tests.
+
+You can browse saved photos, search them by voice or text, and open a photo link
+on your phone by scanning a QR code. Voice, sharing and Instagram posting require
+their respective services and credentials. Automatic Instagram posting is enabled
+by default; set `NIMBUS_AUTO_POST=0` for testing.
+
+The Raspberry Pi runs the screen and webcam. An Arduino UNO Q supplies thermal
+readings and button input, and an ASUS GPU computer processes AI captures over
+the network. Sensor readings are included with captures; the current AI Camera
+mode chooses its design from the photo's content.
 
 | Where | What |
 |---|---|
-| [docs/DESIGN.md](docs/DESIGN.md) | **Start here**: the design, the dial, sensors → effects, voice, search, sponsor tracks |
+| [docs/DESIGN.md](docs/DESIGN.md) | Original design notes, including earlier mode names and sensor-effect concepts |
 | [TEAM_HARDWARE_RUNBOOK.md](TEAM_HARDWARE_RUNBOOK.md) | **Hardware handoff**: touchscreen wiring, camera bring-up, board roles, ASUS/Pi networking, verified behavior, and open gaps |
 | [device/](device/) | The camera app (voice, screen, d-pad, tagging, search). Runs on the Raspberry Pi rig; Mac development and legacy UNO Q mode are also supported |
 | [pipeline/](pipeline/) | The image pipeline and API (`nimbus`), deployed on the GPU box |
 | [infra/elastic/](infra/elastic/) | Elasticsearch for photo search |
-| [docs/HANDOFF.md](docs/HANDOFF.md) | **What is running where right now**, what is half-done, how to get in |
+| [docs/HANDOFF.md](docs/HANDOFF.md) | Deployment handoff notes; check dates before relying on host or service status |
 | [docs/TRACKS.md](docs/TRACKS.md) | Sponsor tracks: what to show a judge for each, and the demo order |
 | [docs/demo/](docs/demo/) | Demo renders |
 

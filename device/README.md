@@ -25,7 +25,7 @@ pull-ups) and reach the Pi over the same I2C link as the thermal array (command 
 | Button | Does |
 |---|---|
 | `shutter` (D4) | take a photo |
-| `mode` | switch mode: Nimbus ⇄ Souvenir |
+| `mode` | switch mode: AI Camera ⇄ Visa Buy |
 | `talk` | hold to speak to the camera |
 | `browse` | next photo / open the gallery |
 
