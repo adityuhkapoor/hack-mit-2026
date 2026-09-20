@@ -75,6 +75,8 @@ def main() -> None:
             return
 
         from .ui import Screen
+        from .tagger import prepare_capture_client
+        prepare_capture_client()
         voice = None
         if not (args.no_voice or args.text):
             try:

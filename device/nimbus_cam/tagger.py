@@ -45,6 +45,20 @@ def _client():
     return OpenAI(base_url=BASE_URL, api_key=key, timeout=30)
 
 
+def prepare_capture_client():
+    """Resolve lazy SDK models before interactive capture; never send a request."""
+    client = None
+    try:
+        client = _client()
+        if client is not None:
+            _ = client.chat.completions
+    except Exception as exc:
+        print(f"[capture startup] client preparation skipped ({type(exc).__name__})")
+    finally:
+        if client is not None:
+            client.close()
+
+
 def _data_url(jpeg: bytes, side: int = 768) -> str:
     im = Image.open(io.BytesIO(jpeg)).convert("RGB")
     im.thumbnail((side, side))
