@@ -34,6 +34,7 @@ Reply with JSON only:
  "brand": "<brand or null>",
  "variant": "<flavour, colour, model or size, e.g. '8.4 fl oz can', or null>",
  "category": "<one of: dish, food, drink, electronics, clothing, book, toy, sports, beauty, home, other>",
+ "cuisine": "<for a dish: the cuisine word a restaurant listing would use, e.g. pizza, thai, ramen, burger, sushi, mexican; else null>",
  "confidence": <0 to 1>,
  "search_query": "<the exact words to search a shop for it>",
  "related": [{"name": "<a related product>", "search_query": "<words to search for it>",
@@ -46,11 +47,15 @@ If there is no buyable product, use confidence 0, describe what is there in name
 OFFERS_PROMPT = """A shopper photographed: {product}. They may also want the related items listed below.
 For each item there are live search results. Pick the results that sell exactly that item and turn them
 into offers. Reply with JSON only:
-{{"offers": [{{"item": <item number>, "merchant": "<store name>", "title": "<listing title>", "price": <number>,
-              "estimated": <true if the price is not in the result text>, "currency": "USD", "url": "<the result url>"}}]}}
+{{"offers": [{{"item": <item number>, "merchant": "<store name>", "price": <number USD>,
+              "est": <true if the price is not in the result text>, "url": "<the result url, exactly>"}}]}}
+Keep it short: no other fields, no prose.
 Up to 3 offers for item 0 and 1 or 2 for each other item, best first within an item (a single unit beats a
 case or multipack, a listed price beats an estimate, a known US retailer or delivery service beats a
-marketplace). If a listing is a multipack, say so in the title ("24-pack") and give the pack price. When the result gives no price, put
+marketplace). If a listing is a multipack, say so in the title ("24-pack") and give the pack price.
+Results marked "nearby restaurant" are real places near the shopper: for a dish, make an offer per place with
+the restaurant as merchant and your best estimate of the dish's price there
+(estimated true); put the nearest-sounding or best-known first. When the result gives no price, put
 your best estimate of the usual US price for that item and set estimated to true. Skip an item with no match.
 
 {results}"""
@@ -66,6 +71,7 @@ class Product:
     search_query: str = ""
     image_url: str | None = None      # from Open Food Facts when it knows the product
     related: list = field(default_factory=list)    # [{"name", "search_query", "why"}]
+    cuisine: str | None = None        # for a dish: what nearby places are tagged with
 
     def label(self) -> str:
         name = self.name if not self.brand or self.brand.lower() in self.name.lower() else f"{self.brand} {self.name}"
@@ -123,7 +129,7 @@ def identify(jpeg: bytes) -> Product:
     return Product(name=str(d.get("name") or "something")[:80], brand=_opt(d.get("brand")),
                    variant=_opt(d.get("variant")), category=str(d.get("category") or "other").lower(),
                    confidence=float(d.get("confidence") or 0), search_query=str(d.get("search_query") or "")[:120],
-                   related=related)
+                   related=related, cuisine=_opt(d.get("cuisine")))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -148,25 +154,57 @@ def open_food_facts(query: str) -> dict | None:
 
 
 def web_search(query: str, n: int = 8) -> list[dict]:
-    """Live web results (DuckDuckGo via ddgs, no key). Each: title, href, body."""
-    try:
+    """Live web results (DuckDuckGo via ddgs, no key). Each: title, href, body. One retry: the free
+    endpoint answers "No results" under load."""
+    def go():
         from ddgs import DDGS
-        return list(DDGS().text(f"{query} buy price", max_results=n))
-    except Exception as e:
-        print(f"[shop] web search unavailable ({type(e).__name__}: {e})")
+        for attempt in range(2):
+            try:
+                return [{"title": r.get("title", ""), "href": r.get("href", ""), "body": r.get("body", "")}
+                        for r in DDGS().text(f"{query} buy price", max_results=n)]
+            except Exception as e:
+                if attempt:
+                    print(f"[shop] web search unavailable ({type(e).__name__}: {e})")
+                time.sleep(0.8)
         return []
+    return cached("web", f"{query}|{n}", 6 * 3600, go)
+
+
+# On-disk cache for the slow, flaky lookups (DuckDuckGo 2–4 s a query and rate-limited, Overpass 8 s or a
+# timeout). A repeated demo of the same product costs nothing the second time.
+CACHE_DIR = Path(os.environ.get("NIMBUS_HOME", Path.home() / ".nimbus" / "camera")) / "shopcache"
+
+
+def cached(kind: str, key: str, ttl_s: float, compute):
+    import hashlib
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    f = CACHE_DIR / f"{kind}-{hashlib.sha1(key.lower().encode()).hexdigest()[:16]}.json"
+    try:
+        if f.exists() and time.time() - f.stat().st_mtime < ttl_s:
+            return json.loads(f.read_text())
+    except (OSError, ValueError):
+        pass
+    value = compute()
+    if value:                       # never cache a failure
+        try:
+            f.write_text(json.dumps(value))
+        except OSError:
+            pass
+    return value
 
 
 def product_image(query: str) -> str | None:
     """A catalogue-style picture of the product (web image search, no key)."""
-    try:
-        from ddgs import DDGS
-        for r in DDGS().images(f"{query} product", max_results=5):
-            if r.get("image", "").startswith("http"):
-                return r["image"]
-    except Exception as e:
-        print(f"[shop] image search unavailable ({type(e).__name__})")
-    return None
+    def go():
+        try:
+            from ddgs import DDGS
+            for r in DDGS().images(f"{query} product", max_results=5):
+                if r.get("image", "").startswith("http"):
+                    return r["image"]
+        except Exception as e:
+            print(f"[shop] image search unavailable ({type(e).__name__})")
+        return None
+    return cached("img", query, 24 * 3600, go)
 
 
 def fetch_image(url: str, dest: Path) -> Path | None:
@@ -180,6 +218,48 @@ def fetch_image(url: str, dest: Path) -> Path | None:
 
 
 DELIVERY_NEAR = os.environ.get("NIMBUS_DELIVERY_NEAR", "Cambridge MA")
+LAT, LON = float(os.environ.get("NIMBUS_LAT", "42.3601")), float(os.environ.get("NIMBUS_LON", "-71.0942"))
+
+
+def nearby_places(cuisine: str, radius_m: int = 2500, n: int = 6) -> list[dict]:
+    """Real restaurants around the camera that serve this (OpenStreetMap via Overpass, no key): name,
+    address, website. These are the places a dish can actually be ordered from, not web-search guesses."""
+    q = (f'[out:json][timeout:8];(node["amenity"~"restaurant|fast_food|cafe"]["cuisine"~"{cuisine}",i]'
+         f'(around:{radius_m},{LAT},{LON});way["amenity"~"restaurant|fast_food|cafe"]["cuisine"~"{cuisine}",i]'
+         f'(around:{radius_m},{LAT},{LON}););out center tags {n * 2};')
+    def fetch():
+        for host in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
+            try:
+                r = httpx.post(host, data={"data": q}, timeout=12, headers={"User-Agent": "Nimbus camera (HackMIT 2026)"})
+                r.raise_for_status()
+                return r.json().get("elements", [])
+            except Exception as e:
+                print(f"[shop] places: {host.split('/')[2]} {type(e).__name__}")
+        return []
+    elements = cached("places", f"{cuisine}|{radius_m}", 7 * 24 * 3600, fetch)
+    out = []
+    for e in elements or []:
+        t = e.get("tags", {})
+        if not t.get("name"):
+            continue
+        addr = " ".join(x for x in (t.get("addr:housenumber"), t.get("addr:street")) if x) or DELIVERY_NEAR
+        lat, lon = (e.get("lat"), e.get("lon")) if "lat" in e else (e.get("center", {}).get("lat"), e.get("center", {}).get("lon"))
+        url = t.get("website") or t.get("contact:website") or (f"https://www.google.com/maps/search/?api=1&query={lat},{lon}" if lat else "")
+        out.append({"title": t["name"], "href": url, "body": f"{addr} · {t.get('cuisine', '')} · nearby restaurant", "place": True})
+        if len(out) >= n:
+            break
+    return out
+
+
+PREWARM_CUISINES = ("pizza", "burger", "ramen", "thai", "sushi", "chinese", "indian", "mexican", "coffee", "sandwich",
+                    "italian", "korean", "vietnamese", "chicken", "ice_cream", "bakery", "noodle", "japanese")
+
+
+def prewarm_places() -> None:
+    """Fill the places cache for the cuisines a demo is likely to hit, so a dish never waits on Overpass."""
+    for c in PREWARM_CUISINES:
+        nearby_places(c)
+        time.sleep(1.0)                # be polite to the free API
 
 
 def find(product: Product) -> list[Offer]:
@@ -193,22 +273,28 @@ def find(product: Product) -> list[Offer]:
             product.image_url = off.get("image_front_url")
             if off.get("quantity") and not product.variant:
                 product.variant = off["quantity"]
+    dish = product.category == "dish"
     items = [{"name": product.label(), "why": "this",
-              "search_query": f"order {query} delivery near {DELIVERY_NEAR}" if product.category == "dish" else query}]
+              "search_query": f"order {query} delivery near {DELIVERY_NEAR}" if dish else query}]
     items += [{"name": x["name"], "why": x["why"], "search_query": x["search_query"]} for x in product.related]
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        searches = list(pool.map(lambda it: web_search(it["search_query"], 8 if it["why"] == "this" else 4), items))
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        places = pool.submit(nearby_places, product.cuisine or product.name) if dish else None
+        searches = list(pool.map(lambda it: web_search(it["search_query"], 6 if it["why"] == "this" else 4), items))
         if not product.image_url:
-            product.image_url = product_image(query)
+            product.image_url = product_image(query if not dish else f"{query} dish")
+        if places is not None:
+            searches[0] = places.result()[:5] + searches[0][:3]       # real places first, delivery sites after
     if not any(searches):
         return []
     client = tagger._client()
     if client is None:
         return [Offer(merchant=_host(r["href"]), title=r["title"], url=r["href"], item=items[0]["name"]) for r in searches[0][:3]]
+    searches = [res[:5] for res in searches]           # Muse's time goes with the text it reads and writes
+    by_url = {r["href"]: r for res in searches for r in res}
     text = "\n\n".join(f"item {k}: {it['name']} ({it['why']})\n" +
-                       "\n".join(f"- {r['title']} | {r['href']} | {r.get('body', '')[:160]}" for r in res)
+                       "\n".join(f"- {r['title'][:90]} | {r['href'][:100]} | {r.get('body', '')[:140]}" for r in res)
                        for k, (it, res) in enumerate(zip(items, searches)) if res)
-    r = client.chat.completions.create(model=tagger.MODEL, max_tokens=3500, reasoning_effort=tagger.REASONING,   # it reasons over the results first; 600 starved the answer
+    r = client.chat.completions.create(model=tagger.MODEL, max_tokens=2200, reasoning_effort=tagger.REASONING,   # it reasons over the results first; 600 starved the answer
                                        messages=[{"role": "user", "content": OFFERS_PROMPT.format(
                                            product=product.label(), results=text)}])
     offers = []
@@ -222,10 +308,13 @@ def find(product: Product) -> list[Offer]:
         except (TypeError, ValueError):
             k = 0
         it = items[k] if 0 <= k < len(items) else items[0]
-        if o.get("url"):
-            offers.append(Offer(merchant=str(o.get("merchant") or _host(o["url"]))[:40], title=str(o.get("title", ""))[:100],
-                                url=str(o["url"]), price=price, currency=str(o.get("currency") or "USD")[:3],
-                                estimated=bool(o.get("estimated", False)), item=it["name"], why=it["why"]))
+        url = str(o.get("url") or "")
+        if url:
+            src = by_url.get(url) or next((r for r in by_url.values() if r["href"].startswith(url[:60])), {})
+            title = src.get("body", "").split(" · ")[0] if src.get("place") else src.get("title", "")
+            offers.append(Offer(merchant=str(o.get("merchant") or _host(url))[:40], title=title[:100], url=url,
+                                price=price, estimated=bool(o.get("est", o.get("estimated", False))),
+                                item=it["name"], why=it["why"]))
     offers.sort(key=lambda o: 0 if o.why == "this" else 1)       # stable: the product first, then related
     return offers
 

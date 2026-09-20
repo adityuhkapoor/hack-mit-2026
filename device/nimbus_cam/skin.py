@@ -1185,7 +1185,10 @@ class Skin:
             start = max(0, min(sel - 1, len(st.offers) - 3))       # a window of three around the selection
             for row, i in enumerate(range(start, min(start + 3, len(st.offers)))):
                 self._offer(img, x, 138 + row * 63, st.offers[i], i, now, a, selected=(i == sel), count=len(st.offers))
-            if not st.offers:
+            if not st.offers and getattr(st, "searching", False):
+                for i in range(3):
+                    self._skeleton(img, x, 138 + i * 63, 500, now, i)
+            elif not st.offers:
                 blit_text(img, "nothing for sale found", x, 176, 20, "Bold", BAD)
         r = st.receipt
         if r and not st.paying_since:

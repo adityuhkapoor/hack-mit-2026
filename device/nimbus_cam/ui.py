@@ -238,9 +238,12 @@ class Screen:
         path = Path(photo.local_photo).parent / "product.jpg"
         if st.offers and 0 <= st.offer_index < len(st.offers):
             o = st.offers[st.offer_index]
+            from .shop import slug
             if o.why != "this":
-                from .shop import slug
                 path = Path(photo.local_photo).parent / f"item_{slug(o.item)}.jpg"
+            elif st.product is not None and st.product.category == "dish":
+                place = Path(photo.local_photo).parent / f"place_{slug(o.merchant)}.jpg"
+                path = place if place.exists() else path
         try:
             key = (str(path), path.stat().st_mtime_ns)
         except OSError:

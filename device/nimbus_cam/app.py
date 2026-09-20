@@ -83,6 +83,7 @@ class State:
     offers: list = field(default_factory=list)
     receipt: shop.Receipt | None = None
     offer_index: int = 0                # the offer the shopper is looking at (browse with show_offer)
+    searching: bool = False             # the product is known, the offers are still being found
     paying_since: float = 0.0           # > 0 while the Visa terminal animation plays
 
 
@@ -96,6 +97,8 @@ class CameraApp:
         self.log: list[str] = []
         self._taggers: list[threading.Thread] = []
         (HOME / "photos").mkdir(parents=True, exist_ok=True)
+        if os.environ.get("NIMBUS_PREWARM", "1") == "1":
+            threading.Thread(target=shop.prewarm_places, daemon=True).start()
 
     # -----------------------------------------------------------------------------------------
     # helpers
@@ -299,11 +302,15 @@ class CameraApp:
             self.state.busy = "looking it up"
             try:
                 product = shop.identify(Path(photo.local_photo).read_bytes())
+                # The name goes on screen now; the offers fill in while the searches run.
+                self.state.current, self.state.screen = photo, "shop"
+                self.state.product, self.state.offers, self.state.receipt, self.state.offer_index = product, [], None, 0
+                self.state.busy, self.state.searching = "", True
                 offers = shop.find(product) if product.confidence >= 0.3 else []
             except Exception as e:
                 return {"error": f"could not identify it: {str(e)[:120]}"}
             finally:
-                self.state.busy = ""
+                self.state.busy, self.state.searching = "", False
             shop.save(pdir, product, offers)
         threading.Thread(target=self._item_images, args=(pdir, product, offers), daemon=True).start()
         self.state.current, self.state.screen = photo, "shop"
@@ -328,6 +335,13 @@ class CameraApp:
             dest = pdir / f"item_{shop.slug(o.item)}.jpg"
             if not dest.exists() and (url := shop.product_image(o.item)):
                 shop.fetch_image(url, dest)
+        if product.category == "dish":          # each restaurant gets its own picture (storefront / their food)
+            for o in offers:
+                if o.why != "this":
+                    continue
+                dest = pdir / f"place_{shop.slug(o.merchant)}.jpg"
+                if not dest.exists() and (url := shop.product_image(f"{o.merchant} {shop.DELIVERY_NEAR} restaurant")):
+                    shop.fetch_image(url, dest)
 
     def show_offer(self, p: dict | None = None) -> dict:
         """Move through the offers on the shop screen: next, previous, or a number."""
