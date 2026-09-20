@@ -107,6 +107,12 @@ the rig by voice.
 4. **The venue address of the ASUS is baked into the Pi** (`NIMBUS_API`, `NIMBUS_ES_URL` in
    `~/.config/labwc/autostart` and `~/start_nimbus.sh`). If DHCP moves it, update both.
 5. **No printer** — dropped, HackMIT does not supply one.
+6. **Dropbox export is built but not yet authorized.** Search, then "save these to Dropbox" exports exactly
+   those photos, unchanged, plus an index into a dated folder in a Dropbox app folder — uploads run on the
+   ASUS, the camera only polls. Tested offline against a fake Dropbox; **no team account has been linked**, so
+   nothing has hit real Dropbox yet. Setup (app, two scopes, one offline refresh token on the ASUS, an export
+   token on both machines) and the synthetic smoke test: [DROPBOX.md](DROPBOX.md). Restarting the API to enable
+   it is a rig job, not a review-session one.
 
 ## Secrets — rotate after the event
 
