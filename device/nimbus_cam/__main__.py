@@ -3,7 +3,7 @@
     python -m nimbus_cam --mac                       screen + voice + webcam + simulated sensors
     python -m nimbus_cam --mac --image photo.jpg     a still instead of the webcam
     python -m nimbus_cam --mac --text                type to the camera in the terminal (Muse, no mic)
-    python -m nimbus_cam --mac --script "take_photo mode=real; search_photos query=fog; photo_details"
+    python -m nimbus_cam --mac --script "take_photo; search_photos query=fog; photo_details"
                                                       run tools with no screen or voice (tests)
     python -m nimbus_cam                             on the UNO Q (sensors over the Bridge)
 """

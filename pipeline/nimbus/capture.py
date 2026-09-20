@@ -98,15 +98,16 @@ def _ai_surroundings(src: np.ndarray, mask: np.ndarray, r: sense.Readings, dial:
     work = imageio.fit_within(src, AI_WORK_LONG)
     bg = 1 - subject.hard(cv2.resize(mask, (work.shape[1], work.shape[0])))
     sv = souvenir or Souvenir()
-    prompt = sense.souvenir_prompt(sv.kind, sv.subject, r) if dial == 3 else sense.scene_prompt(r, dial)
+    prompt = (sense.souvenir_prompt(sv.kind, sv.subject, r) if dial == sense.SOUVENIR
+              else sense.scene_prompt(r, dial))
     names = [comfy.upload(work), comfy.upload(np.repeat(bg[..., None], 3, -1))]
     s = min(1.0, AI_OUT_LONG / max(h, w))
-    gen = comfy.run(klein_inpaint(prompt, names[0], names[1], [], denoise=air_denoise(r) if dial == 1 else 1.0, seed=seed,
+    gen = comfy.run(klein_inpaint(prompt, names[0], names[1], [], denoise=air_denoise(r) if dial == sense.NIMBUS else 1.0, seed=seed,
                                   megapixels=AI_MEGAPIXELS, profile=comfy.profile, upscale_model=AI_UPSCALER,
                                   out_size=(round(w * s), round(h * s))))[0]
     if gen.shape[:2] != (h, w):
         gen = cv2.resize(gen, (w, h), interpolation=cv2.INTER_CUBIC)
-    if dial == 1:
+    if dial == sense.NIMBUS:
         # Same place, so the real leaves, bricks and grass texture belong in it; only the air is new.
         fog = sense.effect_params(r).diffusion
         gen = restyle.detail_transfer(src, gen, REAL_DETAIL * (1 - FOG_HIDES_DETAIL * fog))
@@ -128,17 +129,20 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
         mask = subject.subject_mask(as_shot)
     timings["mask"] = round(time.perf_counter() - t, 3)
 
-    surroundings, prompt, dial_used, fallback = None, None, 0, None
-    if dial > 0:
-        if comfy is None:
-            fallback = "no diffusion backend available"
-        else:
+    surroundings, prompt, dial_used, fallback = None, None, dial, None
+    if comfy is None:
+        fallback = "no diffusion backend available"
+        dial_used = dial if dial == sense.NIMBUS else sense.NIMBUS   # souvenir needs the GPU; Nimbus does not
+        generated = False
+    else:
+        generated = True
+        if True:
             t = time.perf_counter()
             try:
                 surroundings, prompt = _ai_surroundings(as_shot, mask, readings, dial, comfy, seed, souvenir)
-                dial_used = dial
             except ComfyError as e:
-                fallback = str(e)[:300]
+                fallback, generated = str(e)[:300], False
+                dial_used = sense.NIMBUS
             timings["diffusion"] = round(time.perf_counter() - t, 3)
     if surroundings is None:
         surroundings = as_shot
@@ -146,12 +150,13 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
     t = time.perf_counter()
     plate = subject.clean_plate(surroundings, subject.hard(mask))
     params = sense.effect_params(readings)
-    if dial_used > 0:
+    if generated:
+        # The model has already painted the weather, so the procedural levers come down a notch.
         params = sense.scaled(params, sense.AI_EFFECT_SCALE)
     styled = sense.apply_effects(plate, params, seed)
     out = subject.composite(as_shot, styled, mask)
     proof = subject.verify(as_shot, out, mask)
-    if dial_used == 3:
+    if dial_used == sense.SOUVENIR:
         # The frame is packaging around the finished photograph: the proof is measured before it goes on.
         sv = souvenir or Souvenir()
         air = readings.strip(set(web or ()))
@@ -159,7 +164,7 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
     timings["surroundings"] = round(time.perf_counter() - t, 3)
     timings["total"] = round(time.perf_counter() - t0, 3)
     return Capture(out, as_shot, mask, proof, readings, dial, dial_used, prompt, fallback, timings,
-                   souvenir=souvenir if dial_used == 3 else None, web=set(web or ()))
+                   souvenir=souvenir if dial_used == sense.SOUVENIR else None, web=set(web or ()))
 
 
 # ---------------------------------------------------------------------------------------------

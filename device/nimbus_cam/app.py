@@ -91,7 +91,8 @@ class CameraApp:
     def set_mode(self, p: dict) -> dict:
         mode = str(p.get("mode", "")).strip().lower()
         names = ({n.lower(): i for i, n in DIALS.items()} |
-                 {"real": 0, "air": 1, "sensed": 1, "new": 2, "world": 2, "souvenir": 3, "card": 3, "keepsake": 3})
+                 {"nimbus": sense.NIMBUS, "normal": sense.NIMBUS, "photo": sense.NIMBUS, "air": sense.NIMBUS,
+                  "souvenir": sense.SOUVENIR, "card": sense.SOUVENIR, "keepsake": sense.SOUVENIR})
         if mode.isdigit() and int(mode) in DIALS:
             dial = int(mode)
         elif mode in names:
@@ -213,7 +214,7 @@ class CameraApp:
         if dial == 0 and self.render_locally:
             return self._capture_here(jpeg, readings)
         data = {"readings": json.dumps(readings), "dial": str(dial), "seed": str(int(time.time()) % 100000)}
-        if dial == 3:
+        if dial == sense.SOUVENIR:
             # Muse looks at the scene and names the keepsake it should become (~3 s).
             sv = tagger.souvenir(jpeg)
             self.say(f"Making a {sv['kind']}…")

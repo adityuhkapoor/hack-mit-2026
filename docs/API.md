@@ -274,13 +274,13 @@ curl -s -F photo=@capture.jpg -F mask=@strokes.png -F mode=auto $BASE/brushes/$B
 
 Design and rationale: [DESIGN.md](DESIGN.md).
 
-`POST /capture` — multipart: `photo` (file), `readings` (JSON string), `dial` (0 Real, 1 Sensed air,
-2 New world), `seed`. `readings` takes any subset of `temp_c`, `rh` (%), `lux`, `db`, `pm25` (µg/m³),
-`pressure_hpa`, `wind` (m/s), `cloud` (%), `cct` (K). Wind and cloud cover are filled from the local weather when
-absent, and listed in `web`. The subject's pixels are never changed. Dials 1–2 fall back to 0 when the GPU box
-is unavailable (`dial_used`, `fallback_reason`).
+`POST /capture` — multipart: `photo` (file), `readings` (JSON string), `dial` (0 Nimbus, 1 Souvenir),
+`seed`, and `souvenir` (JSON) on dial 1. `readings` takes any subset of `temp_c`, `rh` (%), `lux`, `db`, `pm25` (µg/m³),
+`pressure_hpa`, `wind` (m/s), `cloud` (%), `cct` (K). Humidity, temperature, wind and cloud are filled from the local
+weather when no sensor reports them, and listed in `web`. The subject's pixels are never changed. With no GPU
+the capture falls back to the sensor effects alone (`dial_used`, `fallback_reason`).
 
-`POST /captures/publish` — for Real shots rendered on the camera's own board: multipart `meta` (JSON from
+`POST /captures/publish` — for shots the camera rendered on its own board (the no-GPU fallback): multipart `meta` (JSON from
 `capture.meta_for`), `photo`, `as_shot`, `mask` (JPEGs from `capture.render_files`). The server assigns the
 id, draws the card (its QR code needs the id) and marks `processed_on: "camera"`.
 

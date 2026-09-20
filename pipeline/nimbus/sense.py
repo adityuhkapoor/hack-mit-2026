@@ -13,12 +13,13 @@ sensor drives one photographic lever, named the way a photographer would name it
 
 Wind and cloud cover come from the local weather (weather.py), not a sensor, and are labelled as such.
 
-The dial sets how much freedom the AI gets on top of that:
+Two modes:
 
-    0 real        procedural effects only; no generation
-    1 sensed air  diffusion repaints the measured weather into the real background, same layout
-    2 new world   diffusion replaces the background with a place invented from the readings
-    3 souvenir    the scene becomes the keepsake it deserves: a football card, a ramen packet, a ticket
+    0 nimbus    the surroundings are repainted as the air the camera measured, and the effects above are
+                applied on top. With no GPU reachable it degrades to the effects alone, rendered on the
+                camera itself — same picture, less weather.
+    1 souvenir  the scene becomes the keepsake it deserves: a can of Red Bull makes a trading card, a
+                bowl of noodles a ramen packet.
 """
 
 from __future__ import annotations
@@ -32,7 +33,9 @@ import numpy as np
 from . import effects
 from .color import luminance
 
-DIAL_NAMES = {0: "Real", 1: "Sensed air", 2: "New world", 3: "Souvenir"}
+# Two positions, because one of them already does everything the sensors ask for.
+NIMBUS, SOUVENIR = 0, 1
+DIAL_NAMES = {NIMBUS: "Nimbus", SOUVENIR: "Souvenir"}
 
 # Ranges a hackathon floor and the street outside will actually produce; readings are clipped to them.
 RANGES = {
@@ -319,9 +322,9 @@ def souvenir_prompt(kind: str, subject: str, r: Readings) -> str:
             "No text, no lettering, no logos, no people.")
 
 
-def scene_prompt(r: Readings, dial: int) -> str:
+def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:
     conditions = describe(r)
-    if dial == 1:
+    if dial == NIMBUS:
         return ("Keep the layout of image 1 exactly: the same buildings, ground, objects and perspective, "
                 f"in the same places. Change only the weather, light and atmosphere of the masked "
                 f"surroundings to: {conditions}. Photorealistic, like a real photograph. The surroundings are "

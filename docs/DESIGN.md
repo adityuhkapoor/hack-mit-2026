@@ -19,8 +19,8 @@ code that puts a photo on your phone.
 
 | Say | Tool | D-pad |
 |---|---|---|
-| "Take a picture" / "Sensed air, then shoot" | `take_photo` | centre |
-| "Switch to new world" | `set_mode` | ← → |
+| "Take a picture" | `take_photo` | centre |
+| "Make it a souvenir" | `set_mode` | ← → |
 | "What's the air like?" | `read_air` | (always on screen) |
 | "When did I take this?" / "What was the weather in this one?" | `photo_details` | |
 | "Find the foggy ones from this morning" | `search_photos` | |
@@ -50,15 +50,21 @@ speaker ◄─────────── speech                  │ tool ca
 | **Long Lake** | Pitch: the verified-subject proof converts the photographer who distrusts AI. |
 | Token Company (optional write-up) | Real uses zero tokens. Tags are computed once per photo. Reasoning is set to "minimal", which cut Muse's reasoning tokens from 228 to 87 on the same reply. |
 
-## The dial
+## The two modes
+
+One mode does everything the sensors ask for; the second is the keepsake.
 
 | Pos | Name | Subject | Surroundings | Where it runs |
 |---|---|---|---|---|
-| 0 | **Real** | Unchanged | The sensor effects below. No generation. | **On the camera's own board.** No GPU and no cloud AI. |
-| 1 | **Sensed air** | Unchanged | FLUX.2 klein repaints the measured weather into the *same* place. The real background's fine texture is then carried back in. | GPU box |
-| 2 | **New world** | Unchanged | FLUX.2 klein replaces the surroundings with a place invented from the readings. | GPU box |
+| 0 | **Nimbus** | Unchanged | FLUX.2 klein repaints the measured air into the *same* place, keeping its layout; the real background's fine texture is carried back in, less of it as humidity rises. The sensor effects go on top. | GPU |
+| 1 | **Souvenir** | Unchanged | Muse names the keepsake the scene deserves (a can of Red Bull → a trading card, noodles → a ramen packet); klein paints that artwork, and a frame carries the title and the readings. | GPU |
 
-If the box is unreachable, dials 1–2 fall back to Real. The shutter always produces a picture.
+**With no GPU reachable, the shutter still works**: the camera renders the sensor effects on its own board
+and says so (`fallback_reason`). That is also the Arduino track's "no cloud" story — the degraded path is a
+complete picture, not an error.
+
+Earlier builds had four positions (Real / Sensed air / New world / Souvenir). Real and the split between
+"same place" and "new place" were dropped on 2026-09-19: one sensor-driven mode is the product.
 
 ## Readings → effects
 
@@ -84,10 +90,11 @@ If the box is unreachable, dials 1–2 fall back to Real. The shutter always pro
 UNO Q MCU ── sensors, shutter, dial ──Bridge "key=value;…"──┐
 UNO Q Linux: grab frame + readings ─────────────────────────┘
   │   + wind, cloud from web weather (only if missing)
-  ├─ dial 0 ─► ON THE BOARD: shrink to 2400 px while still 8-bit ─► subject mask ─► clean plate
-  │            ─► sensor effects ─► paste the real subject back ─► verify ─► POST /captures/publish
-  └─ dial 1,2 ─► POST /capture ─► GPU box: mask ─► klein inpaint (1.5 MP) ─► ESRGAN to full size
-               ─► [dial 1: real detail back in, less in fog] ─► lighter effects ─► paste back ─► verify
+  ├─ GPU reachable ─► POST /capture ─► mask ─► klein inpaint (2 MP on the GB10)
+  │                  ─► real detail back in, less in fog ─► sensor effects ─► paste back ─► verify
+  │                  ─► [Souvenir: mount the card frame around it]
+  └─ GPU down ──────► ON THE BOARD: shrink to 2400 px while still 8-bit ─► mask ─► clean plate
+                     ─► sensor effects ─► paste the real subject back ─► verify ─► POST /captures/publish
   ▼
 server stores photo, as-shot, mask overlay, and draws the card (its QR code → /c/<id> → the card image)
   ▼
@@ -116,9 +123,9 @@ it ships with); it generates at 2 MP with no upscaler, where the 3060 Ti needed 
 
 | Path | Time | Notes |
 |---|---|---|
-| Real, on an M3 at 2400 px | ~1.3 s | Estimated at 10–20 s on the UNO Q's A53 cores (to measure on the board). Peak memory **1.26 GB**, flat across shots. |
-| Sensed air / New world, ASUS GB10 | ~25 s | klein at 2 MP, no upscaler. Pi → ASUS → verified capture: 32 s end to end. |
-| Sensed air / New world, Windows 3060 Ti | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. |
+| Effects-only fallback, on an M3 at 2400 px | ~1.3 s | Peak memory **1.26 GB**, flat across shots. |
+| Nimbus / Souvenir on the ASUS GB10 | ~25 s | klein at 2 MP, no upscaler. Pi → ASUS → verified capture: 32 s end to end. |
+| Nimbus / Souvenir on the Windows 3060 Ti | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. |
 | Segmentation | 0.5 s (body), 1.0–1.4 s (general) | M3 |
 
 ## Contracts

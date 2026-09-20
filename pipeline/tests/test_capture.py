@@ -41,33 +41,39 @@ EXTREMES = [
 
 
 @pytest.mark.parametrize("r", EXTREMES)
-@pytest.mark.parametrize("dial", [0, 1, 2])
+@pytest.mark.parametrize("dial", [0, 1])
 def test_subject_pixels_never_change(r, dial):
     img, mask = scene()
     cap = capture.take(img, r, dial, FakeComfy(), mask=mask)
     assert cap.proof.untouched and cap.proof.checked_px > 0
+    assert cap.dial_used == dial
+    if dial == sense.SOUVENIR:
+        assert cap.image.shape[0] > cap.as_shot.shape[0]     # the card's frame is mounted around it
+        return
     core = subject.hard(mask) > 0
     core[:62], core[218:], core[:, :122], core[:, 198:] = False, False, False, False
     assert np.array_equal(cap.image[core], cap.as_shot[core])
-    assert cap.dial_used == dial
 
 
 def test_surroundings_do_change():
     img, mask = scene()
-    cap = capture.take(img, EXTREMES[0], 0, None, mask=mask)
+    cap = capture.take(img, EXTREMES[0], sense.NIMBUS, None, mask=mask)
     bg = mask == 0
     assert np.abs(cap.image[bg] - img[bg]).mean() > 0.02
 
 
-def test_gpu_failure_falls_back_to_real():
+def test_gpu_failure_falls_back_to_effects_only():
+    """No GPU: the shutter still produces a verified picture, with the sensor effects alone."""
     img, mask = scene()
-    cap = capture.take(img, EXTREMES[0], 2, FakeComfy(fail=True), mask=mask)
-    assert cap.dial_used == 0 and "box went away" in cap.fallback_reason and cap.proof.untouched
+    cap = capture.take(img, EXTREMES[0], sense.SOUVENIR, FakeComfy(fail=True), mask=mask)
+    assert cap.dial_used == sense.NIMBUS and "box went away" in cap.fallback_reason and cap.proof.untouched
+    cap = capture.take(img, EXTREMES[0], sense.NIMBUS, None, mask=mask)
+    assert cap.dial_used == sense.NIMBUS and cap.fallback_reason and cap.proof.untouched
 
 
 def test_white_balance_is_the_only_subject_change():
     img, mask = scene()
-    cap = capture.take(img, sense.Readings(cct=3200), 0, None, mask=mask)
+    cap = capture.take(img, sense.Readings(cct=3200), sense.NIMBUS, None, mask=mask)
     assert cap.proof.untouched                         # measured against the white-balanced frame
     assert not np.allclose(cap.as_shot, img)            # which did change: tungsten was corrected
 
@@ -82,9 +88,10 @@ def test_effect_map_directions():
 
 
 def test_prompts_mention_conditions():
-    p = sense.scene_prompt(sense.Readings(temp_c=2, rh=90), 1)
+    p = sense.scene_prompt(sense.Readings(temp_c=2, rh=90))
     assert "frost" in p and "fog" in p and "same places" in p
-    assert "new real-world place" in sense.scene_prompt(sense.Readings(temp_c=2), 2)
+    sv = sense.souvenir_prompt("trading card", "a can of Red Bull", sense.Readings())
+    assert "trading card" in sv and "Red Bull" in sv and "no people" in sv.lower()
 
 
 def test_verify_catches_a_touched_subject():
@@ -96,7 +103,7 @@ def test_verify_catches_a_touched_subject():
 
 def test_card_renders():
     img, mask = scene()
-    cap = capture.take(img, EXTREMES[0], 0, None, mask=mask)
+    cap = capture.take(img, EXTREMES[0], sense.NIMBUS, None, mask=mask)
     c = capture.card(cap, "https://example.com/g#abc")
     assert c.shape[1] == 1200 and c.shape[0] > 800
 
@@ -114,8 +121,8 @@ def test_web_weather_fills_only_gaps(monkeypatch):
 def test_haze_follows_particulates():
     assert sense.effect_params(sense.Readings(pm25=50)).haze > sense.effect_params(sense.Readings(pm25=8)).haze > 0
     img, mask = scene()
-    clear = capture.take(img, sense.Readings(pm25=2), 0, None, mask=mask).image
-    smoky = capture.take(img, sense.Readings(pm25=60), 0, None, mask=mask).image
+    clear = capture.take(img, sense.Readings(pm25=2), sense.NIMBUS, None, mask=mask).image
+    smoky = capture.take(img, sense.Readings(pm25=60), sense.NIMBUS, None, mask=mask).image
     bg = mask == 0
     assert smoky[bg].std() < clear[bg].std()              # haze drains contrast from the surroundings
     assert "smoky" in sense.describe(sense.Readings(pm25=50))

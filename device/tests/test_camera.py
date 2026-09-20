@@ -22,7 +22,7 @@ def fake_embed(monkeypatch):
 
 
 def photo(pid, when, temp, rh, dial=0, caption=""):
-    return Photo(id=pid, created_at=when, dial=dial, dial_name=["Real", "Sensed air", "New world"][dial],
+    return Photo(id=pid, created_at=when, dial=dial, dial_name=["Nimbus", "Souvenir"][dial],
                  readings={"temp_c": temp, "rh": rh}, caption=caption,
                  tags=tagger.condition_tags({"temp_c": temp, "rh": rh}))
 
@@ -32,8 +32,9 @@ def test_parse_readings():
 
 
 def test_query_from_tool_parses_modes_and_numbers():
-    q = Query.from_tool({"query": "fog", "dial": "Sensed air", "min_rh": "80", "after": "2026-09-19T06:00:00-04:00"})
+    q = Query.from_tool({"query": "fog", "dial": "Souvenir", "min_rh": "80", "after": "2026-09-19T06:00:00-04:00"})
     assert q.dial == 1 and q.min_rh == 80.0 and q.text == "fog" and q.limit == 5
+    assert Query.from_tool({"dial": "Nimbus"}).dial == 0
 
 
 def test_es_query_hybrid_shares_filters():
@@ -49,12 +50,12 @@ def test_local_library_search(tmp_path):
     lib = LocalLibrary(tmp_path / "lib.sqlite")
     lib.add(photo("a", "2026-09-19T07:00:00-04:00", 11, 94, caption="a woman in a field"))
     lib.add(photo("b", "2026-09-19T14:00:00-04:00", 33, 25, caption="a woman in a field"))
-    lib.add(photo("c", "2026-09-18T20:00:00-04:00", 16, 50, dial=2, caption="a street at night"))
+    lib.add(photo("c", "2026-09-18T20:00:00-04:00", 16, 50, dial=1, caption="a street at night"))
     assert lib.search(Query(text="fog mist"))[0].id == "a"
     assert [p.id for p in lib.search(Query(min_temp_c=28))] == ["b"]
     assert [p.id for p in lib.search(Query(after="2026-09-19T00:00:00-04:00", before="2026-09-19T12:00:00-04:00"))] == ["a"]
-    assert [p.id for p in lib.search(Query(dial=2))] == ["c"]
-    assert lib.latest(1)[0].id == "b" and lib.get("c").dial_name == "New world"
+    assert [p.id for p in lib.search(Query(dial=1))] == ["c"]
+    assert lib.latest(1)[0].id == "b" and lib.get("c").dial_name == "Souvenir"
 
 
 def test_matches_needs_the_reading_to_filter_on_it():
@@ -111,12 +112,12 @@ def test_app_tools_without_network(tmp_path, monkeypatch):
     monkeypatch.setattr(lc, "take", fake_take)
 
     a = appmod.CameraApp(FakeSensors(), Cam(), LocalLibrary(tmp_path / "lib.sqlite"), api="http://127.0.0.1:9")
-    shot = a.take_photo({"mode": "real"})
-    assert shot["mode"] == "Real" and "unaltered" in shot["proof"] and shot["rendered_on"] == "the camera itself"
+    shot = a.take_photo({})          # no GPU reachable: the effects alone, rendered here
+    assert shot["mode"] == "Nimbus" and "unaltered" in shot["proof"]
     a.wait_for_tags()
     assert a.photo_details({"photo": "current"})["id"] == shot["id"]
     assert a.search_photos({"query": "fog", "min_rh": 80})["count"] == 1
     assert a.search_photos({"query": "fog", "min_temp_c": 30})["count"] == 0
     assert "error" in a.send_to_phone({})          # offline photo: no link to send
-    assert a.set_mode({"mode": "new world"}) == {"mode": "New world"} and "error" in a.set_mode({"mode": "sepia"})
+    assert a.set_mode({"mode": "souvenir"}) == {"mode": "Souvenir"} and "error" in a.set_mode({"mode": "sepia"})
     assert json.loads(json.dumps(a.read_air()))["in_words"]

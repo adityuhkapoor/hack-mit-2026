@@ -18,7 +18,7 @@ app.yaml            Arduino App Lab app manifest
 | APDS-9930 | I2C | light (lux) |
 | Sound sensor module | A0 | sound level (dB) |
 | Arcade pushbutton | digital pin | shutter |
-| Potentiometer | analog pin | the dial: Real / Sensed air / New world |
+| Potentiometer or button | analog/digital pin | the dial: Nimbus / Souvenir |
 | WS2812B ring | digital pin | status: chase = working, green = done, red = error |
 | 0.96 in. OLED (SSD1306) | I2C | dial position, live readings, the proof after a shot |
 | Raspberry Pi HQ Camera (via a MIPI-CSI carrier) or a USB webcam | | the picture |
@@ -54,7 +54,7 @@ ground (internal pull-ups, no resistors):
 | Button | Pin | Header | Does |
 |---|---|---|---|
 | Shutter | GPIO17 | pin 11 | take a photo |
-| Mode | GPIO27 | pin 13 | next mode: Real → Sensed air → New world → Souvenir |
+| Mode | GPIO27 | pin 13 | switch mode: Nimbus ⇄ Souvenir |
 | Talk | GPIO22 | pin 15 | hold to speak to the camera |
 
 Ground: any of pins 6, 9, 14, 20, 25, 30, 34, 39. Move them with
@@ -74,7 +74,7 @@ uv run python -m nimbus_cam --mac                # screen + voice + webcam + sim
 |---|---|
 | A still instead of the webcam | `--image ../pipeline/eval/photos/64.jpg` |
 | Type to the camera (Muse, no mic, no ElevenLabs) | `--text` |
-| Tools only, no screen: a test script | `--script "fog; take_photo mode=real; wait; search_photos query=fog"` |
+| Tools only, no screen: a test script | `--script "fog; take_photo; wait; search_photos query=fog"` |
 | Skip Elasticsearch | `--local-library` |
 
 Keys: ←/→ mode · space shutter · **hold T to talk** · ↑/↓ browse · P send to phone (QR code) · I post to Instagram ·
