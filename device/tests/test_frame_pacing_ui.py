@@ -30,6 +30,9 @@ class FakeRoot:
     def bind(self, *args):
         pass
 
+    def withdraw(self):
+        self.hidden = True
+
     def after(self, delay, callback):
         self.after_calls.append((delay, callback))
         return len(self.after_calls)
@@ -114,6 +117,58 @@ def test_screen_initializes_configured_fps_and_schedules_a_positive_delay(headle
     assert len(pacing_delays) == 1
     assert pacing_delays[0] > 0
     assert pacing_delays[0] == pytest.approx(1000 / 24, abs=1)
+
+
+def test_native_presents_pixels_without_tk_upload(headless_ui, monkeypatch):
+    from native_presenter import presenter
+    ui, roots = headless_ui
+    class FakeNative:
+        def __init__(self, *args, **kwargs):
+            self.frames = []
+        def renderer_info(self):
+            return {"accelerated": True}
+        def present_image(self, image):
+            self.frames.append(image.copy())
+    monkeypatch.setattr(presenter, "NativePresenter", FakeNative)
+    monkeypatch.setenv("NIMBUS_UI_BACKEND", "sdl")
+    monkeypatch.setattr(ui.Screen, "render", lambda self: Image.new("RGB", (4, 3), "red"))
+    screen = ui.Screen(FakeApp())
+    assert roots[0].hidden
+    assert screen._native.frames[0].getpixel((0, 0)) == (255, 0, 0)
+    assert screen.label.configure_calls == []
+
+
+def test_native_failure_keeps_tk_path(headless_ui, monkeypatch):
+    from native_presenter import presenter
+    ui, _ = headless_ui
+    def fail(*args, **kwargs):
+        raise RuntimeError("missing library")
+    monkeypatch.setattr(presenter, "NativePresenter", fail)
+    monkeypatch.setenv("NIMBUS_UI_BACKEND", "sdl")
+    monkeypatch.setattr(ui.Screen, "render", lambda self: Image.new("RGB", (4, 3)))
+    screen = ui.Screen(FakeApp())
+    assert screen._native is None
+    assert len(screen.label.configure_calls) == 1
+
+
+def test_native_routes_release_outside_and_suppresses_shutter_repeat():
+    from nimbus_cam.ui import Screen
+    from native_presenter.presenter import PresenterEvent
+    screen = Screen.__new__(Screen)
+    calls = []
+    screen._closing = False
+    screen.root = FakeRoot()
+    screen._touch_up = lambda event: calls.append((event.x, event.y))
+    screen._key_handlers = {"<space>": lambda event: calls.append("shoot")}
+    screen._native = SimpleNamespace(poll_events=lambda: iter([
+        PresenterEvent("pointer_up", x=-1, y=-1, inside=False),
+        PresenterEvent("key_down", keycode=32, repeat=True),
+        PresenterEvent("key_down", keycode=32),
+        PresenterEvent("key_up", keycode=32),
+    ]))
+    screen._poll_native()
+    assert calls == [(-1, -1), "shoot"]
+    assert screen.root.after_calls[0][0] == 4
 
 
 def test_screen_render_failure_still_schedules_the_next_tick(headless_ui, monkeypatch, capsys):

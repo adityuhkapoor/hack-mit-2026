@@ -85,7 +85,7 @@ class Screen:
         self._pressed: Button | None = None
         self.root.bind("<ButtonPress-1>", self._touch_down)
         self.root.bind("<ButtonRelease-1>", self._touch_up)
-        for key, fn in {"<Left>": lambda e: self._dial(-1), "<Right>": lambda e: self._dial(1),
+        self._key_handlers = {"<Left>": lambda e: self._dial(-1), "<Right>": lambda e: self._dial(1),
                         "<space>": lambda e: self._bg(app.take_photo, {}),
                         "<Up>": lambda e: self._bg(app.show_photo, {"which": "previous"}),
                         "<Down>": lambda e: self._bg(app.show_photo, {"which": "next"}),
@@ -94,10 +94,62 @@ class Screen:
                         "i": lambda e: self._bg(app.post_instagram, {}),
                         "r": lambda e: self._bg(app.print_photo, {}),
                         "f": lambda e: self._toggle("fog"), "h": lambda e: self._toggle("heat"),
-                        "<KeyPress-t>": self._talk_down, "<KeyRelease-t>": self._talk_up}.items():
+                        "<KeyPress-t>": self._talk_down, "<KeyRelease-t>": self._talk_up}
+        for key, fn in self._key_handlers.items():
             self.root.bind(key, fn)
+        self._native = None
+        self._closing = False
+        if os.environ.get("NIMBUS_UI_BACKEND") == "sdl":
+            try:
+                from native_presenter.presenter import NativePresenter
+                self._native = NativePresenter(self.W, self.H, fullscreen=full,
+                                               vsync=False, require_accelerated=True)
+                print(f"[screen backend] SDL {self._native.renderer_info()}")
+                self.root.withdraw()
+                self.root.after(4, self._poll_native)
+            except Exception as exc:
+                if self._native is not None:
+                    self._native.close()
+                self._native = None
+                print(f"[screen backend] SDL unavailable; using Tk: {exc}")
         self._refresh_air()
         self._tick()
+
+    def _poll_native(self):
+        from types import SimpleNamespace
+        if self._closing or self._native is None:
+            return
+        for event in self._native.poll_events():
+            if event.type == "focus_lost":
+                if self._pressed is not None:
+                    self._pressed.down = False
+                    self._pressed = None
+                self._talk_up(None)
+                continue
+            if event.type == "quit":
+                self._closing = True
+                self._talk_up(None)
+                self.root.quit()
+                return
+            pointer = SimpleNamespace(x=event.x, y=event.y)
+            if event.type == "pointer_down" and event.inside:
+                self._touch_down(pointer)
+            elif event.type == "pointer_up":
+                self._touch_up(pointer)
+            elif event.type in ("key_down", "key_up"):
+                key = {1073741904: "<Left>", 1073741903: "<Right>",
+                       1073741906: "<Up>", 1073741905: "<Down>",
+                       32: "<space>", 27: "<Escape>"}.get(event.keycode)
+                if event.keycode == ord("t"):
+                    key = "<KeyPress-t>" if event.type == "key_down" else "<KeyRelease-t>"
+                elif event.type == "key_up" or event.repeat:
+                    continue
+                elif key is None and 0 <= event.keycode < 128:
+                    key = chr(event.keycode)
+                handler = self._key_handlers.get(key)
+                if handler:
+                    handler(None)
+        self.root.after(4, self._poll_native)
 
     def _wire_gpio(self):
         """The physical buttons: on the UNO Q over I2C (NIMBUS_I2C_BUTTONS=1, the rig) or on the Pi's own
@@ -339,12 +391,17 @@ class Screen:
             if stats is not None:
                 stats.record_render(time.monotonic() - t0)
                 t0 = time.monotonic()
-            display = getattr(self, "_tk", None)
-            replace = display is None or (display.width(), display.height()) != image.size
-            if replace:
-                display = ImageTk.PhotoImage(image)
+            native = getattr(self, "_native", None)
+            replace = False
+            if native is not None:
+                native.present_image(image)
             else:
-                display.paste(image)
+                display = getattr(self, "_tk", None)
+                replace = display is None or (display.width(), display.height()) != image.size
+                if replace:
+                    display = ImageTk.PhotoImage(image)
+                else:
+                    display.paste(image)
             if stats is not None:
                 stats.record_image_upload(time.monotonic() - t0)
                 t0 = time.monotonic()
@@ -365,4 +422,11 @@ class Screen:
             self.root.after(delay, self._tick)
 
     def run(self) -> None:
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            self._closing = True
+            if self.voice and self.app.state.talking:
+                self.voice.release()
+            if self._native is not None:
+                self._native.close()

@@ -30,6 +30,7 @@ enum np_event_type {
     NP_EVENT_POINTER_UP = 3,
     NP_EVENT_KEY_DOWN = 4,
     NP_EVENT_KEY_UP = 5,
+    NP_EVENT_FOCUS_LOST = 6,
 };
 
 typedef struct np_event {

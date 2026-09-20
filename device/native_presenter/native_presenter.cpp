@@ -316,6 +316,10 @@ int np_poll_event(np_presenter *presenter, np_event *event_out) {
     SDL_Event event;
     while (SDL_PollEvent(&event)) {
         std::memset(event_out, 0, sizeof(*event_out));
+        if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+            event_out->type = NP_EVENT_FOCUS_LOST;
+            return 1;
+        }
         if (event.type == SDL_QUIT ||
             (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE)) {
             event_out->type = NP_EVENT_QUIT;

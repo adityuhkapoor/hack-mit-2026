@@ -1,7 +1,7 @@
 """Python ownership and validation for the opt-in SDL2 presenter prototype.
 
-This module is intentionally not wired into ``nimbus_cam.ui``.  The creator
-thread owns the SDL window and must call present, poll_events, and close.
+The creator thread owns the SDL window and must call present, poll_events,
+and close. The camera UI enables this backend with NIMBUS_UI_BACKEND=sdl.
 """
 
 from __future__ import annotations
@@ -69,6 +69,7 @@ _EVENT_NAMES = {
     3: "pointer_up",
     4: "key_down",
     5: "key_up",
+    6: "focus_lost",
 }
 
 
