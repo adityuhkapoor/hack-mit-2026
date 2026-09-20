@@ -151,6 +151,16 @@ class CameraApp:
         return {"readings": r.strip(web), "in_words": sense.describe(r), "from_the_web": sorted(web)}
 
     def take_photo(self, p: dict | None = None) -> dict:
+        # Touch, GPIO and voice can arrive together. Reject duplicate requests
+        # instead of serializing them into unexpected additional generations.
+        if not self.lock.acquire(blocking=False):
+            return {"error": "capture already in progress"}
+        try:
+            return self._take_photo(p)
+        finally:
+            self.lock.release()
+
+    def _take_photo(self, p: dict | None = None) -> dict:
         p = p or {}
         if p.get("mode"):
             res = self.set_mode({"mode": p["mode"]})
@@ -202,6 +212,9 @@ class CameraApp:
 
     def show_photo(self, p: dict) -> dict:
         which = str(p.get("which", "next")).lower()
+        if which in ("viewfinder", "camera", "close"):
+            self.state.screen = "viewfinder"
+            return {"showing": "viewfinder"}
         res = self.state.results or self.library.latest(20)
         if not res:
             return {"error": "no photos yet"}
@@ -211,9 +224,6 @@ class CameraApp:
             self.state.index = (self.state.index + step) % len(res)
         elif which.isdigit():
             self.state.index = max(0, min(len(res) - 1, int(which) - 1))
-        elif which in ("viewfinder", "camera", "close"):
-            self.state.screen = "viewfinder"
-            return {"showing": "viewfinder"}
         else:
             hit = [i for i, r in enumerate(res) if r.id == which]
             if not hit:
