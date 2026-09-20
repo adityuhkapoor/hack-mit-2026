@@ -18,9 +18,9 @@ import time
 import subprocess
 from dataclasses import dataclass
 
-from .comfy import CUDA_FP8, MPS_GGUF, Comfy, Profile
+from .comfy import CUDA_FP8, GB10, MPS_GGUF, Comfy, Profile
 
-PROFILES = {p.name: p for p in (CUDA_FP8, MPS_GGUF)}
+PROFILES = {p.name: p for p in (CUDA_FP8, GB10, MPS_GGUF)}
 DEFAULT = "http://172.25.242.235:8188|cuda-fp8|win,http://127.0.0.1:8188|mps-gguf"
 CACHE_SECONDS = 10.0
 

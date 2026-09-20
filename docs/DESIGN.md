@@ -107,10 +107,18 @@ The only change ever made to the subject is **white balance**, and only from a r
 
 ## Performance (measured)
 
+**Where the GPU work runs (2026-09-19):** the **ASUS GB10** (`gx10-5493`, Grace-Blackwell, 128 GB unified,
+Ubuntu 24.04 arm64) on the venue wifi, running ComfyUI plus the Nimbus API on port 8000. The camera posts to
+`http://10.189.73.14:8000` — the venue address, because the tailnet ACL only opens port 22. The Windows box
+over ZeroTier stays as a fallback (`nimbus.akvaithi.page`), but the rig cannot be on ZeroTier and the tailnet
+at once, so the ASUS is the one to use at the event. Its profile is `gb10` (klein fp8 + the fp4 text encoder
+it ships with); it generates at 2 MP with no upscaler, where the 3060 Ti needed 1.5 MP + ESRGAN.
+
 | Path | Time | Notes |
 |---|---|---|
 | Real, on an M3 at 2400 px | ~1.3 s | Estimated at 10–20 s on the UNO Q's A53 cores (to measure on the board). Peak memory **1.26 GB**, flat across shots. |
-| Sensed air / New world on the box | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. `NIMBUS_AI_MP=1.0` saves ~6 s. |
+| Sensed air / New world, ASUS GB10 | ~25 s | klein at 2 MP, no upscaler. Pi → ASUS → verified capture: 32 s end to end. |
+| Sensed air / New world, Windows 3060 Ti | ~30 s | klein at 1.5 MP ≈ 15 s, ESRGAN ≈ 10 s, plus transfers. |
 | Segmentation | 0.5 s (body), 1.0–1.4 s (general) | M3 |
 
 ## Contracts
