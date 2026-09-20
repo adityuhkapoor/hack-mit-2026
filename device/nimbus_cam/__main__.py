@@ -70,7 +70,10 @@ def main() -> None:
     print(f"[camera] library: {app.library.kind} · keys: {keys.status()}")
 
     if args.script:
-        run_script(app, args.script)
+        try:
+            run_script(app, args.script)
+        finally:
+            camera.close()
         return
 
     from .ui import Screen
@@ -90,6 +93,7 @@ def main() -> None:
     finally:
         if voice:
             voice.close()
+        camera.close()
 
 
 if __name__ == "__main__":

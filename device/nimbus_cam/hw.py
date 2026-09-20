@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import math
 import os
 import queue
@@ -220,12 +219,118 @@ class PiSensors:
         self._stop.set()
 
 
+class _Shot:
+    """A shutter request served by the reader thread. `deadline` bounds the wait and `cancelled` makes a
+    request that expired in the queue a no-op, so a timed-out caller can never trigger exposure work later."""
+
+    def __init__(self, deadline: float):
+        self.deadline = deadline
+        self.done = threading.Event()
+        self.result: bytes | None = None
+        self.error: BaseException | None = None
+        self.cancelled = False
+
+
 class Camera:
+    """All device I/O happens on one reader thread: cap.read(), exposure changes, and the shutter's
+    settle/fresh-frame reads are serialized there. `frame()` returns the newest finished frame from a
+    single slot — it never waits on the sensor, so the screen stays responsive even mid-capture.
+
+    A frame's timestamp is when its read() returned; it orders frames but says nothing about when the
+    sensor exposed them, so freshness still comes from draining and settling reads, not timestamps."""
+
+    CAPTURE_TIMEOUT_S = 20.0      # bounded wait for jpeg(): covers the exposure settle + reads + encode
+    REOPEN_EVERY_S = 2.0          # retry _open this often while the device stays failed
+
     def __init__(self, index: int = 0, still: str | None = None):
         self.index = index
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None
         self.cap = None if still else self._open(index)
-        self._lock = threading.Lock()
+        self._latest: np.ndarray | None = None   # written only by the reader thread; an atomic swap
+        self._stop = threading.Event()
+        self._requests: queue.Queue[_Shot] = queue.Queue()
+        self._reader = None if still else threading.Thread(target=self._reader_loop, daemon=True,
+                                                           name="camera-reader")
+        if self._reader:
+            self._reader.start()
+
+    def _reader_loop(self) -> None:
+        failures, last_reopen = 0, 0.0
+        while not self._stop.is_set():
+            self._serve_next()
+            try:
+                ok, f = self.cap.read()
+            except Exception:
+                ok, f = False, None
+            if not ok:
+                failures += 1
+                self._latest = None            # disconnected or failing: don't serve stale frames
+                if failures >= 3 and time.time() - last_reopen > self.REOPEN_EVERY_S:
+                    last_reopen = time.time()
+                    self._reopen()
+                time.sleep(min(0.5, 0.05 * failures))    # backoff: no busy loop on a dead device
+                continue
+            failures = 0
+            self._publish(f)
+
+    def _reopen(self) -> None:
+        try:
+            self.cap.release()
+            self.cap = self._open(self.index, wait_s=5)
+        except Exception as e:
+            print(f"[camera] reopen failed: {e}")
+
+    def _serve_next(self) -> None:
+        try:
+            req = self._requests.get_nowait()
+        except queue.Empty:
+            return
+        if req.cancelled or time.monotonic() > req.deadline:
+            req.error = RuntimeError("capture request expired")
+            req.done.set()
+            return
+        try:
+            req.result = self._capture()
+        except BaseException as e:
+            req.error = e
+        req.done.set()
+
+    def _capture(self) -> bytes:
+        """Runs on the reader thread: the shot's exposure work and its settle/fresh-frame reads are
+        serialized with preview reads, and auto-exposure is restored even when the shot fails."""
+        exp = self._exposure()
+        capped = exp is not None and exp > self.MAX_EXPOSURE
+        try:
+            if capped:
+                self._v4l2(self.index, "auto_exposure=1",
+                           f"exposure_time_absolute={self.MAX_EXPOSURE}", "gain=255")
+                for _ in range(8):      # let the new exposure take effect
+                    self._read()
+            f = None
+            for _ in range(3):          # drop buffered frames so the picture is the moment of the press
+                f = self._read()
+            if f is None:
+                raise RuntimeError("camera returned no frame")
+            return cv2.imencode(".jpg", cv2.cvtColor(f, cv2.COLOR_RGB2BGR),
+                                [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
+        finally:
+            if capped:
+                self._cap_exposure()
+
+    def _read(self) -> np.ndarray | None:
+        """One raw read, published to the slot: preview frames keep flowing during a capture."""
+        ok, f = self.cap.read()
+        if not ok:
+            return None
+        return self._publish(f)
+
+    def _publish(self, f: np.ndarray) -> np.ndarray:
+        rot = self.ROTATE.get(os.environ.get("NIMBUS_ROTATE", "0"))
+        if rot is not None:
+            f = cv2.rotate(f, rot)
+        f = cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+        self._latest = f
+        return f
 
     @staticmethod
     def _open(index: int, wait_s: float = 30) -> cv2.VideoCapture:
@@ -241,7 +346,8 @@ class Camera:
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 4056)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 3040)
                 cap.set(cv2.CAP_PROP_FPS, 30)
-                Camera._cap_exposure(index)
+                cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)   # backends that honor it stop queuing stale frames
+                Camera._v4l2(index, "auto_exposure=3", "exposure_dynamic_framerate=1")
                 return cap
             cap.release()
             if time.time() > deadline:
@@ -258,9 +364,9 @@ class Camera:
     # take the frame, and hand control back.
     MAX_EXPOSURE = 333          # v4l2 units of 100 µs
 
-    @staticmethod
-    def _cap_exposure(index: int) -> None:
-        Camera._v4l2(index, "auto_exposure=3", "exposure_dynamic_framerate=1")
+    def _cap_exposure(self) -> None:
+        """Hand auto-exposure back to the sensor. Runs on the reader thread (from _capture's finally)."""
+        self._v4l2(self.index, "auto_exposure=3", "exposure_dynamic_framerate=1")
 
     @staticmethod
     def _v4l2(index: int, *settings: str) -> str:
@@ -281,52 +387,41 @@ class Camera:
         digits = "".join(ch for ch in out if ch.isdigit())
         return int(digits) if digits else None
 
-    def _sharp_shot(self):
-        """Context: exposure capped for the shot when auto has stretched it, restored afterwards."""
-        import contextlib
-
-        @contextlib.contextmanager
-        def cm():
-            exp = self._exposure()
-            capped = exp is not None and exp > self.MAX_EXPOSURE
-            if capped:
-                self._v4l2(self.index, "auto_exposure=1", f"exposure_time_absolute={self.MAX_EXPOSURE}", "gain=255")
-                with self._lock:
-                    for _ in range(8):      # let the new exposure take effect
-                        self.cap.read()
-            try:
-                yield
-            finally:
-                if capped:
-                    self._cap_exposure(self.index)
-        return cm()
-
     # The rig shoots in portrait: the webcam is mounted on its side and every frame is turned upright here,
     # so the viewfinder, the photo and the print are all portrait. NIMBUS_ROTATE=90 (default on the Pi),
     # 270 if the camera is mounted the other way, 0 for landscape.
     ROTATE = {"0": None, "90": cv2.ROTATE_90_CLOCKWISE, "180": cv2.ROTATE_180, "270": cv2.ROTATE_90_COUNTERCLOCKWISE}
 
     def frame(self) -> np.ndarray | None:
-        """RGB uint8, full resolution, upright."""
+        """RGB uint8, full resolution, upright. The newest finished frame, or None until the first one
+        arrives (or while the device is failing). Do not mutate it — it is the live slot, not a copy."""
         if self.still is not None:
             return self.still.copy()
-        with self._lock:
-            ok, f = self.cap.read()
-        if not ok:
-            return None
-        rot = self.ROTATE.get(os.environ.get("NIMBUS_ROTATE", "0"))
-        if rot is not None:
-            f = cv2.rotate(f, rot)
-        return cv2.cvtColor(f, cv2.COLOR_BGR2RGB)
+        return self._latest
 
-    def jpeg(self) -> bytes:
-        f = None
-        with (self._sharp_shot() if self.cap is not None else contextlib.nullcontext()):
-            for _ in range(3):   # drop buffered frames so the picture is the moment of the press
-                f = self.frame()
-        if f is None:
-            raise RuntimeError("camera returned no frame")
-        return cv2.imencode(".jpg", cv2.cvtColor(f, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
+    def jpeg(self, timeout: float = CAPTURE_TIMEOUT_S) -> bytes:
+        """The photo at the press: the reader thread caps exposure, settles, drops buffered frames and
+        encodes the fresh one. Bounded wait; an expired request never runs (it is cancelled in the queue)."""
+        if self.cap is None:
+            if self.still is None:
+                raise RuntimeError("camera returned no frame")
+            return cv2.imencode(".jpg", cv2.cvtColor(self.still, cv2.COLOR_RGB2BGR),
+                                [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
+        req = _Shot(time.monotonic() + timeout)
+        self._requests.put(req)
+        if not req.done.wait(timeout):
+            req.cancelled = True          # if the reader hasn't started it yet, it never will
+            raise TimeoutError(f"no frame within {timeout:.0f}s")
+        if req.error is not None:
+            raise req.error
+        return req.result
+
+    def close(self) -> None:
+        self._stop.set()
+        if self._reader is not None:
+            self._reader.join(timeout=2)
+        if self.cap is not None:
+            self.cap.release()
 
 
 class PiButtons:
