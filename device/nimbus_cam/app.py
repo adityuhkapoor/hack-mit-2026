@@ -27,6 +27,8 @@ API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
 # plain photo and goes straight to the shop.
 AI_CAMERA, VISA_BUY = 0, 1
 DIALS = {AI_CAMERA: "AI Camera", VISA_BUY: "Visa Buy"}
+# A copy of each shared photo goes here so Instagram and phones off our network can fetch it.
+PUBLIC_API = os.environ.get("NIMBUS_PUBLIC_API", "https://nimbus.akvaithi.page").rstrip("/")
 
 
 def _now_iso() -> str:
@@ -184,15 +186,45 @@ class CameraApp:
         self.state.current, self.state.screen = res[self.state.index], "browse"
         return {"showing": self.state.index + 1, "of": len(res), **self._summary(self.state.current)}
 
+    def _public(self, photo: Photo) -> Photo:
+        """The GPU server sits on a private network, so Instagram (and a phone that is not on it) cannot
+        fetch from it. Publish a copy of the rendered files to the public API (NIMBUS_PUBLIC_API) once
+        and remember the public links."""
+        if photo.public_card_url or not PUBLIC_API or not photo.local_photo:
+            return photo
+        d = Path(photo.local_photo).parent
+        files = {}
+        for k in ("photo", "as_shot", "mask"):
+            f = d / f"{k}.jpg"
+            data = f.read_bytes() if f.exists() else (self.http.get(f"{self.api}/captures/{photo.id}/{k}.jpg", timeout=30).content
+                                                     if photo.photo_url else None)
+            if not data:
+                return photo
+            files[k] = (f"{k}.jpg", data, "image/jpeg")
+        meta = self.http.get(f"{self.api}/captures/{photo.id}", timeout=15).json() if photo.photo_url else None
+        if meta is None:
+            return photo
+        r = self.http.post(f"{PUBLIC_API}/captures/publish", data={"meta": json.dumps(meta)}, files=files, timeout=60)
+        r.raise_for_status()
+        pid = r.json()["id"]
+        photo.public_card_url = f"{PUBLIC_API}/captures/{pid}/card.jpg"
+        photo.public_link = f"{PUBLIC_API}/c/{pid}"
+        self.library.add(photo)
+        return photo
+
     def send_to_phone(self, p: dict | None = None) -> dict:
         photo = self._resolve((p or {}).get("photo"))
         if photo is None:
             return {"error": "no photo to send"}
         if not photo.link:
             return {"error": "this photo only exists on the camera (the server was offline), so there is no link"}
+        try:
+            photo = self._public(photo)        # a link any phone can open, not only ones on our network
+        except Exception as e:
+            print(f"[camera] public copy failed ({type(e).__name__}); using the local link")
         self.state.current, self.state.screen = photo, "qr"
         self.say("Scan to get it on your phone")
-        return {"shown": "a QR code on the camera's screen", "link": photo.link}
+        return {"shown": "a QR code on the camera's screen", "link": photo.public_link or photo.link}
 
     def post_instagram(self, p: dict | None = None) -> dict:
         photo = self._resolve((p or {}).get("photo"))
@@ -202,7 +234,8 @@ class CameraApp:
             return {"error": "this photo is not on the server yet, so Instagram cannot fetch it"}
         caption = (p or {}).get("caption") or self._instagram_caption(photo)
         try:
-            post_id = instagram.post(photo.card_url, caption)
+            photo = self._public(photo)
+            post_id = instagram.post(photo.public_card_url or photo.card_url, caption)
         except instagram.NotConfigured as e:
             return {"error": str(e)}
         except Exception as e:
@@ -274,6 +307,7 @@ class CameraApp:
             return self._capture_here(jpeg, readings)
         sv = tagger.souvenir(jpeg)
         self.say(f"Making a {sv['kind']}…")
+        self.state.busy = f"Making a {sv['kind']}"
         data = {"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": str(int(time.time()) % 100000),
                 "souvenir": json.dumps(sv)}
         r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)

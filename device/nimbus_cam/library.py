@@ -52,6 +52,8 @@ class Photo:
     link: str | None = None         # the short /c/<id> link a phone opens
     local_photo: str | None = None
     processed_on: str = "server"
+    public_card_url: str | None = None   # a copy on the public server, for Instagram and phones off the LAN
+    public_link: str | None = None
 
     def weather_words(self) -> str:
         return sense.describe(sense.Readings.from_dict(self.readings))

@@ -93,6 +93,7 @@ class Screen:
         self._photo_cache: tuple[str, Image.Image] | None = None
         self._last_toast, self._toast_at = "", 0.0
         self.buttons = self._make_buttons()
+        self._busy_since, self._busy_text = None, ""
         self.gpio = self._wire_gpio()
         self._pressed: Button | None = None
         self.root.bind("<ButtonPress-1>", self._touch_down)
@@ -283,7 +284,7 @@ class Screen:
         elif st.screen == "qr":
             img = Image.new("RGB", (self.W, self.H), "white")
             q = qrcode.QRCode(border=2, box_size=10)
-            q.add_data(st.current.link or "")
+            q.add_data(st.current.public_link or st.current.link or "")
             side = int(min(self.W, self.H * (1 - BAR)) * 0.70)
             code = q.make_image(fill_color="black", back_color="white").convert("RGB").resize((side, side), Image.NEAREST)
             img.paste(code, ((self.W - side) // 2, int(self.H * 0.06)))
@@ -306,8 +307,7 @@ class Screen:
                    fill=(143, 227, 168) if p.untouched else (255, 155, 155))
         d = ImageDraw.Draw(img, "RGBA")
         if st.busy:
-            d.rectangle([0, 0, self.W, self.H], fill=(0, 0, 0, 120))
-            d.text((self.W // 2, self.H // 2), f"rendering {st.busy}", font=self.F_BIG, fill="white", anchor="mm")
+            self._draw_busy(d, st)
         if st.talking:
             d.ellipse([self.W - 44, int(self.H * 0.12), self.W - 20, int(self.H * 0.12) + 24], fill=(255, 60, 60))
         if st.toast and time.time() - self._toast_at > 4:
@@ -356,12 +356,45 @@ class Screen:
             d.text((x, y), r.message[:48], font=self.F_SMALL, fill=(200, 215, 240))
         return img
 
+    # How long each kind of wait usually takes, so the bar can move honestly and never quite finish early.
+    EXPECTED = {"AI Camera": 32.0, "Visa Buy": 14.0, "looking it up": 14.0}
+
+    def _draw_busy(self, d: ImageDraw.ImageDraw, st) -> None:
+        import math
+        now = time.time()
+        if self._busy_since is None or self._busy_text != st.busy and not st.busy.startswith("Making"):
+            self._busy_since = now
+        self._busy_text = st.busy
+        elapsed = now - self._busy_since
+        expected = next((v for k, v in self.EXPECTED.items() if st.busy.startswith(k)), 30.0)
+        frac = min(0.96, 1 - math.exp(-elapsed / (expected * 0.55)))   # fast start, slows near the end
+        d.rectangle([0, 0, self.W, self.H], fill=(0, 0, 0, 150))
+        cx, cy = self.W // 2, int(self.H * 0.40)
+        # a ring of clouds chasing each other (it is a camera that paints the air)
+        r = int(self.H * 0.11)
+        for i in range(8):
+            a = now * 2.2 + i * math.pi / 4
+            x, y = cx + r * math.cos(a), cy + r * math.sin(a)
+            size = 6 + 9 * ((i + 1) / 8)
+            glow = int(120 + 135 * ((i + 1) / 8))
+            d.ellipse([x - size, y - size, x + size, y + size], fill=(glow, glow, 255 if i % 2 else glow))
+        label = st.busy if st.busy.startswith("Making") else f"{st.busy}…"
+        d.text((cx, cy + r + int(self.H * 0.06)), label.replace("…", "").strip(), font=self.F_MED, fill="white", anchor="mm")
+        bw, bh = int(self.W * 0.5), max(8, int(self.H * 0.022))
+        bx, by = cx - bw // 2, cy + r + int(self.H * 0.12)
+        d.rounded_rectangle([bx, by, bx + bw, by + bh], radius=bh // 2, fill=(60, 60, 66))
+        d.rounded_rectangle([bx, by, bx + int(bw * frac), by + bh], radius=bh // 2, fill=(230, 120, 60))
+        d.text((cx, by + bh + int(self.H * 0.045)), f"{int(frac * 100)}%  ·  about {max(1, int(expected - elapsed))} s to go",
+               font=self.F_SMALL, fill=(200, 200, 205), anchor="mm")
+
     def _watch_toast(self) -> None:
         if self.app.state.toast != self._last_toast:
             self._last_toast, self._toast_at = self.app.state.toast, time.time()
 
     def _tick(self) -> None:
         self._watch_toast()
+        if not self.app.state.busy:
+            self._busy_since = None
         try:
             self._tk = ImageTk.PhotoImage(self.render())
             self.label.configure(image=self._tk)
