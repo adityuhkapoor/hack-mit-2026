@@ -6,7 +6,7 @@ import time
 import httpx
 
 
-class CaptureRequestError(RuntimeError):
+class CaptureRequestError(httpx.HTTPError):
     """A phase-specific failure without request bodies, tokens, or server error pages."""
 
 
