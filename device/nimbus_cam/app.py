@@ -19,7 +19,7 @@ import httpx
 
 from nimbus import capture as lc, imageio, sense
 
-from . import instagram, shop, tagger
+from . import capture_http, instagram, shop, tagger
 from .library import HOME, Photo, Query
 
 API = os.environ.get("NIMBUS_API", "https://nimbus.akvaithi.page")
@@ -440,7 +440,7 @@ class CameraApp:
 
         def upload():
             try:
-                r = self.http.post(f"{self.api}/capture/prepare", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
+                r = capture_http.request("POST", f"{self.api}/capture/prepare", phase="prepare", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
                                    data={"readings": json.dumps(readings)}, timeout=30)
                 r.raise_for_status()
                 prepared["id"] = r.json()["prepared"]
@@ -454,10 +454,10 @@ class CameraApp:
         up.join(30)
         seed = str(int(time.time()) % 100000)
         if prepared.get("id"):
-            r = self.http.post(f"{self.api}/capture/finish", data={"prepared": prepared["id"], "dial": str(sense.SOUVENIR),
+            r = capture_http.request("POST", f"{self.api}/capture/finish", phase="finish", data={"prepared": prepared["id"], "dial": str(sense.SOUVENIR),
                                                                    "seed": seed, "souvenir": json.dumps(sv)})
         else:   # an older server, or the upload failed: the one-shot route
-            r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
+            r = capture_http.request("POST", f"{self.api}/capture", phase="one-shot", files={"photo": ("shot.jpg", jpeg, "image/jpeg")},
                                data={"readings": json.dumps(readings), "dial": str(sense.SOUVENIR), "seed": seed,
                                      "souvenir": json.dumps(sv)})
         r.raise_for_status()
@@ -508,7 +508,7 @@ class CameraApp:
         pid = meta["id"]
         d = HOME / "photos" / pid
         d.mkdir(parents=True, exist_ok=True)
-        photo_jpg = (files or {}).get("photo") or self.http.get(f"{self.api}/captures/{pid}/photo.jpg").content
+        photo_jpg = (files or {}).get("photo") or capture_http.request("GET", f"{self.api}/captures/{pid}/photo.jpg", phase="photo-download").content
         (d / "photo.jpg").write_bytes(photo_jpg)
         taken = datetime.fromtimestamp(meta["created_at"]).astimezone().isoformat(timespec="seconds")
         photo = Photo(id=pid, created_at=taken, dial=meta["dial_used"], dial_name=meta["dial_name"],
