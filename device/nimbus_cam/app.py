@@ -133,8 +133,8 @@ class CameraApp:
         t.start()
         self._taggers.append(t)
         out = self._summary(photo)
-        if photo.dial != dial:
-            out["note"] = "the GPU server was unavailable, so this was taken in Real"
+        if photo.processed_on == "camera":
+            out["note"] = "the GPU server was unavailable, so the surroundings carry only the sensor effects"
         return out
 
     def photo_details(self, p: dict | None = None) -> dict:
@@ -209,18 +209,24 @@ class CameraApp:
     # capture, storage, tagging
 
     def _capture(self, dial: int) -> Photo:
+        """The GPU paints the surroundings. If it cannot be reached, Nimbus mode is rendered here on the
+        camera (the sensor effects alone) rather than failing; Souvenir has no such fallback."""
         jpeg = self.camera.jpeg()
         readings = self.sensors.readings()
-        if dial == 0 and self.render_locally:
-            return self._capture_here(jpeg, readings)
         data = {"readings": json.dumps(readings), "dial": str(dial), "seed": str(int(time.time()) % 100000)}
         if dial == sense.SOUVENIR:
             # Muse looks at the scene and names the keepsake it should become (~3 s).
             sv = tagger.souvenir(jpeg)
             self.say(f"Making a {sv['kind']}…")
             data["souvenir"] = json.dumps(sv)
-        r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
-        r.raise_for_status()
+        try:
+            r = self.http.post(f"{self.api}/capture", files={"photo": ("shot.jpg", jpeg, "image/jpeg")}, data=data)
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            if dial != sense.NIMBUS or not self.render_locally:
+                raise
+            print(f"[camera] GPU server unreachable ({type(e).__name__}); rendering on the camera")
+            return self._capture_here(jpeg, readings)
         return self._store_server(r.json())
 
     def _capture_here(self, jpeg: bytes, readings: dict) -> Photo:

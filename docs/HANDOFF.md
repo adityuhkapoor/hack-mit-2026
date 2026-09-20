@@ -1,7 +1,7 @@
-# Nimbus — handoff, 19 Sep 2026, 21:10 ET
+# Nimbus — handoff, 19 Sep 2026, 21:25 ET
 
 Written for whoever picks this up next: a teammate, or a fresh agent session. It says what exists, what is
-running where, what is half-done, and what to do first. Design and rationale live in [DESIGN.md](DESIGN.md);
+running where, what is still open, and how to get in. Design and rationale live in [DESIGN.md](DESIGN.md);
 this is the state of the world.
 
 ## The product in one line
@@ -10,34 +10,23 @@ this is the state of the world.
 on the card — and the surroundings are rendered from what the camera measured. You talk to it, and it
 answers, searches its own photos, posts to Instagram, and puts a photo on your phone with a QR code.
 
-## What is running right now
+## What is running right now (updated 21:20 ET)
 
 | Machine | Role | Address | State |
 |---|---|---|---|
-| **Pi 4** (`raspi4`) | the camera: sensors, screen, touch, voice | venue 10.189.57.130 · tailnet 100.72.177.61 | Nimbus running fullscreen on the panel, starts itself at boot |
-| **ASUS GB10** (`gx10-5493`) | the GPU: ComfyUI + the Nimbus API | venue 10.189.73.14:8000 · tailnet 100.90.82.31 | API up under `nohup`, **not a service yet** |
-| **Windows box** | old GPU, fallback only | ZeroTier · `nimbus.akvaithi.page` | up, unused; the rig cannot be on ZeroTier and the tailnet at once |
-| **MacBook** | development | venue 10.189.81.118 | repo, keys, ElevenLabs agent |
+| **Pi 4** (`raspi4`) | the camera: sensors, screen, touch, voice | venue 10.189.57.130 · tailnet 100.72.177.61 | Nimbus on the panel, two-mode build; starts at boot with keys from `/etc/nimbus.env` |
+| **ASUS GB10** (`gx10-5493`) | the GPU: ComfyUI + Nimbus API :8000 + Elasticsearch :9200 | venue 10.189.73.14 · tailnet 100.90.82.31 | all three up; `@reboot` crontab brings them back (no sudo there, so no systemd) |
+| **Windows box** | old GPU, fallback only | ZeroTier · `nimbus.akvaithi.page` | up, unused |
+| **MacBook** | development | venue 10.189.81.118 | repo, Keychain, the ElevenLabs agent |
 
-All three are on **HackMIT.2026** wi-fi. The Pi talks to the ASUS over the venue address because the tailnet
-ACL only opens port 22.
+All on **HackMIT.2026** wi-fi; the Pi reaches the ASUS on the venue address (the tailnet ACL only opens 22).
 
-## The one thing that is half-done
+**Deployed and verified end to end from the Pi:** Nimbus and Souvenir both render on the GB10, subject
+verified, Muse tags the photo, Elasticsearch on the ASUS indexes it, and search finds it. The Pi has rebooted
+once and came back into Nimbus on its own.
 
-**The dial was collapsed from four modes to two, and that change is written, tested and NOT deployed.**
-
-- Modified but uncommitted on the MacBook: `pipeline/nimbus/{sense,capture}.py`,
-  `device/nimbus_cam/{app,agent,__main__}.py`, and both test files. 42 pipeline tests and 8 device tests pass.
-- HEAD is `050a55f`; the rig and the ASUS are running that, i.e. **the old four modes**.
-- New model: **Nimbus** (the everyday mode: surroundings repainted as the measured air, sensor effects on
-  top, falls back to effects-only on the camera if the GPU is unreachable) and **Souvenir** (the scene becomes
-  a keepsake: a can of Red Bull makes a trading card, noodles a ramen packet).
-- To ship it: commit, then
-  `rsync pipeline/nimbus/ asus:~/nimbus/pipeline/nimbus/` + `~/restart_api.sh` on the ASUS,
-  `rsync device/nimbus_cam/ pi:~/nimbus/device/nimbus_cam/` + `~/start_nimbus.sh` on the Pi,
-  and `uv run python -m nimbus_cam.agent` on the Mac so the voice agent learns the new modes.
-
-Arun stopped that deploy mid-flight, so nothing was half-written: the machines are cleanly on the old build.
+Machine-side scripts: `~/start_nimbus.sh` on the Pi (restart the camera), `~/restart_api.sh` and
+`~/start_all.sh` on the ASUS (restart the API; boot everything).
 
 ## Buttons — the open hardware question
 
@@ -72,25 +61,30 @@ the touch screen, the keyboard and the voice.
 - **Voice**: ElevenLabs agent `agent_3501m2xfqx3yemcb5ph6tr8ekjen`, brain = Muse Spark via custom LLM.
   Tested in text mode: it read the air and answered "when did I take my last photo" from the record. **Nobody
   has spoken to it on the rig yet.**
-- **Search**: Elasticsearch on the Mac (Docker); the Pi currently runs `--local-library` (SQLite + embeddings).
+- **Search**: Elasticsearch 8.15 on the ASUS (tarball, no docker), the camera indexes and searches it live.
 - **Instagram**: posting as **@arunningaround**, token verified.
 - **Souvenir**: Muse saw daisies, chose a seed packet, and produced "WILD DAISY MIX — sunshine you can plant".
 
 ## Not done
 
-1. **The ASUS API is not a service.** A reboot loses it. Make a systemd unit from `~/nimbus/start_api.sh`.
-2. **Keys do not survive a Pi reboot.** They are passed at launch from the Mac's Keychain. For persistence
-   they need `/etc/nimbus.env` (root, 0600); the autostart already sources it if present.
-3. **Voice untested by voice** on the rig.
-4. **No printer** — dropped, HackMIT does not supply one. The card is posted and shown, not printed.
-5. **Elasticsearch is not on the Pi or ASUS**, so the rig's search is the local fallback.
+1. **The four buttons.** Needs the UNO Q sketch reflashed (see above). Touch, keys and voice cover every action
+   meanwhile.
+2. **Voice untested by voice** on the rig: the session connects and the devices are right, but nobody has held
+   the button and spoken yet. A speaker must be in the Pi's 3.5 mm jack.
+3. **The ASUS has no sudo for this user**, so ComfyUI, the API and Elasticsearch restart from a user `@reboot`
+   crontab rather than systemd. Good enough for the event; check `~/start_all.sh` if something is missing after
+   a reboot.
+4. **The venue address of the ASUS is baked into the Pi** (`NIMBUS_API`, `NIMBUS_ES_URL` in
+   `~/.config/labwc/autostart` and `~/start_nimbus.sh`). If DHCP moves it, update both.
+5. **No printer** — dropped, HackMIT does not supply one.
 
 ## Secrets — rotate after the event
 
 All of these were pasted into a chat transcript: the **Meta Model API key**, the **ElevenLabs key**, the
 **Instagram token**, the **Tailscale auth key** and the **team SSH private key**. They live in the MacBook's
-Keychain (`meta-model-api-key`, `elevenlabs-api-key`, `ig-token`, `ig-user-id`) and are never written to a
-file in the repo or on the rig.
+Keychain (`meta-model-api-key`, `elevenlabs-api-key`, `ig-token`, `ig-user-id`) and, so the rig survives a
+reboot, in **`/etc/nimbus.env` on the Pi** (root:raspi4, 0640 — the only copy outside the Keychain). Never in
+the repo.
 
 ## Getting in
 

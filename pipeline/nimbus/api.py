@@ -541,8 +541,7 @@ def take_capture(request: Request, photo: UploadFile = File(...), readings: str 
                  dial: int = Form(0), seed: int = Form(1), souvenir: str = Form("{}")):
     """Photo + sensor readings JSON + dial → stored capture.
 
-    dial: 0 real, 1 sensed air, 2 new world, 3 souvenir. On dial 3, `souvenir` is JSON naming what the
-    scene should become: {"kind": "ramen packet", "subject": "a bowl of noodles", "title": …,
+    dial: 0 Nimbus, 1 Souvenir. On dial 1, `souvenir` is JSON naming what the scene should become: {"kind": "ramen packet", "subject": "a bowl of noodles", "title": …,
     "subtitle": …, "palette": ["#111", "#d8b24a"]}; the camera gets it from Muse Spark.
 
     readings: {"temp_c", "rh", "lux", "cct", "wind", "db"}, any subset. Dial 1–2 fall back to 0

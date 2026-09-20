@@ -113,7 +113,9 @@ def test_app_tools_without_network(tmp_path, monkeypatch):
 
     a = appmod.CameraApp(FakeSensors(), Cam(), LocalLibrary(tmp_path / "lib.sqlite"), api="http://127.0.0.1:9")
     shot = a.take_photo({})          # no GPU reachable: the effects alone, rendered here
-    assert shot["mode"] == "Nimbus" and "unaltered" in shot["proof"]
+    assert shot["mode"] == "Nimbus" and "unaltered" in shot["proof"] and shot["rendered_on"] == "the camera itself"
+    assert "sensor effects" in shot["note"]
+    assert "error" in a.take_photo({"mode": "souvenir"})    # souvenir needs the GPU: no silent fallback
     a.wait_for_tags()
     assert a.photo_details({"photo": "current"})["id"] == shot["id"]
     assert a.search_photos({"query": "fog", "min_rh": 80})["count"] == 1

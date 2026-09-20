@@ -68,9 +68,11 @@ ASUS.
 
 ## Working agreements
 
-- **Secrets never go in files or commits.** They live in the macOS Keychain (`meta-model-api-key`,
-  `elevenlabs-api-key`, `ig-token`, `ig-user-id`) and are passed to the rig at launch. On the Pi, a persistent
-  copy would go in `/etc/nimbus.env` (root, 0600) — the autostart sources it if present.
+- **Secrets never go in the repo.** They live in the macOS Keychain (`meta-model-api-key`,
+  `elevenlabs-api-key`, `ig-token`, `ig-user-id`). The one copy outside it is `/etc/nimbus.env` on the Pi
+  (root:raspi4, 0640), so the camera survives a reboot; the autostart sources it.
+- **The camera asks the GPU first, always.** Rendering on the Pi is the fallback for when the server is
+  unreachable, never the default — the first cut of the two-mode change got this backwards.
 - **Edit on the Mac, push, then deploy**: `rsync` to the Pi and the ASUS, then `~/start_nimbus.sh` /
   `~/restart_api.sh`. Both are small scripts on those machines.
 - **Run both test suites before deploying**: `uv run pytest` in `pipeline/` and in `device/`. They are offline
