@@ -291,15 +291,17 @@ class Camera:
         args = ["v4l2-ctl", "-d", f"/dev/video{index}"] + [a for s in settings for a in ("-c", s)]
         return subprocess.run(args, capture_output=True, text=True).stdout
 
-    def _exposure(self) -> int | None:
+    def _ctrl(self, name: str) -> int | None:
         import shutil
         import subprocess
         if not shutil.which("v4l2-ctl"):
             return None
-        out = subprocess.run(["v4l2-ctl", "-d", f"/dev/video{self.index}", "-C", "exposure_time_absolute"],
-                             capture_output=True, text=True).stdout
+        out = subprocess.run(["v4l2-ctl", "-d", f"/dev/video{self.index}", "-C", name], capture_output=True, text=True).stdout
         digits = "".join(ch for ch in out if ch.isdigit())
         return int(digits) if digits else None
+
+    def _exposure(self) -> int | None:
+        return self._ctrl("exposure_time_absolute")
 
     def _sharp_shot(self):
         """Context: exposure capped for the shot when auto has stretched it, restored afterwards."""
@@ -310,7 +312,15 @@ class Camera:
             exp = self._exposure()
             capped = exp is not None and exp > self.MAX_EXPOSURE
             if capped:
-                self._v4l2(self.index, "auto_exposure=1", f"exposure_time_absolute={self.MAX_EXPOSURE}", "gain=255")
+                # Keep the same brightness: shorter exposure, proportionally more gain (exposure × gain is
+                # what auto had settled on). Gain 255 flat out made every shot a white flash.
+                gain = self._ctrl("gain") or 64
+                want = gain * exp / self.MAX_EXPOSURE
+                if want <= 255:
+                    new_exp, new_gain = self.MAX_EXPOSURE, int(round(want))
+                else:                       # even max gain will not cover it: the shortest exposure that does
+                    new_exp, new_gain = int(round(exp * gain / 255)), 255
+                self._v4l2(self.index, "auto_exposure=1", f"exposure_time_absolute={new_exp}", f"gain={new_gain}")
                 with self._lock:
                     for _ in range(8):      # let the new exposure take effect
                         self.cap.read()
