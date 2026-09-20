@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 import queue
@@ -211,6 +212,7 @@ class PiSensors:
 
 class Camera:
     def __init__(self, index: int = 0, still: str | None = None):
+        self.index = index
         self.still = cv2.cvtColor(cv2.imread(still), cv2.COLOR_BGR2RGB) if still else None
         self.cap = None if still else self._open(index)
         self._lock = threading.Lock()
@@ -238,16 +240,56 @@ class Camera:
             print("[camera] waiting for camera permission…", flush=True)
             time.sleep(1.5)
 
+    # -- exposure (Linux / v4l2; a no-op elsewhere) -----------------------------------------------
+    # The C270's auto-exposure trades frame rate for exposure time indoors (up to 100 ms: every hand-held
+    # shot smears), and simply pinning the frame rate makes its auto-exposure go black. So the viewfinder
+    # runs on auto, and the moment the shutter is pressed the exposure is capped for the shot: if auto has
+    # gone past 33 ms, switch to manual 33 ms at full gain (same brightness indoors, a third of the blur),
+    # take the frame, and hand control back.
+    MAX_EXPOSURE = 333          # v4l2 units of 100 µs
+
     @staticmethod
     def _cap_exposure(index: int) -> None:
-        """On Linux, stop the webcam trading frame rate for exposure time (v4l2 "dynamic framerate"), so
-        the exposure stays under the frame interval and moving subjects stay sharp."""
+        Camera._v4l2(index, "auto_exposure=3", "exposure_dynamic_framerate=1")
+
+    @staticmethod
+    def _v4l2(index: int, *settings: str) -> str:
         import shutil
         import subprocess
         if not shutil.which("v4l2-ctl"):
-            return
-        subprocess.run(["v4l2-ctl", "-d", f"/dev/video{index}", "-c", "exposure_dynamic_framerate=0"],
-                       capture_output=True)
+            return ""
+        args = ["v4l2-ctl", "-d", f"/dev/video{index}"] + [a for s in settings for a in ("-c", s)]
+        return subprocess.run(args, capture_output=True, text=True).stdout
+
+    def _exposure(self) -> int | None:
+        import shutil
+        import subprocess
+        if not shutil.which("v4l2-ctl"):
+            return None
+        out = subprocess.run(["v4l2-ctl", "-d", f"/dev/video{self.index}", "-C", "exposure_time_absolute"],
+                             capture_output=True, text=True).stdout
+        digits = "".join(ch for ch in out if ch.isdigit())
+        return int(digits) if digits else None
+
+    def _sharp_shot(self):
+        """Context: exposure capped for the shot when auto has stretched it, restored afterwards."""
+        import contextlib
+
+        @contextlib.contextmanager
+        def cm():
+            exp = self._exposure()
+            capped = exp is not None and exp > self.MAX_EXPOSURE
+            if capped:
+                self._v4l2(self.index, "auto_exposure=1", f"exposure_time_absolute={self.MAX_EXPOSURE}", "gain=255")
+                with self._lock:
+                    for _ in range(8):      # let the new exposure take effect
+                        self.cap.read()
+            try:
+                yield
+            finally:
+                if capped:
+                    self._cap_exposure(self.index)
+        return cm()
 
     def frame(self) -> np.ndarray | None:
         """RGB uint8, full resolution."""
@@ -259,8 +301,9 @@ class Camera:
 
     def jpeg(self) -> bytes:
         f = None
-        for _ in range(3):   # drop buffered frames so the picture is the moment of the press
-            f = self.frame()
+        with (self._sharp_shot() if self.cap is not None else contextlib.nullcontext()):
+            for _ in range(3):   # drop buffered frames so the picture is the moment of the press
+                f = self.frame()
         if f is None:
             raise RuntimeError("camera returned no frame")
         return cv2.imencode(".jpg", cv2.cvtColor(f, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes()
