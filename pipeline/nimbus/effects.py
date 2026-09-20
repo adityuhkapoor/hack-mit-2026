@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import io
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -324,51 +325,60 @@ def _hex(colour: str, fallback=(20, 20, 24)) -> tuple:
         return fallback
 
 
-def souvenir_frame(img: np.ndarray, kind: str, title: str, subtitle: str = "", footer: str = "",
-                   palette: list[str] | None = None) -> np.ndarray:
-    """Dial 3: mount the picture as the keepsake it became — a card border, a title, a line of small print.
+FONT_DIR = Path(__file__).parent / "data" / "fonts"
 
-    The photograph is untouched inside the frame; this only adds the packaging around and over it.
-    """
-    h, w = img.shape[:2]
-    ink, accent = (_hex(p) for p in ((palette or ["#141418", "#d8b24a"]) + ["#141418", "#d8b24a"])[:2])
-    # Muse picks the palette, so the card can come back cream or near-black: pick text that reads on it.
-    dark_card = (0.299 * ink[0] + 0.587 * ink[1] + 0.114 * ink[2]) < 140
-    body = (240, 240, 240) if dark_card else (30, 30, 34)
-    quiet = (170, 170, 175) if dark_card else (95, 95, 100)
-    if abs(sum(accent) - sum(ink)) < 90:          # accent too close to the card to read
-        accent = body
-    border = max(8, int(min(h, w) * 0.035))
-    band = int(min(h, w) * 0.22)          # the title is the print's headline: the model paints no text
-    card = Image.new("RGB", (w + 2 * border, h + 2 * border + band), ink)
-    card.paste(to_pil_local(img), (border, border))
-    d = ImageDraw.Draw(card)
-    d.rectangle([border - 3, border - 3, border + w + 2, border + h + 2], outline=accent, width=3)
 
-    def font(size, bold=False):
-        for name in (["DejaVuSans-Bold.ttf", "LiberationSans-Bold.ttf", "Arial Bold.ttf"] if bold else []):
-            try:
-                return ImageFont.truetype(name, size)
-            except OSError:
-                continue
+def brand_font(size: int, weight: str = "Bold") -> ImageFont.FreeTypeFont:
+    """Plus Jakarta Sans (bundled, OFL); PIL's default if the file is missing."""
+    try:
+        return ImageFont.truetype(str(FONT_DIR / f"PlusJakartaSans-{weight}.ttf"), size)
+    except OSError:
         try:
             return ImageFont.load_default(size=size)
         except TypeError:
             return ImageFont.load_default()
 
-    y = border + h + int(band * 0.08)
+
+def souvenir_frame(img: np.ndarray, kind: str, title: str, subtitle: str = "", footer: str = "",
+                   palette: list[str] | None = None, side: int | None = None) -> np.ndarray:
+    """AI Camera: mount the picture as the thing it became — a square print with the headline under it.
+
+    Square because it is printed square and posted square. The photograph is untouched inside the frame,
+    fitted whole (a landscape shot is letterboxed, never cropped); the packaging is around and under it.
+    `footer` is kept for callers but no longer printed: the print carries the picture and its words only.
+    """
+    h, w = img.shape[:2]
+    side = side or max(h, w)
+    ink, accent = (_hex(p) for p in ((palette or ["#141418", "#d8b24a"]) + ["#141418", "#d8b24a"])[:2])
+    # Muse picks the palette, so the card can come back cream or near-black: pick text that reads on it.
+    dark_card = (0.299 * ink[0] + 0.587 * ink[1] + 0.114 * ink[2]) < 140
+    body = (240, 240, 240) if dark_card else (30, 30, 34)
+    if abs(sum(accent) - sum(ink)) < 90:          # accent too close to the card to read
+        accent = body
+    border = max(10, int(side * 0.035))
+    band = int(side * 0.19)
+    inner = side - 2 * border                     # the picture's box
+    box_h = inner - band
+    card = Image.new("RGB", (side, side), ink)
+    pic = to_pil_local(img)
+    pic.thumbnail((inner, box_h))
+    px, py = border + (inner - pic.width) // 2, border + (box_h - pic.height) // 2
+    card.paste(pic, (px, py))
+    d = ImageDraw.Draw(card)
+    d.rectangle([px - 3, py - 3, px + pic.width + 2, py + pic.height + 2], outline=accent, width=3)
+
+    y = border + box_h + int(band * 0.10)
     head = title.upper()[:28]
-    size = int(band * 0.5)                # as big as fits the width
-    while size > int(band * 0.2) and d.textbbox((0, 0), head, font=font(size, True))[2] > w:
+    size = int(band * 0.46)                       # as big as fits the width
+    while size > int(band * 0.2) and d.textbbox((0, 0), head, font=brand_font(size, "ExtraBold"))[2] > inner:
         size -= 2
-    d.text((border, y), head, font=font(size, True), fill=accent)
+    d.text((border, y), head, font=brand_font(size, "ExtraBold"), fill=accent)
     if subtitle:
-        d.text((border, y + int(band * 0.55)), subtitle[:60], font=font(int(band * 0.19)), fill=body)
-    if footer:
-        d.text((border, y + int(band * 0.78)), footer[:80], font=font(int(band * 0.13)), fill=quiet)
-    tag = kind.upper()[:18]
-    tw = d.textbbox((0, 0), tag, font=font(int(band * 0.17)))[2]
-    d.text((card.width - border - tw, border + int(band * 0.06)), tag, font=font(int(band * 0.17)), fill=accent)
+        d.text((border, y + int(band * 0.56)), subtitle[:60], font=brand_font(int(band * 0.17), "Medium"), fill=body)
+    tag = kind.upper()[:22]
+    tag_font = brand_font(int(band * 0.12), "Bold")
+    tw = d.textbbox((0, 0), tag, font=tag_font)[2]
+    d.text((side - border - tw, border + int(band * 0.04)), tag, font=tag_font, fill=accent)
     return np.asarray(card, np.float32) / 255
 
 

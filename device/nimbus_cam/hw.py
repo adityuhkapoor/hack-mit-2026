@@ -184,8 +184,8 @@ class PiSensors:
 
     def _db(self) -> float | None:
         audio = getattr(self, "audio", None)
-        if audio is not None:
-            return audio.level_db()
+        if audio is not None and (level := audio.level_db()) is not None:
+            return level
         try:
             import sounddevice as sd
             device = None
@@ -510,8 +510,12 @@ class PushToTalkAudio:
         self._released_at = time.time()
         self.talking.clear()
 
-    def level_db(self) -> float:
-        """Rough dBA from the live mic block (the same number the old one-shot sample produced)."""
+    def level_db(self) -> float | None:
+        """Rough dBA from the live mic block (the same number the old one-shot sample produced), or None
+        when no session holds the mic (then the sensor may sample it itself)."""
+        stream = getattr(self, "in_stream", None)
+        if stream is None or not stream.active:
+            return None
         return round(float(94 + 20 * np.log10(max(self._rms, 1e-6))), 1)
 
     def output(self, audio: bytes) -> None:

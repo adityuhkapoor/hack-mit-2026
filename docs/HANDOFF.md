@@ -44,11 +44,21 @@ is patched, `device/unoq/patches/`), and the array delivers one chess subpage pe
 are live at any moment — plenty for temperature and motion. The thermal array is on **Wire2 (A4/A5)** and the
 Pi is on the header SDA/SCL (`Wire`); the sketch finds both itself.
 
+## Look
+
+Brand palette (sky `#70C8FB`, pink `#FF9EC6`, lime `#E2F542`, slate `#1B3139`, coral `#FF7B9C`) and Plus
+Jakarta Sans (bundled, OFL, `pipeline/nimbus/data/fonts`) on the panel and on the print. **The AI Camera print
+is square** (photo fitted whole, headline + subtitle, no sensor line) — the same file prints, posts and shows.
+The QR card (`card.jpg`) still carries the readings for the phone.
+
 ## The two modes (changed 23:50 ET)
 
 **AI Camera** = the pipeline's Souvenir dial with a **fifty-format menu** (`sense.KINDS`: cave painting, alien abduction report, medieval wanted poster … barbie doll packaging). Muse picks the format from the scene (`tagger.souvenir`), the GB10 paints it around the untouched subject. Verified: a Red Bull → "energy drink can", lightning. Now on **klein 9B** (`gb10-9b`, ~19 s a render at 1.5 MP; 4B is the `gb10` fallback, ~9 s). Landscape (portrait was tried: `NIMBUS_ROTATE=90/270`). **Visa Buy** = the shutter saves the frame as shot (no segmentation, no diffusion, no server) and goes straight to identify → offers → BUY WITH VISA. The old "Nimbus" air mode is no longer on the dial (still in the API).
 
 ## Shop (Visa)
+
+Visa Buy shows the product's own picture beside the shot (Open Food Facts or an image search) and plays a
+payment-terminal animation (card tap, contactless ripples, "Contacting Visa…") while the sandbox answers.
 
 "What am I holding?" → `identify_product` (Muse vision → live search → offers) → "buy it" → `buy_it`. A
 **SHOP** button is on the review screen. Checkout is a **real Visa Developer sandbox call** (Visa Direct pull-funds, MLE-encrypted, test card) —

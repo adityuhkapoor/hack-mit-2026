@@ -82,6 +82,7 @@ class State:
     product: shop.Product | None = None # Shop: what the current photo is, what it costs, the receipt
     offers: list = field(default_factory=list)
     receipt: shop.Receipt | None = None
+    paying_since: float = 0.0           # > 0 while the Visa terminal animation plays
 
 
 class CameraApp:
@@ -303,6 +304,8 @@ class CameraApp:
             finally:
                 self.state.busy = ""
             shop.save(pdir, product, offers)
+        if product.image_url and not (pdir / "product.jpg").exists():
+            shop.fetch_image(product.image_url, pdir / "product.jpg")
         self.state.current, self.state.screen = photo, "shop"
         self.state.product, self.state.offers, self.state.receipt = product, offers, None
         best = offers[0] if offers else None
@@ -319,10 +322,14 @@ class CameraApp:
                 return r if "error" in r else {"error": "nothing for sale was found for this photo"}
         which = int((p or {}).get("offer", 1) or 1) - 1
         offer = st.offers[max(0, min(which, len(st.offers) - 1))]
+        st.paying_since = time.time()               # the terminal animation runs while Visa answers
         try:
             receipt = shop.checkout(offer)
+            time.sleep(max(0.0, 2.2 - (time.time() - st.paying_since)))   # let the tap-and-wait play
         except Exception as e:
+            st.paying_since = 0.0
             return {"error": f"payment failed: {str(e)[:120]}"}
+        st.paying_since = 0.0
         st.receipt, st.screen = receipt, "shop"
         if st.current and st.current.local_photo:
             shop.save(Path(st.current.local_photo).parent, st.product, st.offers, receipt)

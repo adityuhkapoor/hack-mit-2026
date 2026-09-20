@@ -142,6 +142,28 @@ def web_search(query: str, n: int = 8) -> list[dict]:
         return []
 
 
+def product_image(query: str) -> str | None:
+    """A catalogue-style picture of the product (web image search, no key)."""
+    try:
+        from ddgs import DDGS
+        for r in DDGS().images(f"{query} product", max_results=5):
+            if r.get("image", "").startswith("http"):
+                return r["image"]
+    except Exception as e:
+        print(f"[shop] image search unavailable ({type(e).__name__})")
+    return None
+
+
+def fetch_image(url: str, dest: Path) -> Path | None:
+    try:
+        r = httpx.get(url, timeout=15, follow_redirects=True, headers={"User-Agent": "Mozilla/5.0 Nimbus camera"})
+        r.raise_for_status()
+        dest.write_bytes(r.content)
+        return dest
+    except Exception:
+        return None
+
+
 def find(product: Product) -> list[Offer]:
     query = product.search_query or product.label()
     if product.category in ("food", "drink"):
@@ -150,6 +172,8 @@ def find(product: Product) -> list[Offer]:
             product.image_url = off.get("image_front_url")
             if off.get("quantity") and not product.variant:
                 product.variant = off["quantity"]
+    if not product.image_url:
+        product.image_url = product_image(query)
     results = web_search(query)
     if not results:
         return []

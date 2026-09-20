@@ -154,6 +154,9 @@ def take(photo: np.ndarray, readings: sense.Readings, dial: int = 0, comfy: Comf
         # The model has already painted the weather, so the procedural levers come down a notch.
         params = sense.scaled(params, sense.AI_EFFECT_SCALE)
     styled = sense.apply_effects(plate, params, seed)
+    print(f"[effects] {sense.DIAL_NAMES[dial_used]}: warmth {params.warmth:+.2f} · diffusion {params.diffusion:.2f} · "
+          f"grain {params.grain:.2f} · blur {params.blur:.2f} · saturation {params.saturation:.2f} · "
+          f"haze {params.haze:.2f} · distortion {params.distortion:.2f}" + (" (scaled: the model painted the air)" if generated else ""))
     out = subject.composite(as_shot, styled, mask)
     proof = subject.verify(as_shot, out, mask)
     if dial_used == sense.SOUVENIR:

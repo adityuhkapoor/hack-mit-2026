@@ -372,11 +372,16 @@ def souvenir_prompt(kind: str, subject: str, r: Readings, title: str = "") -> st
     words, klein renders them legibly. Everything else stays wordless.
     """
     look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
+    # The measured air shapes the artwork's mood: the same police lineup is a foggy one at 90 % RH and a
+    # sun-bleached one at 2000 lux. This is the sensors' main lever in AI Camera; the procedural effects
+    # (sense.effect_params, scaled by AI_EFFECT_SCALE) are the finish on top.
+    air = describe(r)
+    mood = f" The mood and light of the artwork follow the air the camera measured: {air}." if air else ""
     # klein cannot spell (the headline came back "LOIDRAVE OVERDRIVE"), so the artwork is wordless and the
     # frame prints the real title. Blank panels where lettering would go read as design, not as a mistake.
     return (f"Replace the masked surroundings with {look}, featuring {subject}. Fill the whole background in "
             "that style, bold and uncluttered right behind the subject so it stays the focus. Match the "
-            "camera height and light direction of image 1. Purely graphic: absolutely no text, letters, "
+            f"camera height and light direction of image 1.{mood} Purely graphic: absolutely no text, letters, "
             "words, numbers or logos anywhere; where lettering would normally go, leave clean blank panels "
             "and shapes. No other people, faces, figures or photographs of people anywhere in the artwork: "
             "the subject is the only person.")
