@@ -279,7 +279,7 @@ class CameraApp:
         return {"shown": "a QR code on the camera's screen", "link": photo.public_link or photo.link}
 
     def post_instagram(self, p: dict | None = None) -> dict:
-        photo = self._resolve((p or {}).get("photo"))
+        photo = (p or {}).get("_photo") or self._resolve((p or {}).get("photo"))
         if photo is None:
             return {"error": "no photo to post"}
         if not photo.card_url:
@@ -553,9 +553,11 @@ class CameraApp:
         """Every AI Camera photo goes to the account (NIMBUS_AUTO_POST=0 to stop). Waits for the tags so the
         caption is Muse's, then posts the square photo."""
         tagger_thread.join(45)
-        res = self.post_instagram({"photo": photo.id})
+        # The photo object itself, not a lookup by id: the library may know it under another id, or not yet.
+        res = self.post_instagram({"photo": photo.id, "_photo": photo})
         if "error" in res:
             self.say(f"Auto-post failed: {res['error'][:60]}")
+            print(f"[instagram] auto-post failed for {photo.id}: {res['error']}")
 
     def _instagram_caption(self, photo: Photo) -> str:
         tags_file = Path(photo.local_photo).parent / "tags.json" if photo.local_photo else None
