@@ -647,7 +647,8 @@ class Skin:
                 piece.paste((0, 0, 0, 0), (k, 0, d, d)); piece.paste((0, 0, 0, 0), (0, 0, d, d - k))
             else:
                 piece.paste((0, 0, 0, 0), (0, 0, d - k, d)); piece.paste((0, 0, 0, 0), (0, 0, d, d - k))
-            card.paste(fade(piece, 0.95), (int(cx), int(cy)), fade(piece, 0.95))
+            faded = fade(piece, 0.95)
+            card.paste(faded, (int(cx), int(cy)), faded)
 
     def _reticle(self, card, now):
         if not self.reticle:
@@ -809,7 +810,8 @@ class Skin:
         hs = int(s * (0.95 + 0.95 * halo_p))
         hal = ring(max(hs, 8), WHITE + (255,), 3)
         layer = Image.new("RGBA", sp.size, (0, 0, 0, 0))
-        layer.paste(fade(hal, 0.9 * (1 - halo_p)), (cx - hs // 2, cy - hs // 2), fade(hal, 0.9 * (1 - halo_p)))
+        faded = fade(hal, 0.9 * (1 - halo_p))
+        layer.paste(faded, (cx - hs // 2, cy - hs // 2), faded)
         layer.putalpha(ImageChops.multiply(layer.getchannel("A"), body_alpha(sp.width - 2, 74, 5 if down else 0, sp.size)))
         sp.alpha_composite(layer)
         rs = int(s * (1.08 if down else 1.0))
