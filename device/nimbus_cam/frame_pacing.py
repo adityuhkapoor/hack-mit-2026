@@ -115,8 +115,11 @@ class FramePacer:
             self._next_deadline += self.interval
             if self._next_deadline <= current:
                 skipped = math.floor((current - self._next_deadline) / self.interval) + 1
-                self._next_deadline += skipped * self.interval
                 self.missed_deadlines += skipped
+                # Drop overdue work, yield to Tk, and rebase instead of waiting
+                # for another full grid slot on every overloaded frame.
+                self._next_deadline = current + 0.008
+                return 8
         # ceil avoids scheduling before the deadline; min(1) prevents a busy
         # loop when a callback ends within a fraction of a millisecond.
         return max(1, int(math.ceil((self._next_deadline - current) * 1000.0)))

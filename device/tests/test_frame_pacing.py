@@ -83,14 +83,27 @@ def test_scheduler_handles_a_slow_frame_without_accumulating_drift():
     first_future = pacer.next_deadline
     assert first_future > clock.now
 
-    # A later callback still follows the absolute cadence; it does not wait a
-    # full interval from the delayed callback's completion.  At the exact
-    # .10 deadline it skips that consumed slot and schedules .1333...
-    clock.advance(0.010)
-    delay = pacer.next_delay_ms()
-    assert delay == pytest.approx(1000 / 30, abs=1)
-    assert pacer.next_deadline > clock.now
+    assert first_future == pytest.approx(clock.now + 0.008)
     assert pacer.missed_scheduling_deadlines >= 1
+
+
+def test_sustained_overload_yields_without_half_rate_cliff():
+    clock = Clock()
+    pacer = FramePacer(15, clock=clock)
+    pacer.next_delay_ms()
+    for _ in range(8):
+        clock.now = pacer.next_deadline + 0.072
+        assert pacer.next_delay_ms() == 8
+        assert pacer.next_deadline == pytest.approx(clock.now + 0.008)
+
+
+def test_large_pause_rebases_without_backlog():
+    clock = Clock()
+    pacer = FramePacer(15, clock=clock)
+    pacer.next_delay_ms()
+    clock.advance(10_000)
+    assert pacer.next_delay_ms() == 8
+    assert pacer.next_deadline > clock.now
 
 
 def test_invalid_fps_warns_once_and_falls_back_to_default(capsys):

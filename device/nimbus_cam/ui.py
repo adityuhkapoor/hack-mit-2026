@@ -339,11 +339,18 @@ class Screen:
             if stats is not None:
                 stats.record_render(time.monotonic() - t0)
                 t0 = time.monotonic()
-            self._tk = ImageTk.PhotoImage(image)
+            display = getattr(self, "_tk", None)
+            replace = display is None or (display.width(), display.height()) != image.size
+            if replace:
+                display = ImageTk.PhotoImage(image)
+            else:
+                display.paste(image)
             if stats is not None:
                 stats.record_image_upload(time.monotonic() - t0)
                 t0 = time.monotonic()
-            self.label.configure(image=self._tk)
+            if replace:
+                self.label.configure(image=display)
+                self._tk = display
             if stats is not None:
                 stats.record_configure(time.monotonic() - t0)
             success = True

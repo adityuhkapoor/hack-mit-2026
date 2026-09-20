@@ -9,7 +9,10 @@ variable).
 
 The scheduler uses monotonic absolute deadlines.  When rendering or Tk is
 slow, elapsed deadlines are skipped and the next callback is scheduled with a
-positive Tk delay.  It does not run a catch-up burst or add a timer/thread.
+positive Tk delay. When the next deadline has already passed, it drops overdue
+slots and rebases with an 8 ms cooperative delay rather than waiting for another
+full grid slot. This avoids a half-rate cliff under sustained overload. It does
+not run a catch-up burst or add a timer/thread.
 Animation timestamps remain the existing wall-clock values, so this change
 does not alter the skin's animation equations or camera pipeline.
 
@@ -51,3 +54,17 @@ thermal claim.
 If a physical test is inconclusive or regresses touch, shutter, thermals, or
 visual quality, roll back to `NIMBUS_UI_FPS=15` while investigating.  No
 deployment, restart, Pi access, or remote operation is part of this change.
+
+## Persistent Tk image
+
+The screen now retains its Tk PhotoImage and updates its pixels with `paste`
+when the frame dimensions are unchanged. It binds a new image only on first
+presentation or a dimension change. A failed bind is retried on the next frame.
+This removes per-frame Tk label reconfiguration without changing rendered pixels,
+resolution, animation equations, or camera reads. Display update remains on the
+Tk main thread. Diagnostics classify `paste` within image/upload time.
+
+On the Pi, four RGB patterns read back from the actual Tk photo were byte-identical
+after reuse. Headless integration tests cover reuse, changed dimensions, and
+recovery after a failed label bind. See FRAME_PACING_RESULTS.md for the measured
+benefit and remaining bottleneck; configured FPS is not delivered FPS.
