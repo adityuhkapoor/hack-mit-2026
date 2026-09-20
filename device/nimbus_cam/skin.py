@@ -293,15 +293,48 @@ def cover(img: Image.Image, w: int, h: int, centering=(0.5, 0.5)) -> Image.Image
     return r.crop((x, y, x + w, y + h))
 
 
+@lru_cache(maxsize=2048)
+def _text_metrics(text: str, size: float, weight: str):
+    f = font(size, weight)
+    return f.getlength(text), f.getbbox(text)
+
+
+def _fits_text(text: str, size: float, weight: str, maxw: int, track: float) -> bool:
+    """Use conservative font bounds for clear fits; rasterize only near a line boundary.
+
+    Pillow's font box contains the rendered ink (and may include extra whitespace).
+    Matching text_sprite's origins and advances gives an upper bound on cropped width.
+    Ambiguous cases retain the original pixel-width measurement.
+    """
+    f = font(size, weight)
+    gap = f.getlength(" ") + size * 0.11 + track
+    x, left, right = 4.0, float("inf"), float("-inf")
+    for word in text.split(" "):
+        cx = x
+        for part in (word if track else [word]):
+            advance, box = _text_metrics(part, size, weight)
+            if box[3] > box[1]:
+                left = min(left, math.floor(cx + box[0]))
+                right = max(right, math.ceil(cx + box[2]))
+            cx += advance + track
+        x = cx + gap
+    if right - left <= maxw:
+        return True
+    return text_width(text, size, weight, track) <= maxw
+
+
+@lru_cache(maxsize=128)
 def wrap(text: str, size: float, weight: str, maxw: int, lines: int, track: float = 0.0) -> list[str]:
     words, out, cur = text.split(), [], ""
     for w in words:
         t = (cur + " " + w).strip()
-        if text_width(t, size, weight, track) <= maxw or not cur:
+        if _fits_text(t, size, weight, maxw, track) or not cur:
             cur = t
         else:
             out.append(cur)
             cur = w
+            if len(out) >= lines:
+                break  # Remaining words cannot affect the visible lines or ellipsis.
     out.append(cur)
     if len(out) > lines:
         out = out[:lines]
