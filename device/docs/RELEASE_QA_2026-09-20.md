@@ -54,6 +54,8 @@ With that cache provisioned, a fresh real capture completed prepare (321 ms),
 finish (14.758 seconds), and image download (161 ms), all HTTP 200. Review appeared
 28.289 seconds after shutter release; busy feedback took 99 ms. Automatic posting
 was disabled. No capture error or render failure was logged.
+The generated review image was inspected from a display screenshot. The scripted
+return to viewfinder completed, and the run finished with `busy=false`.
 
 This run was undervolted and does not establish normal rendering performance.
 The reveal interval included a 1.571-second callback, and throughput fell sharply.
