@@ -1,7 +1,18 @@
 # Nimbus
 
-Nimbus is a camera with a touchscreen, physical controls and voice commands, built
-for HackMIT 2026. Take a photo to make an AI-designed image or look up a product.
+An experimental camera built at HackMIT 2026. Nimbus keeps the photographed
+subject unchanged while using light, temperature, motion, sound, and weather
+data to generate a new setting around them.
+
+![Nimbus running at HackMIT 2026](docs/media/nimbus-hero.jpg)
+
+**[Watch the demo](https://youtu.be/b3_kws8iIpU)** ·
+**[Instagram](https://www.instagram.com/nimbus_hackmit2026/)** ·
+**[Web interface](web/)**
+
+The prototype runs across a Raspberry Pi 4, an Arduino UNO Q, and an ASUS
+Ascent GX10. It supports voice capture, searchable photo metadata, QR sharing,
+printing, and pixel-level verification that the protected subject was preserved.
 
 The app has two modes:
 
@@ -21,6 +32,8 @@ The Raspberry Pi runs the screen and webcam. An Arduino UNO Q supplies thermal
 readings and button input, and an ASUS GPU computer processes AI captures over
 the network. Sensor readings are included with captures; the current AI Camera
 mode chooses its design from the photo's content.
+
+## Repository guide
 
 | Where | What |
 |---|---|
