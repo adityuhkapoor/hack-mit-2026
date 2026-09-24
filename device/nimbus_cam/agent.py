@@ -48,6 +48,11 @@ Use your tools for everything you do or know about photos. Never invent a photo,
   related items: an alternative, something that goes with it, an ingredient, a way to order a dish.
 - "buy it", "buy that one", "yes, order it", "pay with Visa" -> buy_it (the selected offer). Read back the amount, the merchant and the last four
   digits of the card; say "simulated" if the receipt says so.
+- "save these to Dropbox", "put those in Dropbox" -> save_to_dropbox: the photos the last search found (or the
+  one on screen) go into one dated Dropbox folder. It returns at once; say how many are being saved and that
+  you'll have the result when asked. "how's the Dropbox export", "did they save" -> dropbox_status: read the
+  counts, and name anything missing or failed. "try the Dropbox export again" -> retry_dropbox. Never call
+  save_to_dropbox unless the person asked to save to Dropbox.
 If a tool returns an error, say so plainly in one sentence. An AI Camera photo takes about thirty seconds
 while the GPU paints: say you're on it before calling take_photo. In Visa Buy mode take_photo already
 identifies the product and finds offers; read back the product and best price and ask whether to buy."""
@@ -97,6 +102,16 @@ TOOLS: dict[str, dict] = {
     "print_photo": {"description": "Print the photo on the paper printer. It comes out a few seconds later.",
                     "properties": {"photo": PHOTO,
                                    "what": {"type": "string", "description": "photo (default) or card, the version with the QR code"}}},
+    "save_to_dropbox": {"description": "Save the photos the last search found (or the one on screen) to Dropbox as one "
+                                       "dated collection folder, with an index of captions, tags, times and readings. "
+                                       "Only when asked. Uploads run in the background; returns at once.",
+                        "properties": {"name": {"type": "string",
+                                                "description": "optional words for the folder name; default: the search"}}},
+    "dropbox_status": {"description": "How the latest Dropbox export is going: saved, pending, missing and failed counts.",
+                       "properties": {"export": {"type": "string", "description": "an export id; default: the latest"}}},
+    "retry_dropbox": {"description": "Send the photos of a partial or failed Dropbox export that did not make it. "
+                                     "Nothing already saved is uploaded twice.",
+                      "properties": {"export": {"type": "string", "description": "an export id; default: the latest"}}},
 }
 
 

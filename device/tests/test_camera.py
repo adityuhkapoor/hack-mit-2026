@@ -242,3 +242,138 @@ def test_review_screen_has_a_print_button_and_the_row_does_not_overlap():
     assert row[-1].x1 <= 1.0
     next(b for b in row if b.key == "print").action()
     assert printed == [{}]
+
+
+def _dropbox_rig(tmp_path, monkeypatch, handler):
+    import httpx
+
+    from nimbus_cam import app as appmod
+    monkeypatch.setattr(appmod, "HOME", tmp_path)
+    monkeypatch.setattr(appmod, "EXPORT_TOKEN", "exp0rt")
+    monkeypatch.setattr(appmod, "EXPORT_POLL_S", 0.01)
+    lib = LocalLibrary(tmp_path / "lib.sqlite")
+    for pid, hour, rh in (("fog1", 7, 94), ("fog2", 8, 91), ("dry1", 14, 25)):
+        shot = photo(pid, f"2026-09-20T{hour:02d}:00:00-04:00", 12, rh, caption=f"{pid} in a field")
+        shot.photo_url = f"http://box:8000/captures/{pid}/photo.jpg"
+        lib.add(shot)
+    cam = photo("cam1", "2026-09-20T07:30:00-04:00", 11, 93, caption="taken offline")   # no photo_url: camera only
+    (tmp_path / "photos" / "cam1").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "photos" / "cam1" / "photo.jpg").write_bytes(b"\xff\xd8camera-bytes")
+    cam.local_photo = str(tmp_path / "photos" / "cam1" / "photo.jpg")
+    lib.add(cam)
+    a = appmod.CameraApp(FakeSensors(), None, lib, api="http://box:8000")
+    a.http = httpx.Client(transport=httpx.MockTransport(handler))
+    return appmod, a
+
+
+def _job(ids, status="running", done=0, **more):
+    return {"id": "job1", "status": status, "folder": "/2026-09-20 09.33 fog", "query": "fog", "requested": len(ids),
+            "done": done, "pending": len(ids) - done, "missing": 0, "failed": 0, "missing_ids": [], "failed_ids": [],
+            "error": None, "index": "pending", "items": []} | more
+
+
+def test_save_to_dropbox_snapshots_the_search_results(tmp_path, monkeypatch):
+    """The selection is what the search showed, captured the moment the user asked: a later search, a browse
+    or a new photo changes nothing about what is exported."""
+    import httpx
+    posts, polls = [], []
+
+    def handler(req):
+        if req.method == "POST":
+            posts.append(req)
+            sel = json.loads(dict(_form(req))["selection"])
+            return httpx.Response(200, json=_job([p["id"] for p in sel["photos"]], status="queued"))
+        polls.append(req)
+        return httpx.Response(200, json=_job(["fog1", "fog2", "cam1"], status="done", done=3))
+    appmod, a = _dropbox_rig(tmp_path, monkeypatch, handler)
+    assert "error" in a.save_to_dropbox({})                       # nothing searched, nothing on screen
+    assert posts == []
+    assert a.search_photos({"query": "fog", "min_rh": 80})["count"] == 3
+    shown = [p.id for p in a.state.results]
+    a.show_photo({"which": "next"})
+    out = a.save_to_dropbox({})
+    a.search_photos({"query": "dry", "max_rh": 30})                # the results change right after
+    assert out["requested"] == 3 and out["from_the_camera_only"] == 1 and out["status"] == "queued"
+    (req,) = posts
+    assert req.url.path == "/exports" and req.headers["x-export-token"] == "exp0rt"
+    form = _form(req)
+    sel = json.loads(dict(form)["selection"])
+    assert sel["query"] == "fog"
+    assert [p["id"] for p in sel["photos"]] == shown and set(shown) == {"fog1", "fog2", "cam1"}   # as shown, not "dry1"
+    by_id = {p["id"]: p for p in sel["photos"]}
+    assert by_id["fog1"]["caption"] == "fog1 in a field" and by_id["fog1"]["readings"] == {"temp_c": 12, "rh": 94}
+    assert "fog" in by_id["fog1"]["tags"] and by_id["fog1"]["created_at"] == "2026-09-20T07:00:00-04:00"
+    assert by_id["cam1"]["camera_only"] is True and "camera_only" not in by_id["fog1"]
+    assert "local_photo" not in by_id["fog1"] and "photo_url" not in by_id["fog1"]     # no paths or urls leave the camera
+    files = [(name, data) for key, name, data in _files(req)]
+    assert files == [("cam1.jpg", b"\xff\xd8camera-bytes")]                          # only the camera-only photo's bytes
+    for t in a._export_watchers:
+        t.join(5)
+    assert polls and any(line.endswith("Dropbox: all 3 saved to Dropbox") for line in a.log)
+    assert {"save_to_dropbox", "dropbox_status", "retry_dropbox"} <= set(appmod.CameraApp.TOOLS)
+
+
+def test_dropbox_status_and_retry_read_back_counts(tmp_path, monkeypatch):
+    import httpx
+    state = {"job": _job(["fog1", "fog2"], status="partial", done=1, failed=1, pending=0, failed_ids=["fog2"])}
+    seen = []
+
+    def handler(req):
+        seen.append((req.method, req.url.path))
+        if req.url.path.endswith("/retry"):
+            state["job"] = _job(["fog1", "fog2"], status="done", done=2)
+        return httpx.Response(200, json=state["job"])
+    appmod, a = _dropbox_rig(tmp_path, monkeypatch, handler)
+    assert "error" in a.dropbox_status({}) and "error" in a.retry_dropbox({})     # nothing exported yet
+    a.exports.append("job1")
+    s = a.dropbox_status({})
+    assert s["summary"] == "1 of 2 saved; 0 missing, 1 failed" and s["failed"] == ["fog2"] and "retry_dropbox" in s["next"]
+    assert seen[-1] == ("GET", "/exports/job1")
+    state["job"] = _job(["fog1", "fog2"], status="partial", done=1, missing=1, pending=0, missing_ids=["fog2"])
+    s = a.dropbox_status({})
+    assert s["missing"] == ["fog2"] and "not on the server" in s["missing_why"]
+    r = a.retry_dropbox({})
+    assert r["status"] == "done" and r["summary"] == "all 2 saved to Dropbox" and ("POST", "/exports/job1/retry") in seen
+    for t in a._export_watchers:
+        t.join(5)
+    assert any(line.endswith("Dropbox: all 2 saved to Dropbox") for line in a.log)
+
+
+def test_dropbox_errors_are_plain_and_never_touch_the_camera(tmp_path, monkeypatch):
+    import httpx
+
+    def refuse(req):
+        return httpx.Response(503, json={"detail": "Dropbox export is not enabled on this server (NIMBUS_EXPORT_TOKEN is not set)"})
+    _, a = _dropbox_rig(tmp_path, monkeypatch, refuse)
+    a.search_photos({"query": "fog"})
+    assert "not set up on the server" in a.save_to_dropbox({})["error"]
+
+    def wrong_token(req):
+        return httpx.Response(401, json={"detail": "X-Export-Token missing or wrong"})
+    _, a = _dropbox_rig(tmp_path, monkeypatch, wrong_token)
+    a.search_photos({"query": "fog"})
+    assert "export token" in a.save_to_dropbox({})["error"]
+
+    def down(req):
+        raise httpx.ConnectError("no route")
+    _, a = _dropbox_rig(tmp_path, monkeypatch, down)
+    a.search_photos({"query": "fog"})
+    assert "could not reach" in a.save_to_dropbox({})["error"]
+    a.exports.append("job1")
+    assert "could not reach" in a.dropbox_status({})["error"] and "could not reach" in a.retry_dropbox({})["error"]
+    assert a.state.screen == "browse" and a.state.busy == "" and a.exports == ["job1"]
+
+
+def _form(req):
+    """The text fields of a multipart request, as (name, value) pairs."""
+    from email import message_from_bytes
+    msg = message_from_bytes(b"Content-Type: " + req.headers["content-type"].encode() + b"\r\n\r\n" + req.read())
+    return [(p.get_param("name", header="content-disposition"), p.get_payload(decode=True).decode())
+            for p in msg.get_payload() if p.get_filename() is None]
+
+
+def _files(req):
+    from email import message_from_bytes
+    msg = message_from_bytes(b"Content-Type: " + req.headers["content-type"].encode() + b"\r\n\r\n" + req.read())
+    return [(p.get_param("name", header="content-disposition"), p.get_filename(), p.get_payload(decode=True))
+            for p in msg.get_payload() if p.get_filename() is not None]

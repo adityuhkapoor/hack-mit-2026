@@ -20,7 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
-from . import analyze, brush, capture, effects, grade, imageio, look, printing, realtime, restyle, sense, styles
+from . import (analyze, brush, capture, dropbox_export, effects, grade, imageio, look, printing, realtime, restyle,
+               sense, styles)
 from .backends import Backends
 from .comfy import ComfyError
 
@@ -33,6 +34,7 @@ looks = look.LookStore()
 brushes = brush.BrushStore()
 captures = capture.CaptureStore()
 backends = Backends()
+exporter = dropbox_export.Exporter(dropbox_export.JobStore(), captures)
 _preview_tables: dict[str, np.ndarray] = {}
 _gpu_lock = threading.Lock()  # one diffusion job at a time; the 8 GB card cannot overlap them
 
@@ -51,6 +53,7 @@ GPU_CALLS_PER_MINUTE = int(os.environ.get("NIMBUS_GPU_CALLS_PER_MIN", "20"))
 LOOKS_PER_MINUTE = int(os.environ.get("NIMBUS_LOOKS_PER_MIN", "12"))
 MAX_STORED_LOOKS = int(os.environ.get("NIMBUS_MAX_LOOKS", "300"))
 PRINTS_PER_MINUTE = int(os.environ.get("NIMBUS_PRINTS_PER_MIN", "6"))
+EXPORTS_PER_MINUTE = int(os.environ.get("NIMBUS_EXPORTS_PER_MIN", "6"))
 _live_sessions = 0
 _calls: dict[str, list[float]] = {}
 
@@ -746,3 +749,86 @@ def print_capture(capture_id: str, request: Request, which: Literal["photo", "ca
     except printing.PrintError as e:
         raise HTTPException(e.status, str(e)) from e
     return {"capture": capture_id, "which": which, **job}
+
+
+# ---------------------------------------------------------------------------------------------
+# Dropbox: "save these to Dropbox" after a search. Off unless NIMBUS_EXPORT_TOKEN and the Dropbox app
+# credentials are set (dropbox_export.py). Every call here needs the token; uploads run on a worker thread.
+
+
+def _export_auth(request: Request) -> None:
+    token = dropbox_export.required_token()
+    if token is None:
+        raise HTTPException(503, "Dropbox export is not enabled on this server (NIMBUS_EXPORT_TOKEN is not set)")
+    if not hmac.compare_digest(request.headers.get("x-export-token", ""), token):
+        raise HTTPException(401, "X-Export-Token missing or wrong")
+
+
+def _export_job(job_id: str) -> dropbox_export.ExportJob:
+    try:
+        return exporter.store.get(job_id)
+    except KeyError as e:
+        raise HTTPException(404, f"no export {job_id}") from e
+
+
+@app.get("/exports/dropbox")
+def dropbox_status():
+    """Whether Dropbox export is switched on here. Never a credential, never a job."""
+    return dropbox_export.status()
+
+
+@app.post("/exports")
+def create_export(request: Request, selection: str = Form(...), photos: list[UploadFile] = File(default=[])):
+    """Start an export: `selection` is JSON {"query": "the foggy ones", "photos": [{"id", "created_at", "caption",
+    "tags", "readings", ...}]} — the search results exactly as the camera showed them, snapshotted here the moment
+    they arrive. Each photo's stored photo.jpg is uploaded unchanged; a photo that only exists on the camera can
+    come along as a file named `<id>.jpg` in `photos`. Returns the job at once ({"id", "status": "queued", ...});
+    follow it with GET /exports/{id}. The folder is named here from the date and the words of the query."""
+    _export_auth(request)
+    if dropbox_export.credentials() is None:
+        raise HTTPException(503, "Dropbox is not configured on this server (NIMBUS_DROPBOX_* unset)")
+    _rate_limit(request, cost="export", per_minute=EXPORTS_PER_MINUTE)
+    try:
+        sel = dropbox_export.Selection.model_validate_json(selection)
+    except ValueError as e:
+        raise HTTPException(400, f"bad selection: {str(e)[:300]}") from e
+    staged: dict[str, bytes] = {}
+    wanted = {p.id for p in sel.photos if p.camera_only}
+    for up in photos:
+        cid = Path(up.filename or "").stem
+        if cid not in wanted:
+            raise HTTPException(400, f"unexpected file {up.filename!r}: only camera-only photos in the selection")
+        data = up.file.read()
+        if not data.startswith(b"\xff\xd8"):
+            raise HTTPException(400, f"{up.filename} must be a JPEG")
+        staged[cid] = data
+    job = exporter.create(sel, staged)
+    exporter.submit(job.id)
+    return _export_job(job.id).summary()
+
+
+@app.get("/exports")
+def list_exports(request: Request, limit: int = 20):
+    _export_auth(request)
+    return [j.summary() for j in exporter.store.list()[:limit]]
+
+
+@app.get("/exports/{job_id}")
+def get_export(job_id: str, request: Request):
+    """Progress and outcome: status queued | running | done | partial | failed | interrupted, with counts
+    (requested, done, pending, missing, failed) and the ids that did not make it."""
+    _export_auth(request)
+    return _export_job(job_id).summary()
+
+
+@app.post("/exports/{job_id}/retry")
+def retry_export(job_id: str, request: Request):
+    """Send what did not make it. Photos Dropbox already has are never uploaded again."""
+    _export_auth(request)
+    _rate_limit(request, cost="export", per_minute=EXPORTS_PER_MINUTE)
+    _export_job(job_id)
+    try:
+        exporter.retry(job_id)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    return _export_job(job_id).summary()

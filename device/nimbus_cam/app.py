@@ -11,7 +11,7 @@ import json
 import os
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
@@ -58,6 +58,10 @@ PRINT_SIZE = os.environ.get("NIMBUS_PRINT_SIZE", "3x4")            # the page lo
 PRINT_LAYOUT = os.environ.get("NIMBUS_PRINT_LAYOUT", "polaroid1full")   # one polaroid filling that page
 PRINT_QUALITY = os.environ.get("NIMBUS_PRINT_QUALITY", "draft") or None  # draft is the quickest the printer does
 PRINT_MEDIA = os.environ.get("NIMBUS_PRINT_MEDIA") or None   # e.g. PhotographicGlossy; unset = the printer's setting
+# "Save these to Dropbox": the GPU box uploads (it holds the Dropbox credentials); the camera only sends the
+# list. Must match NIMBUS_EXPORT_TOKEN on that box.
+EXPORT_TOKEN = os.environ.get("NIMBUS_EXPORT_TOKEN", "")
+EXPORT_POLL_S = 3.0
 
 
 def _now_iso() -> str:
@@ -97,6 +101,9 @@ class CameraApp:
         self.lock = threading.RLock()
         self.log: list[str] = []
         self._taggers: list[threading.Thread] = []
+        self.last_search: str = ""                  # the words of the last search; names a Dropbox collection
+        self.exports: list[str] = []                # Dropbox export job ids, oldest first
+        self._export_watchers: list[threading.Thread] = []
         (HOME / "photos").mkdir(parents=True, exist_ok=True)
         if os.environ.get("NIMBUS_PREWARM", "1") == "1":
             threading.Thread(target=shop.prewarm_places, daemon=True).start()
@@ -206,6 +213,7 @@ class CameraApp:
         q = Query.from_tool(p)
         found = self.library.search(q)
         self.state.results, self.state.index = found, 0
+        self.last_search = q.text
         if found:
             self.state.current, self.state.screen = found[0], "browse"
         self.say(f"Search '{q.text}': {len(found)} found")
@@ -435,8 +443,129 @@ class CameraApp:
         self.say("Printing")
         return {"printing": True, "what": what, "job": r.json().get("job")}
 
+    # -- Dropbox: the photos a search found, saved as one collection ------------------------------
+
+    def _export_headers(self) -> dict[str, str]:
+        return {"X-Export-Token": EXPORT_TOKEN} if EXPORT_TOKEN else {}
+
+    def _export_error(self, r: httpx.Response) -> dict:
+        try:
+            detail = r.json().get("detail", r.text)
+        except ValueError:
+            detail = r.text
+        if r.status_code == 503:
+            return {"error": f"Dropbox export is not set up on the server: {str(detail)[:120]}"}
+        if r.status_code == 401:
+            return {"error": "the server refused the camera's export token"}
+        return {"error": f"the server refused the export: {str(detail)[:160]}"}
+
+    def save_to_dropbox(self, p: dict | None = None) -> dict:
+        """Export the photos on screen (the last search's results, else the one being looked at) to Dropbox.
+        The list is copied here, now: a later search changes nothing about what gets saved."""
+        p = p or {}
+        chosen = list(self.state.results) or ([self.state.current] if self.state.current else [])
+        snapshot = [asdict(x) for x in chosen]        # a deep copy: the results list may be replaced any moment
+        if not snapshot:
+            return {"error": "nothing to save: search for photos first, or take one"}
+        query = str(p.get("name") or (self.last_search if self.state.results else "") or
+                    (chosen[0].caption if len(chosen) == 1 else ""))
+        files, photos = {}, []
+        for d in snapshot:
+            keep = {k: d[k] for k in ("id", "created_at", "dial_name", "readings", "web", "caption", "tags", "scene",
+                                       "mood", "proof", "untouched", "processed_on")}
+            local = Path(d["local_photo"]) if d.get("local_photo") else None
+            if not d.get("photo_url") and local is not None and local.exists():   # only ever existed here
+                keep["camera_only"] = True
+                files[d["id"]] = (f"{d['id']}.jpg", local.read_bytes(), "image/jpeg")
+            photos.append(keep)
+        try:
+            r = self.http.post(f"{self.api}/exports", data={"selection": json.dumps({"query": query, "photos": photos})},
+                               files=[("photos", f) for f in files.values()], headers=self._export_headers(), timeout=60)
+        except httpx.HTTPError as e:
+            return {"error": f"could not reach the server ({type(e).__name__})"}
+        if r.status_code != 200:
+            return self._export_error(r)
+        job = r.json()
+        self.exports.append(job["id"])
+        self.say(f"Dropbox: saving {job['requested']}…")
+        t = threading.Thread(target=self._watch_export, args=(job["id"],), daemon=True)
+        t.start()
+        self._export_watchers.append(t)
+        return {"export": job["id"], "folder": job["folder"], "requested": job["requested"],
+                "from_the_camera_only": len(files), "status": job["status"],
+                "note": "uploading in the background on the server; ask for dropbox_status to hear how it went"}
+
+    def _export_speak(self, job: dict) -> dict:
+        c = {k: job[k] for k in ("requested", "done", "pending", "missing", "failed")}
+        status = job["status"]
+        if status == "done":
+            line = f"all {c['done']} saved to Dropbox"
+        elif status in ("queued", "running"):
+            line = f"saving: {c['done']} of {c['requested']} so far"
+        elif status == "partial":
+            line = f"{c['done']} of {c['requested']} saved; {c['missing']} missing, {c['failed']} failed"
+        else:
+            line = f"{status}: {job.get('error') or 'nothing was saved'}"
+        out = {"export": job["id"], "status": status, "folder": job["folder"], "summary": line, **c}
+        if job.get("missing_ids"):
+            out["missing"] = job["missing_ids"]
+            out["missing_why"] = "these photos are not on the server, so they could not be uploaded"
+        if job.get("failed_ids"):
+            out["failed"] = job["failed_ids"]
+        if job.get("error"):
+            out["error_detail"] = job["error"]
+        if status in ("partial", "failed", "interrupted"):
+            out["next"] = "retry_dropbox sends what did not make it, without duplicating what did"
+        return out
+
+    def _export_fetch(self, job_id: str) -> dict:
+        """The job as the server has it (always with a `status`), or {"error": why not}."""
+        try:
+            r = self.http.get(f"{self.api}/exports/{job_id}", headers=self._export_headers(), timeout=15)
+        except httpx.HTTPError as e:
+            return {"error": f"could not reach the server ({type(e).__name__})"}
+        return r.json() if r.status_code == 200 else self._export_error(r)
+
+    def _watch_export(self, job_id: str) -> None:
+        """Follow a job until it settles and put the outcome on the screen. Never touches the camera."""
+        for _ in range(int(1800 / EXPORT_POLL_S)):
+            job = self._export_fetch(job_id)
+            if "status" not in job:
+                return
+            if job["status"] not in ("queued", "running"):
+                self.say("Dropbox: " + self._export_speak(job)["summary"])
+                return
+            self.state.toast = f"Dropbox: {job['done']} of {job['requested']}…"
+            time.sleep(EXPORT_POLL_S)
+
+    def dropbox_status(self, p: dict | None = None) -> dict:
+        """How the latest export (or the one named) is going: counts, and what is missing or failed."""
+        job_id = str((p or {}).get("export") or (self.exports[-1] if self.exports else ""))
+        if not job_id:
+            return {"error": "nothing has been saved to Dropbox yet"}
+        job = self._export_fetch(job_id)
+        return self._export_speak(job) if "status" in job else job
+
+    def retry_dropbox(self, p: dict | None = None) -> dict:
+        """Send the photos of a partial or failed export that did not make it. Nothing is uploaded twice."""
+        job_id = str((p or {}).get("export") or (self.exports[-1] if self.exports else ""))
+        if not job_id:
+            return {"error": "nothing has been saved to Dropbox yet"}
+        try:
+            r = self.http.post(f"{self.api}/exports/{job_id}/retry", headers=self._export_headers(), timeout=15)
+        except httpx.HTTPError as e:
+            return {"error": f"could not reach the server ({type(e).__name__})"}
+        if r.status_code != 200:
+            return self._export_error(r)
+        self.say("Dropbox: retrying…")
+        t = threading.Thread(target=self._watch_export, args=(job_id,), daemon=True)
+        t.start()
+        self._export_watchers.append(t)
+        return self._export_speak(r.json())
+
     TOOLS = ("take_photo", "set_mode", "read_air", "search_photos", "photo_details", "show_photo",
-             "send_to_phone", "post_instagram", "identify_product", "show_offer", "buy_it", "print_photo")
+             "send_to_phone", "post_instagram", "identify_product", "show_offer", "buy_it", "print_photo",
+             "save_to_dropbox", "dropbox_status", "retry_dropbox")
 
     # -----------------------------------------------------------------------------------------
     # capture, storage, tagging

@@ -327,6 +327,35 @@ The frames are fixed templates (`nimbus/data/polaroid_frame*.png`, built once by
 (`polaroid_logo*.png`) filled with the photo's most prominent colour. `nimbus/print_dev.py` is a localhost dev page
 with Print, Print lines (a cutting guide), copies and speed.
 
+## Dropbox export
+
+Off unless `NIMBUS_EXPORT_TOKEN` is set and Dropbox credentials are configured (`NIMBUS_DROPBOX_CREDENTIALS`
+file or `NIMBUS_DROPBOX_APP_KEY` / `_APP_SECRET` / `_REFRESH_TOKEN`). Setup, smoke test and semantics:
+[DROPBOX.md](DROPBOX.md). Every call but the first needs `X-Export-Token`.
+
+`GET /exports/dropbox` — `{"enabled": true}` or `{"enabled": false, "reason": …}`. Never a credential.
+
+`POST /exports` — multipart. `selection` (JSON text): `{"query": "foggy photos from this morning",
+"photos": [{"id", "created_at", "dial_name", "readings", "web", "caption", "tags", "scene", "mood", "proof",
+"untouched", "processed_on", "camera_only"}, …]}` — 1 to 200 photos, the camera's snapshot of the search result;
+repeated ids collapse to one. `photos` (files, optional): the JPEG of each photo marked `camera_only`, named
+`<id>.jpg`, for shots that exist only on the camera; a file for any other id, or one that is not a JPEG, is 400.
+The server chooses the folder (`/<date> <time> <query slug>` inside the app folder) and the filenames; nothing
+in the request is a path. Returns the job summary at once with `status: "queued"`; uploads run in a worker
+thread. Errors: 400 bad selection, 401 wrong token, 429 too many, 503 not enabled / no credentials.
+
+`GET /exports?limit=20` · `GET /exports/{id}` — the summary: `status` (`queued` `running` `done` `partial`
+`failed` `interrupted`), `folder`, `query`, `index`, `error`, counts `requested done pending missing failed`,
+`missing_ids`, `failed_ids`, and `items` (`id filename status error bytes`). `missing` means the bytes were not on
+the server and not sent by the camera; it is never counted as saved.
+
+`POST /exports/{id}/retry` — re-queues only the `failed` and `missing` items of a `partial`, `failed` or
+`interrupted` job. Before each upload the worker compares Dropbox's `content_hash` at the target path with the
+local file and skips what is already there, so a retry never duplicates. 409 if the job is still running.
+
+The camera's `NIMBUS_EXPORT_TOKEN` is what it sends; it has no Dropbox credential. Tools: `save_to_dropbox`,
+`dropbox_status`, `retry_dropbox`.
+
 
 ## Two-phase capture
 
