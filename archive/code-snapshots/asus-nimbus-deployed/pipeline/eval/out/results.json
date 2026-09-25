@@ -1,0 +1,70 @@
+{
+  "per_grade": {
+    "teal_orange": {
+      "none": 8.91,
+      "oracle": 0.66,
+      "mkl_direct": 19.92,
+      "neutral_fit": 13.86,
+      "neutral_diffusion": 15.23
+    },
+    "warm_film": {
+      "none": 7.91,
+      "oracle": 0.61,
+      "mkl_direct": 17.38,
+      "neutral_fit": 7.98,
+      "neutral_diffusion": 13.67
+    },
+    "cool_matte": {
+      "none": 8.63,
+      "oracle": 0.68,
+      "mkl_direct": 15.37,
+      "neutral_fit": 7.54,
+      "neutral_diffusion": 13.18
+    },
+    "punchy_warm": {
+      "none": 7.06,
+      "oracle": 0.54,
+      "mkl_direct": 21.83,
+      "neutral_fit": 11.84,
+      "neutral_diffusion": 17.38
+    },
+    "cross_process": {
+      "none": 11.4,
+      "oracle": 0.63,
+      "mkl_direct": 19.96,
+      "neutral_fit": 12.35,
+      "neutral_diffusion": 14.7
+    },
+    "mono_selenium": {
+      "none": 14.56,
+      "oracle": 2.39,
+      "mkl_direct": 15.69,
+      "neutral_fit": 15.35,
+      "neutral_diffusion": 17.44
+    },
+    "moody_green": {
+      "none": 4.28,
+      "oracle": 0.75,
+      "mkl_direct": 19.37,
+      "neutral_fit": 7.1,
+      "neutral_diffusion": 16.19
+    }
+  },
+  "overall": {
+    "none": 8.96,
+    "oracle": 0.89,
+    "mkl_direct": 18.5,
+    "neutral_fit": 10.86,
+    "neutral_diffusion": 15.4
+  },
+  "pairs": 3,
+  "strip_columns": [
+    "B (your photo)",
+    "reference G(A)",
+    "truth G(B)",
+    "oracle",
+    "mkl_direct",
+    "neutral_fit",
+    "neutral_diffusion"
+  ]
+}

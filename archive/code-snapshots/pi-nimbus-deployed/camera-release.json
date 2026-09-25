@@ -1,0 +1,31 @@
+{
+  "commit": "595bfc2",
+  "files": {
+    "device/nimbus_cam/__main__.py": "6bcfda8671daf860c033d32a89afaa76f855163f51aacfdc69781b7bfccab67f",
+    "device/nimbus_cam/hw.py": "182d2ede81e6752311f7d1eab0a9732eda0966dd3901f02564c6b19b6b684503",
+    "device/nimbus_cam/ui.py": "101ccfa13dedc3a0b995f4f8f941194281090e38d94933466d999cfd7be57101",
+    "device/nimbus_cam/skin.py": "0d65ffd7bed2f3ecc3ff0f8eb08329e57ddc8000de97d24726dd71bdbe6380b0",
+    "device/nimbus_cam/tagger.py": "787289a8981eaeb5bffd22d404711e487bfaa7896500fac2f2139c75e330cbcb",
+    "device/nimbus_cam/frame_pacing.py": "11584d46206255415f24506f03eaa94686a522ddbb254d5112d489a86d404adb",
+    "device/native_presenter/presenter.py": "625bb7541d6e497c4fec963fa47d8f5f09535a39998f6beecb5e35d92fab5af3",
+    "device/native_presenter/native_presenter.cpp": "1ea46e29b41d3f1cf2945ad126d96d26b4fcdd335fa286494c9cbf60a0024e6b",
+    "device/native_presenter/native_presenter.h": "fff3772fed83b5037fab2c6a8d06459762eb6d942b37d2bfcb868dbfa93494dd",
+    "device/native_presenter/build/libnimbus_native_presenter.so": "996001c5a52b3c645d4e5631500d28a814fd183bc52f4cfd621eeb9981cbe281"
+  },
+  "previous": {
+    "device/nimbus_cam/__main__.py": "c94f25e6b55c4743919a555abb0cfcd8e932a091aa993ee94092aa1229e7a3ca",
+    "device/nimbus_cam/hw.py": "182d2ede81e6752311f7d1eab0a9732eda0966dd3901f02564c6b19b6b684503",
+    "device/nimbus_cam/ui.py": "ad4cdb241485a5575b9822eb2eb5b99959317277b67f86d65c89ba5ba5d302b8",
+    "device/nimbus_cam/skin.py": "8b284c142850f56c930ccf23af75fbef4cf9b39f9b932b83a944a0c788f618ec"
+  },
+  "backend": "sdl-wayland",
+  "target_fps": 24,
+  "validation": "Steady home/review approx24 callbacks/s; transition hitches and unreachable remote AI API remain; physical scanout not measured",
+  "network": {
+    "config_commit": "d3004a6",
+    "api": "http://127.0.0.1:18000",
+    "library": "http://127.0.0.1:19200",
+    "transport": "nimbus-asus-tunnel.service",
+    "validation": "API/library200; forced tunnel restart recovered; real AI capture23.505s, subject unaltered verified across different hotspots"
+  }
+}

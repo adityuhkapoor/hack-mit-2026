@@ -1,0 +1,67 @@
+# user services:
+== /home/raspi4/.config/systemd/user/*.service
+# system nimbus services:
+[Unit]
+Description=Nimbus camera API and library tunnel to ASUS
+After=network-online.target tailscaled.service
+Wants=network-online.target
+[Service]
+User=raspi4
+ExecStart=/usr/bin/ssh -NT -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=/home/raspi4/.ssh/nimbus_asus_known_hosts -o ExitOnForwardFailure=yes -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o ConnectTimeout=15 -i /home/raspi4/.ssh/nimbus_asus_tunnel -L 127.0.0.1:18000:127.0.0.1:8000 -L 127.0.0.1:19200:127.0.0.1:9200 asus@100.90.82.31
+Restart=always
+RestartSec=5
+[Install]
+WantedBy=multi-user.target
+[Unit]
+Description=Nimbus camera on the panel
+After=systemd-user-sessions.service network-online.target
+Conflicts=getty@tty1.service camera-kiosk.service
+
+[Service]
+Type=simple
+User=raspi4
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory=/home/raspi4/nimbus/device
+# Optional secrets (ElevenLabs, Muse, Instagram), root-owned and 0600. Absent is fine:
+# voice and tagging switch off, everything else still works.
+EnvironmentFile=-/etc/nimbus.env
+Environment=NIMBUS_FULLSCREEN=1 NIMBUS_SEG=human
+ExecStart=/home/raspi4/nimbus/device/run-pi.sh --local-library
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+# crontab:
+# lightdm:
+[LightDM]
+[Seat:*]
+greeter-session=pi-greeter-labwc
+greeter-hide-users=false
+user-session=rpd-labwc
+display-setup-script=/usr/share/dispsetup.sh
+autologin-user=raspi4
+autologin-session=rpd-labwc
+[XDMCPServer]
+[VNCServer]
+# wifi profiles:
+HackMIT.2026:802-11-wireless
+tailscale0:tun
+ztgac7sghi:tun
+lo:loopback
+Fallback-Adi-iPhone:802-11-wireless
+Fallback-Arun-iPhone:802-11-wireless
+Fallback-Calvin-iPhone:802-11-wireless
+Fallback-Calvin-laptop:802-11-wireless
+Wired connection 1:802-3-ethernet
+# bluetooth:
+Device 57:DB:A6:6E:87:96 Whammo 2.0 Speaker
+# apt extras:
+adb 1:34.0.5-12
+i2c-tools 4.4-2
+pipewire-alsa:arm64 1.4.2-1+rpt3
+python3-gpiozero 2.0.1-0+rpt1+trixie

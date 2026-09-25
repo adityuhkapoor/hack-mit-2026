@@ -1,0 +1,38 @@
+@reboot /home/asus/start_all.sh
+
+# comfyui launch:
+2046 /home/asus/nimbus-gpu/comfyui-env/bin/python main.py --listen 127.0.0.1 --port 8188 --disable-all-custom-nodes
+
+# models:
+-rw-r--r-- 1 asus asus  4070624520 Sep 19 16:10 /home/asus/nimbus-gpu/ComfyUI/models/diffusion_models/flux-2-klein-4b-fp8.safetensors
+-rw-rw-r-- 1 asus asus 18157185168 Sep 19 21:21 /home/asus/nimbus-gpu/ComfyUI/models/diffusion_models/flux-2-klein-9b.safetensors
+-rw-r--r-- 1 asus asus  3848213998 Sep 19 16:20 /home/asus/nimbus-gpu/ComfyUI/models/text_encoders/qwen_3_4b_fp4_flux2.safetensors
+-rw-rw-r-- 1 asus asus  6802593327 Sep 19 21:26 /home/asus/nimbus-gpu/ComfyUI/models/text_encoders/qwen_3_8b_fp4mixed.safetensors
+-rw-r--r-- 1 asus asus   336211292 Sep 19 16:01 /home/asus/nimbus-gpu/ComfyUI/models/vae/flux2-vae.safetensors
+-rw-r--r-- 1 asus asus           0 Sep 19 15:01 /home/asus/nimbus-gpu/ComfyUI/models/vae/put_vae_here
+
+# comfyui version:
+3c80da7 Fix ace step VAE decode crashing on non bf16 GPUs. (#16405)
+
+# printers:
+printer Epson_XP4200 now printing Epson_XP4200-123.  enabled since Sun 20 Sep 2026 12:15:39 PM PDT
+	Waiting for job to complete.
+printer EPSON_XP_4200_Series_USB is idle.  enabled since Sun 20 Sep 2026 11:09:34 AM PDT
+
+# wifi profiles:
+HackMIT.2026:802-11-wireless
+tailscale0:tun
+lo:loopback
+docker0:bridge
+D8\:1F\:83:802-11-wireless
+Fallback-Adi-iPhone:802-11-wireless
+Fallback-Calvin-iPhone:802-11-wireless
+Fallback-Calvin-laptop:802-11-wireless
+gx10-5493_Hotspot:802-11-wireless
+TEMP-Arun-iPhone:802-11-wireless
+Wired connection 3:802-3-ethernet
+
+# elasticsearch:
+bin
+config
+data

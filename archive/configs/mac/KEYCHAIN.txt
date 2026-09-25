@@ -1,0 +1,2 @@
+Keychain services holding the keys (values not exported here): meta-model-api-key elevenlabs-api-key ig-token ig-user-id visa-sandbox-user visa-sandbox-password hf-token
+The Pi's copy of the runtime keys is configs/pi/etc-nimbus.env (chmod 600).

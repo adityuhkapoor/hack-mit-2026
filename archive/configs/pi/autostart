@@ -1,0 +1,5 @@
+# Nimbus starts with the desktop session on the panel.
+# Optional keys (ElevenLabs, Muse, Instagram) live in /etc/nimbus.env, root-owned 0600; without it the
+# camera still shoots, renders Real on this Pi, and searches — only voice and tagging switch off.
+[ -r /etc/nimbus.env ] && set -a && . /etc/nimbus.env && set +a
+~/start_nimbus.sh &

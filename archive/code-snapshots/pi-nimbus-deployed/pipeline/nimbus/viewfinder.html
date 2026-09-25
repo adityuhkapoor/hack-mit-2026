@@ -1,0 +1,127 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus viewfinder</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; background: #0b0b0c; color: #eee; font: 14px/1.45 system-ui, sans-serif; }
+  header { padding: 12px 16px 0; }
+  h1 { font-size: 16px; margin: 0 0 8px; font-weight: 600; letter-spacing: .01em; }
+  #stage { position: relative; max-width: 960px; margin: 8px auto; padding: 0 16px; }
+  canvas { width: 100%; border-radius: 10px; background: #000; display: block; }
+  #hud { position: absolute; left: 24px; top: 12px; background: rgba(0,0,0,.55); padding: 6px 10px;
+         border-radius: 8px; font: 12px/1.5 ui-monospace, monospace; white-space: pre; }
+  #hero { position: absolute; right: 24px; top: 12px; width: 26%; border-radius: 8px; border: 1px solid #333; display: none; }
+  #styles { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; max-width: 960px; margin: 0 auto; }
+  button { background: #1b1b1f; color: #ddd; border: 1px solid #333; border-radius: 999px;
+           padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  button.on { background: #2b6cb0; border-color: #2b6cb0; color: #fff; }
+  button.gpu::after { content: " ◆"; color: #7fb3ff; font-size: 10px; }
+  .row { display: flex; gap: 14px; align-items: center; padding: 0 16px 14px; max-width: 960px; margin: 0 auto; flex-wrap: wrap; }
+  label { color: #aaa; }
+  .note { color: #888; max-width: 960px; margin: 0 auto; padding: 0 16px 24px; }
+</style>
+
+<header>
+  <h1>Nimbus — live viewfinder</h1>
+</header>
+<div id="styles"></div>
+<div id="stage">
+  <canvas id="out"></canvas>
+  <div id="hud">connecting…</div>
+  <canvas id="hero"></canvas>
+</div>
+<div class="row">
+  <label><input type="checkbox" id="showHero" checked> show diffusion frame inset</label>
+  <label><input type="checkbox" id="stillBlend" checked> fade in diffusion when still</label>
+  <label>send <select id="fps"><option>10</option><option selected>15</option><option>24</option></select> fps</label>
+</div>
+<p class="note">Grade and camera styles render on this Mac. ◆ styles run FLUX.2 klein on the GPU box: the local
+stand-in updates every frame while real diffusion frames stream in at a few fps, and the stand-in's colors are
+re-fitted from each one. Hold the camera still and the diffusion frame fades in.</p>
+
+<script>
+const out = document.getElementById('out'), hero = document.getElementById('hero');
+const octx = out.getContext('2d'), hctx = hero.getContext('2d');
+const hud = document.getElementById('hud');
+let ws, sending = false, styleId = null, lastMeta = {}, localTimes = [], heroTimes = [], nextIsHero = false;
+
+async function start() {
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+  const video = document.createElement('video');
+  video.srcObject = stream; video.muted = true; await video.play();
+  const grab = document.createElement('canvas'); grab.width = 640; grab.height = 360;
+  const gctx = grab.getContext('2d');
+
+  const styles = await (await fetch('/styles')).json();
+  const bar = document.getElementById('styles');
+  styles.forEach(s => {
+    const b = document.createElement('button');
+    b.textContent = s.name;
+    b.title = s.description + (s.available ? '' : ' — GPU unavailable');
+    if (s.needs_gpu) b.classList.add('gpu');
+    b.disabled = !s.available;
+    b.onclick = () => { [...bar.children].forEach(c => c.classList.remove('on')); b.classList.add('on'); pick(s.id); };
+    bar.appendChild(b);
+  });
+
+  connect();
+  function connect() {
+    ws = new WebSocket(`ws://${location.host}/ws/preview`);
+    ws.binaryType = 'blob';
+    ws.onopen = () => { hud.textContent = 'pick a style'; if (styleId) pick(styleId); };
+    ws.onclose = () => { hud.textContent = 'disconnected — retrying'; setTimeout(connect, 1000); };
+    ws.onmessage = async (ev) => {
+      if (typeof ev.data === 'string') { const m = JSON.parse(ev.data); if (m.type === 'hero') nextIsHero = true; else lastMeta = m; return; }
+      const bmp = await createImageBitmap(ev.data);
+      if (nextIsHero) {  // the raw diffusion frame, for the inset
+        nextIsHero = false;
+        if (hero.width !== bmp.width) { hero.width = bmp.width; hero.height = bmp.height; }
+        hctx.drawImage(bmp, 0, 0);
+        heroTimes.push(performance.now()); if (heroTimes.length > 10) heroTimes.shift();
+        return;
+      }
+      if (out.width !== bmp.width) { out.width = bmp.width; out.height = bmp.height; }
+      octx.drawImage(bmp, 0, 0);
+      sending = false;
+      localTimes.push(performance.now()); if (localTimes.length > 30) localTimes.shift();
+      draw();
+    };
+  }
+
+  function pick(id) {
+    styleId = id;
+    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'style', style_id: id,
+      still_blend: document.getElementById('stillBlend').checked }));
+  }
+
+  setInterval(() => {
+    if (!ws || ws.readyState !== 1 || sending || !styleId) return;
+    gctx.drawImage(video, 0, 0, grab.width, grab.height);
+    grab.toBlob(b => { if (b && ws.readyState === 1) { sending = true; ws.send(b); } }, 'image/jpeg', 0.8);
+  }, 1000 / parseInt(document.getElementById('fps').value || '15'));
+
+  document.getElementById('stillBlend').onchange = () => pick(styleId);
+}
+
+function fps(times) {
+  if (times.length < 3) return 0;
+  return (times.length - 1) / ((times[times.length - 1] - times[0]) / 1000);
+}
+
+function draw() {
+  const d = lastMeta.diffusion;
+  const lines = [
+    `${lastMeta.style || ''}  local ${fps(localTimes).toFixed(1)} fps (${lastMeta.local_ms ?? '-'} ms)`,
+    d || lastMeta.hero_mix !== undefined
+      ? `diffusion ${fps(heroTimes).toFixed(1)} fps  rt ${d ? d.round_trip_ms : '-'} ms  gpu ${d ? d.gpu_ms : '-'} ms`
+      : 'local only',
+    `motion ${lastMeta.motion ?? '-'}  hero ${lastMeta.hero_mix ?? 0}${lastMeta.distilled ? '  distilled' : ''}`,
+  ];
+  if (lastMeta.diffusion_error) lines.push(`gpu: ${lastMeta.diffusion_error.slice(0, 60)}`);
+  hud.textContent = lines.join('\n');
+  hero.style.display = document.getElementById('showHero').checked && hero.width > 1 ? 'block' : 'none';
+}
+
+start().catch(e => hud.textContent = 'camera error: ' + e.message);
+</script>

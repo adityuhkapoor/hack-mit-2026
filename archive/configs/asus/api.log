@@ -1,0 +1,214 @@
+INFO:     Started server process [99380]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:60588 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60600 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38680 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57282 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41792 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41546 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41558 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41574 - "GET /printer HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32872 - "POST /capture/prepare HTTP/1.1" 200 OK
+[ WARN:0@437.048] global net_impl_backend.cpp:345 setPreferableTarget Targets are not supported by the new graph engine for now
+[effects] AI Camera: warmth +0.23 · diffusion 0.26 · grain 0.02 · blur 0.15 · saturation 1.06 · haze 0.00 · distortion 0.14 (scaled: the model painted the air)
+INFO:     127.0.0.1:35034 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39682 - "GET /captures/de29435ef620/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39684 - "POST /captures/de29435ef620/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36630 - "POST /captures/de29435ef620/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36630 - "GET /captures/de29435ef620/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36630 - "GET /captures/de29435ef620/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36630 - "GET /captures/de29435ef620 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45924 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.24 · diffusion 0.26 · grain 0.02 · blur 0.14 · saturation 1.06 · haze 0.00 · distortion 0.14 (scaled: the model painted the air)
+INFO:     127.0.0.1:45936 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54444 - "GET /captures/e1b78956a82a/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42088 - "POST /captures/e1b78956a82a/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42088 - "GET /captures/e1b78956a82a/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42088 - "GET /captures/e1b78956a82a/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42088 - "GET /captures/e1b78956a82a HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48420 - "POST /captures/e1b78956a82a/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34168 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.25 · diffusion 0.26 · grain 0.01 · blur 0.14 · saturation 1.00 · haze 0.00 · distortion 0.14 (scaled: the model painted the air)
+INFO:     127.0.0.1:44240 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49988 - "GET /captures/bfc49037cbf8/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49998 - "POST /captures/bfc49037cbf8/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49998 - "GET /captures/bfc49037cbf8/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49998 - "GET /captures/bfc49037cbf8/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49998 - "GET /captures/bfc49037cbf8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41506 - "POST /captures/bfc49037cbf8/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56146 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41866 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.28 · diffusion 0.25 · grain 0.02 · blur 0.14 · saturation 1.00 · haze 0.00 · distortion 0.13 (scaled: the model painted the air)
+INFO:     127.0.0.1:41872 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48182 - "GET /captures/afcbc8b05ddb/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48186 - "POST /captures/afcbc8b05ddb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55406 - "GET /captures/afcbc8b05ddb/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55406 - "GET /captures/afcbc8b05ddb/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55406 - "GET /captures/afcbc8b05ddb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58988 - "POST /captures/afcbc8b05ddb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45622 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.29 · diffusion 0.25 · grain 0.02 · blur 0.14 · saturation 1.00 · haze 0.00 · distortion 0.13 (scaled: the model painted the air)
+INFO:     127.0.0.1:45628 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55022 - "GET /captures/fb5e2834f0dd/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45778 - "POST /captures/fb5e2834f0dd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34914 - "GET /captures/fb5e2834f0dd/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34914 - "GET /captures/fb5e2834f0dd/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34914 - "GET /captures/fb5e2834f0dd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57050 - "POST /captures/fb5e2834f0dd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45786 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.28 · diffusion 0.00 · grain 0.02 · blur 0.14 · saturation 1.00 · haze 0.00 · distortion 0.00 (scaled: the model painted the air)
+INFO:     127.0.0.1:45788 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56378 - "GET /captures/7468ee19be98/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56386 - "POST /captures/7468ee19be98/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54942 - "GET /captures/7468ee19be98/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54942 - "GET /captures/7468ee19be98/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54942 - "GET /captures/7468ee19be98 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34718 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34720 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54342 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.17 · diffusion 0.26 · grain 0.01 · blur 0.18 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:54344 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38750 - "GET /captures/af1736d83ba7/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38754 - "GET /captures/af1736d83ba7/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38754 - "GET /captures/af1736d83ba7/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38760 - "POST /captures/af1736d83ba7/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38754 - "GET /captures/af1736d83ba7 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59678 - "POST /captures/af1736d83ba7/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60734 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.16 · diffusion 0.28 · grain 0.02 · blur 0.17 · saturation 1.00 · haze 0.00 · distortion 0.13 (scaled: the model painted the air)
+INFO:     127.0.0.1:60742 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50464 - "GET /captures/9d2325d2c4ff/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41808 - "GET /captures/9d2325d2c4ff/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41808 - "GET /captures/9d2325d2c4ff/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41808 - "GET /captures/9d2325d2c4ff HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41808 - "POST /captures/9d2325d2c4ff/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39614 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.15 · diffusion 0.29 · grain 0.02 · blur 0.16 · saturation 1.00 · haze 0.00 · distortion 0.12 (scaled: the model painted the air)
+INFO:     127.0.0.1:39628 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44086 - "GET /captures/d5c536374af0/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44094 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55722 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60946 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38320 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38320 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50576 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36966 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43568 - "POST /captures/d5c536374af0/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56168 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37324 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.14 · diffusion 0.29 · grain 0.02 · blur 0.17 · saturation 1.05 · haze 0.00 · distortion 0.12 (scaled: the model painted the air)
+INFO:     127.0.0.1:37338 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47410 - "GET /captures/7c03ff224df6/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "POST /captures/7c03ff224df6/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "GET /captures/7c03ff224df6/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "GET /captures/7c03ff224df6/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47420 - "GET /captures/7c03ff224df6 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50910 - "POST /captures/bfc49037cbf8/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58852 - "POST /captures/7c03ff224df6/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45106 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.14 · diffusion 0.29 · grain 0.02 · blur 0.17 · saturation 1.06 · haze 0.00 · distortion 0.12 (scaled: the model painted the air)
+INFO:     127.0.0.1:45110 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45224 - "GET /captures/bd5fdfea2b96/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "POST /captures/bd5fdfea2b96/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "GET /captures/bd5fdfea2b96/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "GET /captures/bd5fdfea2b96/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "GET /captures/bd5fdfea2b96 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56686 - "POST /captures/bd5fdfea2b96/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37736 - "POST /captures/bd5fdfea2b96/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53722 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.15 · diffusion 0.29 · grain 0.02 · blur 0.16 · saturation 1.06 · haze 0.00 · distortion 0.12 (scaled: the model painted the air)
+INFO:     127.0.0.1:53728 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:34390 - "GET /captures/83808cd00ebd/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "GET /captures/83808cd00ebd/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "GET /captures/83808cd00ebd/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "GET /captures/83808cd00ebd HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "POST /captures/83808cd00ebd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "POST /captures/83808cd00ebd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "POST /captures/83808cd00ebd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46900 - "POST /captures/83808cd00ebd/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33224 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:45442 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.15 · diffusion 0.33 · grain 0.01 · blur 0.17 · saturation 1.00 · haze 0.00 · distortion 0.13 (scaled: the model painted the air)
+INFO:     127.0.0.1:45458 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42558 - "GET /captures/2dd4dbd14f1e/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52310 - "POST /captures/2dd4dbd14f1e/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52310 - "GET /captures/2dd4dbd14f1e/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52310 - "GET /captures/2dd4dbd14f1e/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52310 - "GET /captures/2dd4dbd14f1e HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43446 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.16 · diffusion 0.33 · grain 0.01 · blur 0.18 · saturation 1.00 · haze 0.00 · distortion 0.13 (scaled: the model painted the air)
+INFO:     127.0.0.1:43454 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40832 - "GET /captures/76fada84e6f3/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40840 - "POST /captures/76fada84e6f3/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39148 - "GET /captures/76fada84e6f3/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39148 - "GET /captures/76fada84e6f3/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39148 - "GET /captures/76fada84e6f3 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39148 - "POST /captures/76fada84e6f3/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46606 - "POST /captures/76fada84e6f3/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56040 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.14 · diffusion 0.34 · grain 0.02 · blur 0.16 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:56048 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54158 - "GET /captures/4b2665c754fe/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54174 - "POST /captures/4b2665c754fe/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54174 - "GET /captures/4b2665c754fe/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54174 - "GET /captures/4b2665c754fe/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54174 - "GET /captures/4b2665c754fe HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49770 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.15 · diffusion 0.34 · grain 0.02 · blur 0.15 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:49782 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42542 - "GET /captures/d49063374ecb/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40130 - "POST /captures/d49063374ecb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40130 - "GET /captures/d49063374ecb/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40130 - "GET /captures/d49063374ecb/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40130 - "GET /captures/d49063374ecb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33036 - "POST /captures/d49063374ecb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33036 - "POST /captures/d49063374ecb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33036 - "POST /captures/d49063374ecb/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54620 - "POST /captures/af1736d83ba7/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54620 - "POST /captures/af1736d83ba7/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54620 - "POST /captures/af1736d83ba7/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47940 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.15 · diffusion 0.34 · grain 0.02 · blur 0.21 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:47956 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:32980 - "GET /captures/3806a6917d01/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49636 - "GET /captures/3806a6917d01/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49636 - "GET /captures/3806a6917d01/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49636 - "GET /captures/3806a6917d01 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44896 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.14 · diffusion 0.34 · grain 0.02 · blur 0.18 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:44908 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53944 - "GET /captures/df93b6461027/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53948 - "POST /captures/df93b6461027/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53948 - "GET /captures/df93b6461027/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53948 - "GET /captures/df93b6461027/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53948 - "GET /captures/df93b6461027 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38250 - "POST /captures/df93b6461027/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39424 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.12 · diffusion 0.35 · grain 0.01 · blur 0.16 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:43536 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37478 - "GET /captures/9ce4e3a65532/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42900 - "GET /captures/9ce4e3a65532/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42900 - "GET /captures/9ce4e3a65532/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42900 - "GET /captures/9ce4e3a65532 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:33502 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.13 · diffusion 0.35 · grain 0.02 · blur 0.21 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:33518 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58358 - "GET /captures/cbb7502486ce/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43714 - "POST /captures/cbb7502486ce/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43714 - "GET /captures/cbb7502486ce/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43714 - "GET /captures/cbb7502486ce/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:43714 - "GET /captures/cbb7502486ce HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49118 - "POST /capture/prepare HTTP/1.1" 200 OK
+[effects] AI Camera: warmth +0.12 · diffusion 0.35 · grain 0.01 · blur 0.18 · saturation 1.00 · haze 0.00 · distortion 0.10 (scaled: the model painted the air)
+INFO:     127.0.0.1:49124 - "POST /capture/finish HTTP/1.1" 200 OK
+INFO:     127.0.0.1:46944 - "GET /captures/2d4e1b457c2c/photo.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "GET /captures/2d4e1b457c2c/as_shot.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "GET /captures/2d4e1b457c2c/mask.jpg HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "GET /captures/2d4e1b457c2c HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "POST /captures/2d4e1b457c2c/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "POST /captures/2d4e1b457c2c/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "POST /captures/2d4e1b457c2c/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "POST /captures/2d4e1b457c2c/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44694 - "POST /captures/2d4e1b457c2c/print?which=photo&layout=polaroid1full&size=3x4&quality=draft HTTP/1.1" 200 OK

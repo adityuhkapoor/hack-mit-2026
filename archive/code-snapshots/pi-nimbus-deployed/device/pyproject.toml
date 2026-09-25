@@ -1,0 +1,39 @@
+[project]
+name = "nimbus-cam"
+version = "0.1.0"
+description = "The nimbus camera app: voice, controls, capture, tagging, search. Runs on a Mac or the UNO Q."
+requires-python = ">=3.12"
+dependencies = [
+    "nimbus",
+    "httpx>=0.27",
+    "opencv-python-headless>=4.10",
+    "openai>=1.50",
+    "elevenlabs>=2.0",
+    "sounddevice>=0.5",
+    "elasticsearch>=8.15,<9",
+    "fastembed>=0.4",
+    "qrcode>=8.0",
+    "smbus2>=0.4",          # the thermal array behind the UNO Q, on the Pi rig
+    "ddgs>=9.0",            # live product search for Shop (no key)
+    "jwcrypto>=1.6.1",
+]
+
+[tool.uv.sources]
+nimbus = { path = "../pipeline", editable = true }
+
+[dependency-groups]
+dev = ["pytest>=8.3"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["nimbus_cam"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+# Homebrew's Python has no Tk; the camera's screen (and its push-to-talk key release) needs it.
+python-preference = "only-managed"

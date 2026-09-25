@@ -1,0 +1,432 @@
+"""What the camera felt: sensor readings → how the surroundings are rendered.
+
+The subject is never touched (see subject.py). Everything here acts on the *surroundings*, and each
+sensor drives one photographic lever, named the way a photographer would name it:
+
+    temperature   → hue                  cold air renders blue, hot air amber
+    motion        → blur                 a moving scene smears, the way a slow shutter sees it
+    humidity      → diffusion            a Pro-Mist bloom, heavier as the air gets wetter
+    light (lux)   → grain                dim scenes get high-ISO grain, bright ones stay clean
+    wind          → distortion           the background bends and smears in the wind
+    ambient noise → saturation           a quiet room is muted, a loud one vivid
+    particulates  → haze                 PM2.5 is what haze is: the distance loses contrast
+
+Wind and cloud cover come from the local weather (weather.py), not a sensor, and are labelled as such.
+
+Two modes:
+
+    0 nimbus    the surroundings are repainted as the air the camera measured, and the effects above are
+                applied on top. With no GPU reachable it degrades to the effects alone, rendered on the
+                camera itself — same picture, less weather.
+    1 souvenir  the scene becomes the keepsake it deserves: a can of Red Bull makes a trading card, a
+                bowl of noodles a ramen packet.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import asdict, dataclass
+
+import cv2
+import numpy as np
+
+from . import effects
+from .color import luminance
+
+# Two positions, because one of them already does everything the sensors ask for.
+NIMBUS, SOUVENIR = 0, 1
+DIAL_NAMES = {NIMBUS: "Nimbus", SOUVENIR: "AI Camera"}
+
+# Ranges a hackathon floor and the street outside will actually produce; readings are clipped to them.
+RANGES = {
+    "temp_c": (5.0, 35.0),
+    "rh": (20.0, 90.0),
+    "lux": (math.log10(5.0), math.log10(5000.0)),   # compared in log10(lux)
+    "wind": (0.0, 8.0),                              # m/s
+    "db": (35.0, 90.0),
+    "pm25": (0.0, 60.0),                             # µg/m³; Boston is ~5–12, wildfire smoke 50+
+    "motion": (0.0, 1.0),                            # 0 still … 1 the scene is moving fast
+}
+
+
+@dataclass
+class Readings:
+    temp_c: float | None = None
+    rh: float | None = None       # relative humidity, %
+    lux: float | None = None
+    cct: float | None = None      # kelvin, from a colour sensor; drives white balance, not the effects
+    wind: float | None = None     # m/s
+    db: float | None = None       # ambient sound level, dBA
+    pm25: float | None = None     # particulates, µg/m³ (SEN54)
+    motion: float | None = None   # 0–1, how much the scene is moving (thermal or camera frame delta)
+    pressure_hpa: float | None = None   # BME280; words only, the effects ignore it
+    cloud: float | None = None    # % sky covered (web weather)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Readings":
+        return cls(**{k: (None if d.get(k) is None else float(d[k])) for k in cls.__dataclass_fields__})
+
+    def to_dict(self) -> dict:
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+    def norm(self, key: str) -> float | None:
+        """0–1 position of a reading within RANGES, or None if the sensor did not report."""
+        v = getattr(self, key)
+        if v is None:
+            return None
+        if key == "lux":
+            v = math.log10(max(v, 0.1))
+        lo, hi = RANGES[key]
+        return float(np.clip((v - lo) / (hi - lo), 0, 1))
+
+    def strip(self, web: set[str] | frozenset = frozenset()) -> str:
+        """One line for the card, only for values that exist; web-sourced ones are marked as such."""
+        parts = []
+        if self.temp_c is not None:
+            parts.append(f"{self.temp_c:.0f}°C")
+        if self.rh is not None:
+            parts.append(f"{self.rh:.0f}% RH")
+        if self.cct is not None:
+            parts.append(f"{self.cct:.0f} K")
+        if self.lux is not None:
+            parts.append(f"{self.lux:.0f} lux")
+        if self.db is not None:
+            parts.append(f"{self.db:.0f} dB")
+        if self.pm25 is not None:
+            parts.append(f"PM2.5 {self.pm25:.0f}")
+        if self.motion is not None:
+            parts.append("still" if self.motion < 0.15 else
+                         f"motion {self.motion:.0%}")
+        if self.pressure_hpa is not None:
+            parts.append(f"{self.pressure_hpa:.0f} hPa")
+        if self.wind is not None:
+            parts.append(f"wind {self.wind:.1f} m/s" + (" (web)" if "wind" in web else ""))
+        if self.cloud is not None:
+            parts.append(f"{self.cloud:.0f}% cloud" + (" (web)" if "cloud" in web else ""))
+        return " · ".join(parts)
+
+
+@dataclass
+class EffectParams:
+    warmth: float = 0.0       # -1 cold … +1 hot
+    diffusion: float = 0.0    # 0–1 bloom
+    grain: float = 0.0        # film_grain amount
+    distortion: float = 0.0   # 0–1 bend and smear
+    saturation: float = 1.0   # multiplier
+    haze: float = 0.0         # 0–1 veil over the distance
+    blur: float = 0.0         # 0–1 motion blur
+
+
+def effect_params(r: Readings) -> EffectParams:
+    """The sensor → effect map. Missing sensors leave their lever neutral."""
+    p = EffectParams()
+    if (t := r.norm("temp_c")) is not None:
+        p.warmth = 2 * t - 1
+    if (h := r.norm("rh")) is not None:
+        p.diffusion = h ** 1.5          # dry air stays crisp; the bloom arrives as it gets humid
+    if (l := r.norm("lux")) is not None:
+        p.grain = 0.045 * (1 - l) ** 1.3
+    if (w := r.norm("wind")) is not None:
+        p.distortion = w
+    if (d := r.norm("db")) is not None:
+        p.saturation = 0.55 + 0.95 * d  # 0.55 in a silent room … 1.5 at a loud party
+    if (q := r.norm("pm25")) is not None:
+        p.haze = q ** 0.8
+    if (m := r.norm("motion")) is not None:
+        p.blur = m ** 1.2          # a still scene stays sharp; blur arrives as things start moving
+    return p
+
+
+# ---------------------------------------------------------------------------------------------
+# The effects themselves (float32 sRGB in [0, 1])
+
+
+def warm(img: np.ndarray, amount: float) -> np.ndarray:
+    """Push the grade toward amber (+) or blue (-), keeping luminance."""
+    if abs(amount) < 1e-3:
+        return img
+    gains = np.array([1 + 0.16 * amount, 1 + 0.02 * amount, 1 - 0.2 * amount], np.float32)
+    out = img * gains
+    lum_in, lum_out = luminance(img), luminance(np.clip(out, 0, 1))
+    return np.clip(out * (lum_in / np.maximum(lum_out, 1e-4))[..., None], 0, 1)
+
+
+def mist(img: np.ndarray, strength: float) -> np.ndarray:
+    """Black Pro-Mist: highlights bloom into their surroundings and the shadows lift slightly."""
+    if strength < 1e-3:
+        return img
+    # Both blurs are wide and smooth, so they are computed at 512 px and scaled up: identical to the
+    # eye, and 13 s → well under 1 s at 12 MP.
+    h, w = img.shape[:2]
+    small = effects._scale_to_long(img, min(512, max(h, w)))
+    r = max(small.shape[:2]) * 0.02
+    hot = np.clip((luminance(small) - 0.45) / 0.55, 0, 1)[..., None]
+    glow = effects._resize(cv2.GaussianBlur(small * hot, (0, 0), r), w, h, cv2.INTER_LINEAR)
+    haze = effects._resize(cv2.GaussianBlur(small, (0, 0), r * 2.5), w, h, cv2.INTER_LINEAR)
+    # Screen, not add: light combines that way, and bright skies stay textured instead of clipping.
+    # Written in place: this runs at full resolution on the camera's own board, where every extra
+    # full-size temporary counts.
+    glow *= -0.7 * strength
+    glow += 1                                   # 1 - 0.7·s·glow
+    out = 1 - img
+    out *= glow
+    np.subtract(1, out, out=out)                # screen
+    out *= 1 - 0.35 * strength
+    haze *= 0.35 * strength
+    out += haze
+    out += 0.03 * strength
+    return np.clip(out, 0, 1, out=out)
+
+
+def wind_bend(img: np.ndarray, amount: float, seed: int = 0) -> np.ndarray:
+    """Barrel bend plus a horizontal gust smear, both growing with wind speed."""
+    if amount < 1e-3:
+        return img
+    out = effects.barrel(img, k=0.09 * amount)
+    k = max(1, int(max(img.shape[:2]) * 0.012 * amount)) | 1
+    kernel = np.zeros((k, k), np.float32)
+    kernel[k // 2, :] = 1.0 / k
+    smear = cv2.filter2D(out, -1, kernel, borderType=cv2.BORDER_REFLECT)
+    return np.clip(out * (1 - 0.6 * amount) + smear * 0.6 * amount, 0, 1)
+
+
+def haze(img: np.ndarray, amount: float) -> np.ndarray:
+    """Particulate haze: contrast drains toward a pale veil taken from the scene's own brightest air.
+
+    Unlike the mist filter it has no glow; it is the loss of contrast and colour that haze causes.
+    """
+    if amount < 1e-3:
+        return img
+    small = effects._scale_to_long(img, min(256, max(img.shape[:2])))
+    lum = luminance(small)
+    veil = small[lum >= np.quantile(lum, 0.9)].mean(0)                     # the sky, or the brightest air
+    veil = 0.75 * veil + 0.25 * np.array([0.85, 0.83, 0.78], np.float32)   # slightly warm and pale
+    # Haze accumulates with distance. With no depth sensor, height in the frame stands in for it: the
+    # foreground at the bottom keeps most of its contrast, the horizon and sky take the full veil.
+    y = np.linspace(1, 0, img.shape[0], dtype=np.float32)
+    k = (0.45 * amount * (0.3 + 0.7 * y ** 0.6))[:, None, None]
+    out = img * (1 - k) + veil * k
+    return np.clip(saturate(out, 1 - 0.4 * amount), 0, 1).astype(np.float32)
+
+
+def motion_blur(img: np.ndarray, amount: float, angle: float = 0.0) -> np.ndarray:
+    """What a slow shutter does to a moving scene: a straight smear, longer the faster things move."""
+    if amount < 1e-3:
+        return img
+    length = max(3, int(max(img.shape[:2]) * 0.02 * amount)) | 1
+    kernel = np.zeros((length, length), np.float32)
+    kernel[length // 2, :] = 1.0 / length
+    if angle:
+        m = cv2.getRotationMatrix2D((length / 2 - 0.5, length / 2 - 0.5), angle, 1.0)
+        kernel = cv2.warpAffine(kernel, m, (length, length))
+        kernel /= kernel.sum() + 1e-6
+    return np.clip(cv2.filter2D(img, -1, kernel, borderType=cv2.BORDER_REFLECT), 0, 1)
+
+
+def saturate(img: np.ndarray, factor: float) -> np.ndarray:
+    if abs(factor - 1) < 1e-3:
+        return img
+    lum = luminance(img)[..., None]
+    return np.clip(lum + (img - lum) * factor, 0, 1)
+
+
+# On the AI dials the diffusion model has already painted the temperature, light and air, so the
+# procedural levers would double it. Grain is film, not weather, and stays at full strength.
+AI_EFFECT_SCALE = {"warmth": 0.3, "diffusion": 0.4, "distortion": 0.5, "saturation": 0.25, "grain": 1.0,
+                   "haze": 0.4, "blur": 1.0}   # blur is the shutter, not the weather: full strength
+
+
+def scaled(p: EffectParams, scale: dict[str, float]) -> EffectParams:
+    return EffectParams(warmth=p.warmth * scale["warmth"], diffusion=p.diffusion * scale["diffusion"],
+                        grain=p.grain * scale["grain"], distortion=p.distortion * scale["distortion"],
+                        saturation=1 + (p.saturation - 1) * scale["saturation"], haze=p.haze * scale["haze"],
+                        blur=p.blur * scale["blur"])
+
+
+def apply_effects(img: np.ndarray, p: EffectParams, seed: int = 0) -> np.ndarray:
+    out = warm(img, p.warmth)
+    out = saturate(out, p.saturation)
+    out = wind_bend(out, p.distortion, seed)
+    out = motion_blur(out, p.blur)
+    out = mist(out, p.diffusion)
+    out = haze(out, p.haze)
+    if p.grain > 1e-3:
+        out = effects.film_grain(out, p.grain, seed)
+    return out.astype(np.float32)
+
+
+# ---------------------------------------------------------------------------------------------
+# Prompts for the AI positions of the dial
+
+
+def describe(r: Readings) -> str:
+    """The measured conditions in words a diffusion model can paint."""
+    bits = []
+    if r.temp_c is not None:
+        t = r.temp_c
+        bits.append("freezing cold air, frost on surfaces, pale blue winter light" if t < 8 else
+                    "cool, crisp autumn air" if t < 16 else
+                    "mild, comfortable spring air" if t < 24 else
+                    "warm summer air, golden light" if t < 30 else
+                    "sweltering heat, shimmering heat haze, bleached sunlight")
+    if r.rh is not None:
+        h = r.rh
+        bits.append("thick fog and drifting mist" if h > 80 else
+                    "soft humid haze" if h > 60 else
+                    "clear air" if h > 35 else "bone-dry, perfectly clear air")
+    if r.lux is not None:
+        l = r.lux
+        bits.append("night, lit by streetlights and glowing windows" if l < 20 else
+                    "dusk, the blue hour" if l < 150 else
+                    "overcast daylight" if l < 1500 else "bright direct sun, hard shadows")
+    if r.wind is not None and r.wind > 2:
+        bits.append("strong wind, leaves and clouds streaming sideways" if r.wind > 5 else
+                    "a steady breeze moving the trees")
+    if r.pm25 is not None and r.pm25 > 15:
+        bits.append("smoky, hazy air, the distance fading into a pale brown veil" if r.pm25 > 35 else
+                    "a light haze softening the distance")
+    if r.pressure_hpa is not None and r.pressure_hpa < 1003:
+        bits.append("a heavy, low sky, a storm gathering")
+    if r.cloud is not None and (r.lux is None or r.lux >= 20) and "overcast" not in " ".join(bits):
+        # at night the sky reads as dark anyway, and "overcast" from the light level needs no repeat
+        bits.append("a fully overcast sky" if r.cloud > 85 else
+                    "scattered clouds" if r.cloud > 30 else "a clear, open sky")
+    if r.motion is not None and r.motion > 0.3:
+        bits.append("blurred with movement, everything in motion" if r.motion > 0.6 else "a scene in gentle movement")
+    if r.db is not None:
+        # Loudness sets the energy of colour and light, never people: "bustling" summoned crowds.
+        bits.append("vivid, saturated, energetic colour and light" if r.db > 70 else
+                    "calm, muted, still light" if r.db < 50 else "")
+    return ", ".join(b for b in bits if b) or "the same conditions"
+
+
+# The keepsakes the camera knows how to make. Muse names one from the scene (see nimbus_cam.tagger);
+# anything it invents is passed through as-is, with these as the examples that keep it plausible.
+# AI Camera: the fifty things a scene can become. kind → what the surroundings are repainted as.
+SOUVENIRS = {
+    "cave painting": "a prehistoric cave wall: ochre and charcoal pigments on rough rock, hand stencils, painted animals",
+    "alien abduction report": "a redacted government file: typewritten dossier, grainy UFO photos, stamped classified, tractor beam light",
+    "medieval wanted poster": "a parchment wanted poster: aged paper, woodcut border, wax seal, torn edges",
+    "sticker on a banana": "a produce sticker on a bright yellow banana peel: glossy oval label, supermarket produce aisle",
+    "dollar bill": "an engraved banknote: green intaglio linework, ornate border, guilloche patterns, a portrait oval",
+    "aquarium species information board": "a public aquarium information panel: deep blue water, coral, a museum-style species plaque",
+    "zoo enclosure sign": "a zoo enclosure sign: green painted wood, a habitat map, leaves and bars at the edges",
+    "dinosaur fossil museum": "a natural history museum hall: fossil bones, a display plinth, dramatic spotlights, stone walls",
+    "hieroglyphic tablet": "a carved Egyptian stone tablet: sandstone relief, hieroglyph columns, gold leaf traces",
+    "renaissance royal portrait": "an oil painting royal portrait: dark varnished background, velvet drapery, a gilded frame",
+    "nasa astronaut id": "a NASA astronaut ID badge: mission patches, a blue starfield, a lanyard, official crest",
+    "forbes 30 under 30": "a business magazine feature: clean white studio backdrop, bold typographic blocks, a laurel emblem",
+    "fortnite loading screen": "a video game loading screen: stylised cel-shaded battle island, glowing storm, dramatic sky",
+    "instant noodle packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
+    "pokemon card": "a collectible monster trading card: holographic foil, energy symbols, a yellow border, an arena backdrop",
+    "sports trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
+    "newspaper front page": "a broadsheet newspaper front page: newsprint texture, halftone photos, column rules, a masthead",
+    "police evidence board": "a detective's evidence board: corkboard, pinned photos, red string, sticky notes",
+    "cereal box": "a breakfast cereal box front: candy colours, a cartoon mascot, milk splash, a bowl of cereal",
+    "hot sauce bottle": "a hot sauce bottle label: flames, chilli peppers, a vintage badge layout, red and black",
+    "milk carton": "a milk carton side panel: white waxed cardboard, blue and black print, a missing-person panel layout",
+    "museum exhibit": "a museum exhibit case: glass vitrine, a spotlit plinth, an engraved brass placard, dark walls",
+    "wwe entrance": "a wrestling arena entrance: pyrotechnics, a titantron screen, smoke, a roaring stadium of lights",
+    "minecraft inventory": "a blocky voxel game inventory: pixelated grid slots, cubes of grass and stone, a crafting table",
+    "celebrity gossip tabloid": "a gossip tabloid cover: hot pink and yellow starbursts, paparazzi flash, shouting headlines",
+    "lottery scratch ticket": "a scratch-off lottery ticket: silver latex panels, lucky sevens, gold coins, bright gradients",
+    "music album cover": "a record album cover: bold graphic art, limited palette, print texture, a parental advisory corner",
+    "energy drink can": "an energy drink can graphic: metallic surface, lightning, neon streaks, extreme sports energy",
+    "youtube thumbnail": "a video thumbnail: saturated colours, a big red arrow, an explosion of emojis, a shocked frame",
+    "netflix thumbnail": "a streaming series key art: moody cinematic lighting, a dark gradient, a red accent glow",
+    "school detention slip": "a school detention slip: pink carbon-copy paper, ruled lines, a rubber stamp, a wooden desk",
+    "employee id at spongebob krusty krab": "a fast-food employee badge at an undersea burger joint: cartoon ocean, a bubbly kitchen, anchor decor",
+    "comic book cover": "a comic book cover: halftone dots, ink outlines, action bursts, a price corner box",
+    "coffee cup sleeve": "a coffee cup sleeve: kraft cardboard, a stamped logo, coffee-ring stains, a cafe counter",
+    "highschool yearbook": "a high school yearbook page: laser-lit studio portrait backdrop, a grid of ovals, cheesy gradients",
+    "wikipedia page": "an online encyclopedia article: white page, an infobox, blue links, a plain sans-serif layout",
+    "sports illustrated": "a sports magazine cover: stadium floodlights, bold red masthead, action photography look",
+    "concert t shirt": "a concert tour t-shirt print: black cotton, distressed white ink, a tour date list, flames",
+    "guinness world records page": "a world records book page: a bold blue and gold layout, a big holographic seal, record photos",
+    "national geographic wildlife documentary": "a wildlife documentary frame: golden savanna light, long grass, a yellow border frame",
+    "grocery store flyer": "a supermarket sale flyer: red price starbursts, product cutouts, a weekly deals grid",
+    "vending machine selection": "a vending machine window: glass front, spiral coils, backlit rows of snacks, a code button pad",
+    "laboratory specimen jar": "a specimen jar in a laboratory: glass and formaldehyde tint, a handwritten label, shelves of jars",
+    "viking saga page": "an illuminated Norse saga manuscript: vellum, runes, knotwork borders, a longship",
+    "shakespeare playbill": "an Elizabethan playbill: cream paper, ornate woodcut flourishes, the Globe theatre",
+    "gravestone": "a weathered gravestone in a churchyard: carved granite, moss, ivy, a misty cemetery",
+    "police lineup": "an empty police lineup room: height-marked wall, harsh fluorescent light, a numbered card, nobody else in the line",
+    "barbie doll packaging": "a fashion doll box: hot pink blister packaging, a dreamhouse backdrop, sparkle accents",
+    "wedding invitation": "a wedding invitation: cream card stock, letterpress florals, gold foil edges, soft botanical corners",
+    "tinder dating app profile": "a dating app profile screen: phone UI card, a rounded photo frame around the subject only, pastel gradient, heart and X buttons",
+    "prison mugshot": "a booking-photo backdrop: grey height-chart wall, flat flash light, a blank placard, no one else in frame",
+    "tattoo parlour": "a tattoo parlour flash sheet: black ink outlines, old-school roses, daggers, swallows on aged paper",
+    "auction catalogue": "a fine-art auction catalogue page: white page, a lot number box, a plinth, museum lighting",
+    "romance novel cover": "a paperback romance cover: windswept painterly backdrop, sunset glow, an embossed frame, swirling ribbons",
+    "couples therapy progress report": "a therapist's clipboard report: pastel office, a plant, a checklist form, a sofa",
+    "mafia family portrait": "a mafia patriarch's study, empty: dark wood panelling, a velvet armchair, a cigar and whisky, dramatic side light",
+    "skype video call screen": "a video-call window: laptop UI chrome, blank thumbnail tiles, mute and hang-up buttons, webcam grain",
+    "vinyl record": "a vinyl record and its sleeve: a black disc with a printed label, gatefold artwork, a record-shop crate",
+    "billboard chart": "a music chart page: numbered ranking rows, arrows up and down, a chart-topper banner, magazine layout",
+    "mixtape cover": "a cassette mixtape J-card: hand-drawn marker doodles, a plastic tape shell, tracklist lines, 90s colours",
+    "reality tv cover": "a reality TV show key art backdrop: glossy studio set, a dramatic spotlight, a mansion, sparkle lens flares, an empty stage",
+    "fishing photo": "a proud fishing catch photo: a lake at dawn, a boat rail, a tackle box, mist on the water",
+    "scuba diving": "an underwater scuba photo: blue depth, coral reef, bubbles rising, shafts of sunlight",
+    "lego instruction manual": "a brick-toy instruction manual page: numbered steps, blue-gradient page, exploded-view bricks, a parts inventory",
+    "gardening seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
+    "astronaut in space": "an EVA photo in orbit: the curved Earth below, a station truss, black space, a suit's visor reflection",
+    "playing cards": "a playing card face: the ornate corner pips, a mirrored court-card frame, red and black on ivory",
+    "github profile": "a developer profile page: dark-mode UI, a contribution heatmap, repository cards, monospace details",
+    "new york times best seller": "a hardback bestseller cover: bold typographic jacket, a medallion sticker, a bookstore display",
+    "artist sketchbook page": "a sketchbook spread: pencil studies, ink washes, coffee rings, torn tape corners on toned paper",
+    "driver's license": "a driver's license card: holographic security print, a state seal, a barcode strip, plain photo box",
+    "valentine's day card": "a Valentine's card: red and pink hearts, lace edges, a ribbon, glitter accents",
+    "circus poster": "a vintage circus poster: striped big top, ornate Victorian borders, lions and trapeze, faded reds and golds",
+    "ouija board": "a spirit board: dark varnished wood, a planchette, moons and suns, candlelight",
+    "jack o' lantern carving": "a pumpkin-carving night: glowing jack-o'-lanterns, autumn leaves, a porch at dusk, candle glow",
+    "christmas card": "a Christmas card: snowy village, fairy lights, pine branches and berries, warm window light",
+    "ugly sweater competition": "an ugly-sweater party: tinsel, knitted reindeer patterns, a festive stage, pom-poms",
+    "north pole passport": "a North Pole passport page: entry stamps, snowflake watermark, a holly-trimmed border",
+    "santa's naughty list": "Santa's naughty list: a parchment scroll, a quill, a red-and-gold ledger at a workshop desk",
+    "valentine's day love coupon": "a love coupon: a perforated ticket, hearts and arrows, a redeem-by stamp",
+    "easter egg": "a painted Easter egg scene: pastel eggs in grass, a wicker basket, spring blossom",
+    "reindeer team roster": "a reindeer team roster: a stable board, sleigh bells, antlers, a snowy workshop wall",
+    # kept for older photos and voice requests
+    "trading card": "a sports trading card: bold team colours, action-poster background, a foil-like sheen",
+    "ramen packet": "instant noodle packaging artwork: loud reds and yellows, steam swirls, appetising graphics",
+    "ticket stub": "a printed ticket stub: perforated edge, guilloche pattern, ink-stamped date",
+    "postcard": "a vintage travel postcard: painted scenery, saturated skies, a soft printed grain",
+    "magazine cover": "a glossy magazine cover: studio backdrop, clean colour blocking",
+    "seed packet": "an old seed packet: botanical illustration, cream paper, hand-lettered flourishes",
+    "stamp": "a postage stamp: engraved lines, perforated border, a flat single-colour field",
+}
+KINDS = [k for k in SOUVENIRS if k not in ("trading card", "ramen packet", "ticket stub", "postcard", "magazine cover",
+                                            "seed packet", "stamp")]        # the menu (the rest are old aliases)
+
+
+def souvenir_prompt(kind: str, subject: str, r: Readings, title: str = "") -> str:
+    """AI Camera: the surroundings become the artwork of whatever the scene should be.
+
+    Written as an art-direction brief (composition, palette, lighting, finish): in a six-way test on the
+    same photos it was the only wording that reliably kept a calm area behind the subject for the headline
+    and never invented extra people. The measured air is the lighting line, so the same format comes out
+    foggy at 90 % RH and sun-bleached at 2000 lux. klein cannot spell, so the artwork is wordless and the
+    frame prints the real title.
+    """
+    look = SOUVENIRS.get(kind.lower().strip(), f"{kind} artwork")
+    air = describe(r) or "natural light"
+    return (f"Art direction for image 1: the surroundings become {look}. Composition: {subject} stays the hero "
+            "at the same camera height and light direction; the artwork frames them, never crowds them, with a "
+            "calm area directly behind them. Palette: two dominant colours from the format plus one accent. "
+            f"Lighting: {air}. Finish: crisp, print-ready, professionally designed. Purely graphic: absolutely "
+            "no text, letters, words, numbers or logos anywhere; where lettering would normally go, leave clean "
+            "blank panels and shapes. No other people, faces, figures or photographs of people anywhere in the "
+            "artwork: the subject is the only person.")
+
+
+def scene_prompt(r: Readings, dial: int = NIMBUS) -> str:
+    conditions = describe(r)
+    if dial == NIMBUS:
+        return ("Keep the layout of image 1 exactly: the same buildings, ground, objects and perspective, "
+                f"in the same places. Change only the weather, light and atmosphere of the masked "
+                f"surroundings to: {conditions}. Photorealistic, like a real photograph. The surroundings are "
+                "deserted: nobody else is in the scene.")
+    return ("Replace the masked surroundings with a completely new real-world place that embodies: "
+            f"{conditions}. Match the camera height, perspective and light direction of image 1 so the "
+            "subject belongs there. Photorealistic, like a real photograph. The place is deserted: an empty "
+            "scene with nobody else in it.")
