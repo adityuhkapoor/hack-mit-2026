@@ -37,6 +37,7 @@ mode chooses its design from the photo's content.
 
 | Where | What |
 |---|---|
+| [docs/BUILD_LOG.md](docs/BUILD_LOG.md) | Photos and notes from loose electronics through the HackMIT prototype and printable enclosure design |
 | [docs/DESIGN.md](docs/DESIGN.md) | Original design notes, including earlier mode names and sensor-effect concepts |
 | [TEAM_HARDWARE_RUNBOOK.md](TEAM_HARDWARE_RUNBOOK.md) | **Hardware handoff**: touchscreen wiring, camera bring-up, board roles, ASUS/Pi networking, verified behavior, and open gaps |
 | [device/](device/) | The camera app (voice, screen, d-pad, tagging, search). Runs on the Raspberry Pi rig; Mac development and legacy UNO Q mode are also supported |
